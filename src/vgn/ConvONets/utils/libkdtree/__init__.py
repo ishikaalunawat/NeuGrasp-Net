@@ -1,4 +1,4 @@
-from .pykdtree.kdtree import KDTree
+from pykdtree.kdtree import KDTree
 
 
 __all__ = [

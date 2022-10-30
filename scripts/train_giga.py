@@ -1,6 +1,8 @@
 import argparse
 from pathlib import Path
 from datetime import datetime
+import wandb
+import numpy as np
 
 from ignite.contrib.handlers.tqdm_logger import ProgressBar
 from ignite.engine import Engine, Events
@@ -17,6 +19,12 @@ from vgn.networks import get_network, load_network
 LOSS_KEYS = ['loss_all', 'loss_qual', 'loss_rot', 'loss_width', 'loss_occ']
 
 def main(args):
+
+    filename = 'summary_%s.txt' % (args.dataset_raw.name)
+    with open(filename, 'r') as f:
+        note = (";").join(f.readlines()[1:5]).replace('\n', '')
+
+    wandb.init(config=args, project="6dgrasp", entity="irosa-ias", notes = note)
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
     kwargs = {"num_workers": 16, "pin_memory": True} if use_cuda else {}
@@ -34,6 +42,9 @@ def main(args):
             args.description,
         ).strip(",")
         logdir = args.logdir / description
+        meshdir = logdir / "meshes"
+        meshdir.mkdir(parents=True, exist_ok=True)
+        
     else:
         logdir = Path(args.savedir)
 
@@ -46,7 +57,7 @@ def main(args):
         net = get_network(args.net).to(device)
     else:
         net = load_network(args.load_path, device, args.net)
-
+    
     # define optimizer and metrics
     optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)
 
@@ -57,6 +68,8 @@ def main(args):
     }
     for k in LOSS_KEYS:
         metrics[k] = Average(lambda out, sk=k: out[3][sk])
+    
+    wandb.watch(net, log_freq=100)
 
     # create ignite engines for training and validation
     trainer = create_trainer(net, optimizer, loss_fn, metrics, device)
@@ -66,12 +79,12 @@ def main(args):
     ProgressBar(persist=True, ascii=True, dynamic_ncols=True, disable=args.silence).attach(trainer)
 
     train_writer, val_writer = create_summary_writers(net, device, logdir)
-
+    
     @trainer.on(Events.EPOCH_COMPLETED)
     def log_train_results(engine):
         epoch, metrics = trainer.state.epoch, trainer.state.metrics
         for k, v in metrics.items():
-            train_writer.add_scalar(k, v, epoch)
+            wandb.log({'train_'+k:v})
 
         msg = 'Train'
         for k, v in metrics.items():
@@ -80,11 +93,20 @@ def main(args):
 
     @trainer.on(Events.EPOCH_COMPLETED)
     def log_validation_results(engine):
+        
         evaluator.run(val_loader)
         epoch, metrics = trainer.state.epoch, evaluator.state.metrics
+        out = evaluator.state.output
+
+        input_sdf, recon_sdf = out[0][-1].cpu().numpy(), out[-1][-1].cpu().numpy()
+        
+        np.save('input_sdf.npy', input_sdf)
+        np.save('recon_sdf.npy', recon_sdf)
+
         for k, v in metrics.items():
             val_writer.add_scalar(k, v, epoch)
-            
+            wandb.log({'val_'+k:v})
+        
         msg = 'Val'
         for k, v in metrics.items():
             msg += f' {k}: {v:.4f}'
@@ -152,9 +174,9 @@ def prepare_batch(batch, device):
 
 
 def select(out):
-    qual_out, rot_out, width_out, occ = out
+    qual_out, rot_out, width_out, sdf = out
     rot_out = rot_out.squeeze(1)
-    occ = torch.sigmoid(occ) # to probability
+    occ = torch.sigmoid(sdf) # to probability
     return qual_out.squeeze(-1), rot_out, width_out.squeeze(-1), occ
 
 
@@ -194,6 +216,8 @@ def _width_loss_fn(pred, target):
 def _occ_loss_fn(pred, target):
     return F.binary_cross_entropy(pred, target, reduction="none").mean(-1)
 
+# def get_mesh(voxels):
+#     return mcubes.marching_cubes(voxels, 0)
 
 def create_trainer(net, optimizer, loss_fn, metrics, device):
     def _update(_, batch):
@@ -220,12 +244,20 @@ def create_trainer(net, optimizer, loss_fn, metrics, device):
 
 def create_evaluator(net, loss_fn, metrics, device):
     def _inference(_, batch):
+
         net.eval()
         with torch.no_grad():
             x, y, pos, pos_occ = prepare_batch(batch, device)
-            y_pred = select(net(x, pos, p_tsdf=pos_occ))
-            loss, loss_dict = loss_fn(y_pred, y)
-        return x, y_pred, y, loss_dict
+            out = net(x, pos, p_tsdf=pos_occ)
+
+            # Out: qual_out, rot_out, width_out, sdf => (4,) => (32, 40, 40, 40)
+            y_pred = select(out)
+            sdf = out[-1]
+            _, loss_dict = loss_fn(y_pred, y)
+            #print(y_pred[-1].shape)
+
+
+        return x, y_pred, y, loss_dict, sdf
 
     evaluator = Engine(_inference)
 
@@ -253,8 +285,8 @@ if __name__ == "__main__":
     parser.add_argument("--logdir", type=Path, default="data/runs")
     parser.add_argument("--description", type=str, default="")
     parser.add_argument("--savedir", type=str, default="")
-    parser.add_argument("--epochs", type=int, default=10)
-    parser.add_argument("--batch-size", type=int, default=32)
+    parser.add_argument("--epochs", type=int, default=20)
+    parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--lr", type=float, default=2e-4)
     parser.add_argument("--val-split", type=float, default=0.1)
     parser.add_argument("--augment", action="store_true")

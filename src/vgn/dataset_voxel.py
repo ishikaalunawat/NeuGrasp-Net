@@ -53,7 +53,7 @@ class DatasetVoxel(torch.utils.data.Dataset):
 
 
 class DatasetVoxelOccFile(torch.utils.data.Dataset):
-    def __init__(self, root, raw_root, num_point=2048, num_point_occ=2048, augment=False):
+    def __init__(self, root, raw_root, num_point=2048, num_point_occ=8000, augment=False):
         self.root = root
         self.augment = augment
         self.num_point = num_point
@@ -85,7 +85,8 @@ class DatasetVoxelOccFile(torch.utils.data.Dataset):
         rotations[0] = ori.as_quat()
         rotations[1] = (ori * R).as_quat()
 
-        x, y = voxel_grid[0], (label, rotations, width)
+        #x, y = voxel_grid[0], (label, rotations, width)
+        x, y = (voxel_grid[0], rotations),  (label, width)
 
         occ_points, occ = self.read_occ(scene_id, self.num_point_occ)
         occ_points = occ_points / self.size - 0.5

@@ -62,9 +62,9 @@ class ConvolutionalOccupancyNetwork(nn.Module):
                 for k, v in c.items():
                     c[k] = v.detach()
             tsdf = self.decoder_tsdf(p_tsdf, c, **kwargs)
-            return qual, rot, width, tsdf
+            return qual, width, tsdf
         else:
-            return qual, rot, width
+            return qual, width
             
     def infer_geo(self, inputs, p_tsdf, **kwargs):
         c = self.encode_inputs(inputs)

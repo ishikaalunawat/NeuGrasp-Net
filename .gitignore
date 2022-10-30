@@ -114,3 +114,7 @@ venv.bak/
 # custom
 .DS_Store
 /notebooks
+
+*.npy
+wandb/
+test
