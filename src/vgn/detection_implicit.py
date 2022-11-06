@@ -16,7 +16,8 @@ LOW_TH = 0.5
 
 class VGNImplicit(object):
     def __init__(self, model_path, model_type, best=False, force_detection=False, qual_th=0.9, out_th=0.5, visualize=False, resolution=40, **kwargs):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        #self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = "cpu"
         self.net = load_network(model_path, self.device, model_type=model_type)
         self.qual_th = qual_th
         self.best = best

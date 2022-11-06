@@ -8,6 +8,7 @@ from ignite.contrib.handlers.tqdm_logger import ProgressBar
 from ignite.engine import Engine, Events
 from ignite.handlers import ModelCheckpoint
 from ignite.metrics import Average, Accuracy, Precision, Recall
+
 import torch
 from torch.utils import tensorboard
 import torch.nn.functional as F
@@ -16,7 +17,7 @@ import torch.nn.functional as F
 from vgn.dataset_voxel import DatasetVoxelOccFile
 from vgn.networks import get_network, load_network
 
-LOSS_KEYS = ['loss_all', 'loss_qual', 'loss_rot', 'loss_width', 'loss_occ']
+LOSS_KEYS = ['loss_all', 'loss_qual', 'loss_occ']
 
 def main(args):
 
@@ -60,6 +61,7 @@ def main(args):
     
     # define optimizer and metrics
     optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, mode='max')
 
     metrics = {
         "accuracy": Accuracy(lambda out: (torch.round(out[1][0]), out[2][0])),
@@ -72,14 +74,16 @@ def main(args):
     wandb.watch(net, log_freq=100)
 
     # create ignite engines for training and validation
-    trainer = create_trainer(net, optimizer, loss_fn, metrics, device)
+    trainer = create_trainer(net, optimizer, scheduler, loss_fn, metrics, device)
     evaluator = create_evaluator(net, loss_fn, metrics, device)
 
     # log training progress to the terminal and tensorboard
     ProgressBar(persist=True, ascii=True, dynamic_ncols=True, disable=args.silence).attach(trainer)
 
-    train_writer, val_writer = create_summary_writers(net, device, logdir)
+    #train_writer, val_writer = create_summary_writers(net, device, logdir)
     
+
+
     @trainer.on(Events.EPOCH_COMPLETED)
     def log_train_results(engine):
         epoch, metrics = trainer.state.epoch, trainer.state.metrics
@@ -96,21 +100,21 @@ def main(args):
         
         evaluator.run(val_loader)
         epoch, metrics = trainer.state.epoch, evaluator.state.metrics
-        out = evaluator.state.output
-
-        input_sdf, recon_sdf = out[0][-1].cpu().numpy(), out[-1][-1].cpu().numpy()
-        
-        np.save('input_sdf.npy', input_sdf)
-        np.save('recon_sdf.npy', recon_sdf)
+        # out = evaluator.state.output
 
         for k, v in metrics.items():
-            val_writer.add_scalar(k, v, epoch)
             wandb.log({'val_'+k:v})
-        
+
         msg = 'Val'
         for k, v in metrics.items():
             msg += f' {k}: {v:.4f}'
         print(msg)
+
+    @evaluator.on(Events.COMPLETED)
+    def reduct_step(engine):
+    # engine is evaluator
+    # engine.metrics is a dict with metrics, e.g. {"loss": val_loss_value, "acc": val_acc_value}
+        scheduler.step(evaluator.state.metrics['accuracy'])
 
     def default_score_fn(engine):
         score = engine.state.metrics['accuracy']
@@ -219,7 +223,7 @@ def _occ_loss_fn(pred, target):
 # def get_mesh(voxels):
 #     return mcubes.marching_cubes(voxels, 0)
 
-def create_trainer(net, optimizer, loss_fn, metrics, device):
+def create_trainer(net, optimizer, scheduler, loss_fn, metrics, device):
     def _update(_, batch):
         net.train()
         optimizer.zero_grad()

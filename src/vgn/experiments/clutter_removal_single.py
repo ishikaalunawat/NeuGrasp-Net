@@ -34,6 +34,7 @@ def run(
     resolution=40,
     silence=False,
     save_freq=8,
+    visualize = True
     
 ):
     """Run several rounds of simulated clutter removal experiments.
@@ -71,8 +72,12 @@ def run(
 
         if pc.is_empty():
             break  # empty point cloud, abort this round TODO this should not happen
-
-        grasps, scores, timings["planning"] = grasp_plan_fn(state)
+        if visualize:
+            mesh_pose_list = get_mesh_pose_list_from_world(sim.world, object_set)
+            scene_mesh = get_scene_from_mesh_pose_list(mesh_pose_list)
+            grasps, scores, timings["planning"], visual_mesh = grasp_plan_fn(state, scene_mesh)
+        else:
+            grasps, scores, timings["planning"] = grasp_plan_fn(state)
 
         if len(grasps) == 0:
             no_grasp += 1
@@ -94,4 +99,4 @@ def run(
         last_label = label
     left_objs += sim.num_objects
 
-    return success, cnt, total_objs
+    return (success, cnt, total_objs), visual_mesh
