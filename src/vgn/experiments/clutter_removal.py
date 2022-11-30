@@ -2,6 +2,7 @@ import collections
 import argparse
 from datetime import datetime
 import uuid
+import wandb
 
 import numpy as np
 import pandas as pd
@@ -17,7 +18,7 @@ MAX_CONSECUTIVE_FAILURES = 2
 
 
 State = collections.namedtuple("State", ["tsdf", "pc"])
-
+wandb.init(project="6dgrasp", entity="irosa-ias")
 
 def run(
     grasp_plan_fn,
@@ -48,6 +49,8 @@ def run(
     #n = 6
     sim = ClutterRemovalSim(scene, object_set, gui=sim_gui, seed=seed, add_noise=add_noise, sideview=sideview)
     logger = Logger(logdir, description)
+    
+
     cnt = 0
     success = 0
     left_objs = 0
@@ -86,7 +89,9 @@ def run(
                 mesh_pose_list = get_mesh_pose_list_from_world(sim.world, object_set)
                 scene_mesh = get_scene_from_mesh_pose_list(mesh_pose_list)
                 grasps, scores, timings["planning"], visual_mesh = grasp_plan_fn(state, scene_mesh)
+                assert not visual_mesh.is_empty
                 logger.log_mesh(scene_mesh, visual_mesh, f'round_{round_id:03d}_trial_{trial_id:03d}')
+                
             else:
                 grasps, scores, timings["planning"] = grasp_plan_fn(state)
             planning_times.append(timings["planning"])
@@ -173,8 +178,11 @@ class Logger(object):
         io.append_csv(self.rounds_csv_path, round_id, object_count)
 
     def log_mesh(self, scene_mesh, aff_mesh, name):
-        scene_mesh.export(self.mesh_dir / (name + "_scene.obj"))
-        aff_mesh.export(self.mesh_dir / (name + "_aff.obj"))
+        scene_mesh.export(self.mesh_dir / (name + "_scene.obj"), 'obj')
+        aff_mesh.export(str(self.mesh_dir / (name + "_aff.obj")), 'obj')
+        assert not aff_mesh.is_empty
+        wandb.log({'Grasps (Scene vs Grasp)' : [wandb.Object3D(open(self.mesh_dir / (name + "_scene.obj"))),
+                                                wandb.Object3D(open(self.mesh_dir / (name + "_aff.obj")))]})
 
     def log_grasp(self, round_id, state, timings, grasp, score, label):
         # log scene

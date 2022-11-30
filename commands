@@ -1,0 +1,17 @@
+# training
+nohup python scripts/train_giga.py --dataset data/pile/data_pile_train_constructed_4M --dataset_raw data/pile/data_pile_train_random_raw_4M --epochs 100 > nohup_logs/train4M_100ep.out &
+
+# reconstruction only
+python scripts/eval_geometry_voxel.py --model-path data/runs/22-11-06-14-39_dataset=data_pile_train_constructed_500K,augment=False,net=giga,batch_size=64,lr=2e-04/best_vgn_giga_val_acc=0.8706.pt --type giga --dataset data/pile/data_pile_train_constructed_500K --dataset_raw data/pile/data_pile_train_random_raw_500K --ROI
+
+# grasps visual
+python scripts/sim_grasp_multiple.py --num-view 1 --object-set pile/test --scene pile --num-rounds 100 --sideview --add-noise dex --force --best --model data/runs/22-11-06-14-39_dataset=data_pile_train_constructed_500K,augment=False,net=giga,batch_size=64,lr=2e-04/best_vgn_giga_val_acc=0.8706.pt --type giga --result-path data/grasps --vis
+
+# dataset creation
+python scripts/generate_data_parallel.py --scene pile --object-set pile/train --num-grasps 4000000 --num-proc 40 --save-scene ./data/pile/data_pile_train_random_raw_4M
+
+nohup python scripts/clean_balance_data.py ./data/pile/data_pile_train_random_raw_4M > nohup_logs/dataset4M_2.out &
+
+python scripts/construct_dataset_parallel.py --num-proc 40 --single-view --add-noise dex ./data/pile/data_pile_train_random_raw_4M ./data/pile/data_pile_train_constructed_4M
+
+nohup python scripts/save_occ_data_parallel.py ./data/pile/data_pile_train_random_raw_4M 100000 2 --num-proc 40 > nohup_logs/dataset4M_4.out &

@@ -83,7 +83,6 @@ def main(args):
     #train_writer, val_writer = create_summary_writers(net, device, logdir)
     
 
-
     @trainer.on(Events.EPOCH_COMPLETED)
     def log_train_results(engine):
         epoch, metrics = trainer.state.epoch, trainer.state.metrics
@@ -114,7 +113,7 @@ def main(args):
     def reduct_step(engine):
     # engine is evaluator
     # engine.metrics is a dict with metrics, e.g. {"loss": val_loss_value, "acc": val_acc_value}
-        scheduler.step(evaluator.state.metrics['accuracy'])
+        scheduler.step(evaluator.state.metrics['loss_all'])
 
     def default_score_fn(engine):
         score = engine.state.metrics['accuracy']
@@ -290,7 +289,7 @@ if __name__ == "__main__":
     parser.add_argument("--description", type=str, default="")
     parser.add_argument("--savedir", type=str, default="")
     parser.add_argument("--epochs", type=int, default=20)
-    parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--lr", type=float, default=2e-4)
     parser.add_argument("--val-split", type=float, default=0.1)
     parser.add_argument("--augment", action="store_true")
