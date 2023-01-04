@@ -72,7 +72,7 @@ class LocalDecoder(nn.Module):
         padding (float): conventional padding paramter of ONet for unit cube, so [-0.5, 0.5] -> [-0.55, 0.55]
     '''
 
-    def __init__(self, dim=6, c_dim=128, # <- 3:6 Changed to predict only grasp quality
+    def __init__(self, dim=7, c_dim=128, # <- 3:7 Changed to predict only grasp quality
                  hidden_size=256, 
                  n_blocks=5, 
                  out_dim=1, 
@@ -95,7 +95,7 @@ class LocalDecoder(nn.Module):
             self.fc_c = nn.ModuleList([
                 nn.Linear(c_dim, hidden_size) for i in range(n_blocks)
             ])
-
+        
         if not no_xyz:
             self.fc_p = nn.Linear(dim, hidden_size)
 
@@ -131,6 +131,18 @@ class LocalDecoder(nn.Module):
 
 
     def forward(self, p, c_plane, **kwargs):
+
+        if isinstance(p, tuple):
+            p, r = p
+            p.float()
+            r = r.float()
+            #print(p.size(), r.size())
+            f = torch.cat([p,r], dim = 2) # <- Changed to predict only grasp quality
+            #print(p.size())
+        else:
+            #print(p.size())
+            f = p
+
         if self.c_dim != 0:
             plane_type = list(c_plane.keys())
             if self.concat_feat:
@@ -157,12 +169,10 @@ class LocalDecoder(nn.Module):
                     c += self.sample_plane_feature(p, c_plane['yz'], plane='yz')
                 c = c.transpose(1, 2)
 
-        p = p.float()
-
         if self.no_xyz:
             net = torch.zeros(p.size(0), p.size(1), self.hidden_size).to(p.device)
         else:
-            net = self.fc_p(p)
+            net = self.fc_p(f)
 
         for i in range(self.n_blocks):
             if self.c_dim != 0:

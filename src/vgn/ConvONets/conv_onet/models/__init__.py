@@ -39,7 +39,7 @@ class ConvolutionalOccupancyNetwork(nn.Module):
 
         self.detach_tsdf = detach_tsdf
 
-    def forward(self, inputs, p, p_tsdf=None, sample=True, **kwargs):
+    def forward(self, inputs, grasp_query, p_tsdf=None, sample=True, **kwargs): # <- Changed to predict only grasp quality
         ''' Performs a forward pass through the network.
 
         Args:
@@ -49,6 +49,7 @@ class ConvolutionalOccupancyNetwork(nn.Module):
             p_tsdf (tensor): tsdf query points, B*N_P*3
         '''
         #############
+        p, _ = grasp_query # <- Changed to predict only grasp quality
         if isinstance(p, dict):
             batch_size = p['p'].size(0)
         else:
@@ -56,7 +57,7 @@ class ConvolutionalOccupancyNetwork(nn.Module):
         c = self.encode_inputs(inputs)
         # feature = self.query_feature(p, c)
         # qual, rot, width = self.decode_feature(p, feature)
-        qual = self.decode(p, c) # <- Changed to predict only grasp quality
+        qual = self.decode(grasp_query, c) # <- Changed to predict only grasp quality
         if p_tsdf is not None:
             if self.detach_tsdf:
                 for k, v in c.items():

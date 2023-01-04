@@ -80,10 +80,10 @@ class DatasetVoxelOccFile(torch.utils.data.Dataset):
         pos = pos / self.size - 0.5
         width = width / self.size
 
-        rotations = np.empty((2, 4), dtype=np.single)
-        R = Rotation.from_rotvec(np.pi * np.r_[0.0, 0.0, 1.0])
-        rotations[0] = ori.as_quat()
-        rotations[1] = (ori * R).as_quat()
+        #rotations = np.empty((2, 4), dtype=np.single)
+        #R = Rotation.from_rotvec(np.pi * np.r_[0.0, 0.0, 1.0])
+        rotations = ori.as_quat().reshape(1, 4)            # <- Changed to predict only grasp quality
+        #rotations[1] = (ori * R).as_quat()
 
         # x, y = voxel_grid[0], (label, rotations, width)
 

@@ -104,7 +104,7 @@ def GIGA():
         'decoder': 'simple_local',
         'decoder_tsdf': True,
         'decoder_kwargs': {
-            'dim': 1, # <- 3:1 Changed to predict only grasp quality
+            'dim': 7, # <- 3:7 Changed to predict only grasp quality
             'sample_mode': 'bilinear',
             'hidden_size': 32,
             'concat_feat': True

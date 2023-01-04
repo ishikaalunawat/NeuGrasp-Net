@@ -178,7 +178,8 @@ def prepare_batch(batch, device): #pc==tsdf
 
 
 def select(out):
-    qual_out, rot_out, width_out, sdf = out
+    #qual_out, rot_out, width_out, sdf = out
+    qual_out, sdf = out     # <- Changed to predict only grasp quality (check inside)
     # rot_out = rot_out.squeeze(1)
     occ = torch.sigmoid(sdf) # to probability
     #return qual_out.squeeze(-1), rot_out, width_out.squeeze(-1), occ
@@ -193,11 +194,11 @@ def loss_fn(y_pred, y):
     # loss_width = _width_loss_fn(width_pred, width)
     loss_occ = _occ_loss_fn(occ_pred, occ)
     loss = loss_qual + label * (0.01) + loss_occ # <-label * (loss_rot + 0.01 * loss_width): new one, Changed
-    loss_dict = {'loss_qual': loss_qual.mean()
+    loss_dict = {'loss_qual': loss_qual.mean(),
                 #  'loss_rot': loss_rot.mean(),
                 #  'loss_width': loss_width.mean(),
-                #  'loss_occ': loss_occ.mean(),
-                #  'loss_all': loss.mean()
+                'loss_occ': loss_occ.mean(),
+                'loss_all': loss.mean()
                 }
     return loss.mean(), loss_dict
 
