@@ -85,13 +85,21 @@ class DatasetVoxelOccFile(torch.utils.data.Dataset):
         rotations[0] = ori.as_quat()
         rotations[1] = (ori * R).as_quat()
 
-        x, y = voxel_grid[0], (label, rotations, width)
-        #x, y = (voxel_grid[0], rotations),  (label, width)
+        # x, y = voxel_grid[0], (label, rotations, width)
+
+        # occ_points, occ = self.read_occ(scene_id, self.num_point_occ)
+        # occ_points = occ_points / self.size - 0.5
+
+        # return x, y, pos, occ_points, occ
+
+        tsdf, y, rot = voxel_grid[0], label, rotations # <- Changed to predict only grasp quality
 
         occ_points, occ = self.read_occ(scene_id, self.num_point_occ)
         occ_points = occ_points / self.size - 0.5
 
-        return x, y, pos, occ_points, occ
+        grasp_query = (pos, rot)
+
+        return tsdf, y, grasp_query, occ_points, occ
 
     def read_occ(self, scene_id, num_point):
         occ_paths = list((self.raw_root / 'occ' / scene_id).glob('*.npz'))

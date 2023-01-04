@@ -179,6 +179,7 @@ class Logger(object):
 
     def log_mesh(self, scene_mesh, aff_mesh, name):
         scene_mesh.export(self.mesh_dir / (name + "_scene.obj"), 'obj')
+        aff_mesh = aff_mesh.scaled(4)
         aff_mesh.export(str(self.mesh_dir / (name + "_aff.obj")), 'obj')
         assert not aff_mesh.is_empty
         wandb.log({'Grasps (Scene vs Grasp)' : [wandb.Object3D(open(self.mesh_dir / (name + "_scene.obj"))),

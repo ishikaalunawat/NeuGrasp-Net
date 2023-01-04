@@ -25,10 +25,10 @@ class ConvolutionalOccupancyNetwork(nn.Module):
         super().__init__()
         
         self.decoder_qual = decoders[0].to(device)
-        self.decoder_rot = decoders[1].to(device)
-        self.decoder_width = decoders[2].to(device)
-        if len(decoders) == 4:
-            self.decoder_tsdf = decoders[3].to(device)
+        # self.decoder_rot = decoders[1].to(device)
+        # self.decoder_width = decoders[2].to(device)
+        if len(decoders) == 2:
+            self.decoder_tsdf = decoders[1].to(device)
 
         if encoder is not None:
             self.encoder = encoder.to(device)
@@ -56,15 +56,15 @@ class ConvolutionalOccupancyNetwork(nn.Module):
         c = self.encode_inputs(inputs)
         # feature = self.query_feature(p, c)
         # qual, rot, width = self.decode_feature(p, feature)
-        qual, rot, width = self.decode(p, c)
+        qual = self.decode(p, c) # <- Changed to predict only grasp quality
         if p_tsdf is not None:
             if self.detach_tsdf:
                 for k, v in c.items():
                     c[k] = v.detach()
             tsdf = self.decoder_tsdf(p_tsdf, c, **kwargs)
-            return qual, rot, width, tsdf
+            return qual, tsdf # <- Changed to predict only grasp quality
         else:
-            return qual, rot, width
+            return qual # <- Changed to predict only grasp quality
             
     def infer_geo(self, inputs, p_tsdf, **kwargs):
         c = self.encode_inputs(inputs)
@@ -118,10 +118,10 @@ class ConvolutionalOccupancyNetwork(nn.Module):
 
         qual = self.decoder_qual(p, c, **kwargs)
         qual = torch.sigmoid(qual)
-        rot = self.decoder_rot(p, c, **kwargs)
-        rot = nn.functional.normalize(rot, dim=2)
-        width = self.decoder_width(p, c, **kwargs)
-        return qual, rot, width
+        #rot = self.decoder_rot(p, c, **kwargs)
+        #rot = nn.functional.normalize(rot, dim=2)
+        #width = self.decoder_width(p, c, **kwargs)
+        return qual
 
     def to(self, device):
         ''' Puts the model to the device.

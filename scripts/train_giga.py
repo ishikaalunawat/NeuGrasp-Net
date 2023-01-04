@@ -33,7 +33,7 @@ def main(args):
     # create log directory
     if args.savedir == '':
         time_stamp = datetime.now().strftime("%y-%m-%d-%H-%M")
-        description = "{}_dataset={},augment={},net={},batch_size={},lr={:.0e},{}".format(
+        description = "{}_dataset={},augment={},net=6d_{},batch_size={},lr={:.0e},{}".format(
             time_stamp,
             args.dataset.name,
             args.augment,
@@ -55,18 +55,18 @@ def main(args):
 
     # build the network or load
     if args.load_path == '':
-        net = get_network(args.net).to(device)
+        net = get_network(args.net).to(device) # <- Changed to predict only grasp quality (check inside)
     else:
         net = load_network(args.load_path, device, args.net)
     
     # define optimizer and metrics
     optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, mode='max')
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, mode='min')
 
     metrics = {
-        "accuracy": Accuracy(lambda out: (torch.round(out[1][0]), out[2][0])),
-        "precision": Precision(lambda out: (torch.round(out[1][0]), out[2][0])),
-        "recall": Recall(lambda out: (torch.round(out[1][0]), out[2][0])),
+        "accuracy": Accuracy(lambda out: (torch.round(out[1][0]), out[2][0]))
+        # "precision": Precision(lambda out: (torch.round(out[1][0]), out[2][0])),
+        # "recall": Recall(lambda out: (torch.round(out[1][0]), out[2][0])),
     }
     for k in LOSS_KEYS:
         metrics[k] = Average(lambda out, sk=k: out[3][sk])
@@ -163,39 +163,42 @@ def create_train_val_loaders(root, root_raw, batch_size, val_split, augment, kwa
     return train_loader, val_loader
 
 
-def prepare_batch(batch, device):
-    pc, (label, rotations, width), pos, pos_occ, occ_value = batch
+def prepare_batch(batch, device): #pc==tsdf
+    #pc, (label, rotations, width), pos, pos_occ, occ_value = batch
+    pc, label, (pos, rotations), pos_occ, occ_value = batch
     pc = pc.float().to(device)
     label = label.float().to(device)
     rotations = rotations.float().to(device)
-    width = width.float().to(device)
+    # width = width.float().to(device)
     pos.unsqueeze_(1) # B, 1, 3
     pos = pos.float().to(device)
     pos_occ = pos_occ.float().to(device)
     occ_value = occ_value.float().to(device)
-    return pc, (label, rotations, width, occ_value), pos, pos_occ
+    return pc, (label, occ_value), (pos, rotations), pos_occ
 
 
 def select(out):
     qual_out, rot_out, width_out, sdf = out
-    rot_out = rot_out.squeeze(1)
+    # rot_out = rot_out.squeeze(1)
     occ = torch.sigmoid(sdf) # to probability
-    return qual_out.squeeze(-1), rot_out, width_out.squeeze(-1), occ
+    #return qual_out.squeeze(-1), rot_out, width_out.squeeze(-1), occ
+    return qual_out.squeeze(-1), occ
 
 
 def loss_fn(y_pred, y):
-    label_pred, rotation_pred, width_pred, occ_pred = y_pred
-    label, rotations, width, occ = y
+    label_pred, occ_pred = y_pred
+    label, occ = y
     loss_qual = _qual_loss_fn(label_pred, label)
-    loss_rot = _rot_loss_fn(rotation_pred, rotations)
-    loss_width = _width_loss_fn(width_pred, width)
+    # loss_rot = _rot_loss_fn(rotation_pred, rotations)
+    # loss_width = _width_loss_fn(width_pred, width)
     loss_occ = _occ_loss_fn(occ_pred, occ)
-    loss = loss_qual + label * (loss_rot + 0.01 * loss_width) + loss_occ
-    loss_dict = {'loss_qual': loss_qual.mean(),
-                 'loss_rot': loss_rot.mean(),
-                 'loss_width': loss_width.mean(),
-                 'loss_occ': loss_occ.mean(),
-                 'loss_all': loss.mean()}
+    loss = loss_qual + label * (0.01) + loss_occ # <-label * (loss_rot + 0.01 * loss_width): new one, Changed
+    loss_dict = {'loss_qual': loss_qual.mean()
+                #  'loss_rot': loss_rot.mean(),
+                #  'loss_width': loss_width.mean(),
+                #  'loss_occ': loss_occ.mean(),
+                #  'loss_all': loss.mean()
+                }
     return loss.mean(), loss_dict
 
 
@@ -203,18 +206,18 @@ def _qual_loss_fn(pred, target):
     return F.binary_cross_entropy(pred, target, reduction="none")
 
 
-def _rot_loss_fn(pred, target):
-    loss0 = _quat_loss_fn(pred, target[:, 0])
-    loss1 = _quat_loss_fn(pred, target[:, 1])
-    return torch.min(loss0, loss1)
+# def _rot_loss_fn(pred, target):
+#     loss0 = _quat_loss_fn(pred, target[:, 0])
+#     loss1 = _quat_loss_fn(pred, target[:, 1])
+#     return torch.min(loss0, loss1)
 
 
-def _quat_loss_fn(pred, target):
-    return 1.0 - torch.abs(torch.sum(pred * target, dim=1))
+# def _quat_loss_fn(pred, target):
+#     return 1.0 - torch.abs(torch.sum(pred * target, dim=1))
 
 
-def _width_loss_fn(pred, target):
-    return F.mse_loss(40 * pred, 40 * target, reduction="none")
+# def _width_loss_fn(pred, target):
+#     return F.mse_loss(40 * pred, 40 * target, reduction="none")
 
 def _occ_loss_fn(pred, target):
     return F.binary_cross_entropy(pred, target, reduction="none").mean(-1)
@@ -227,8 +230,9 @@ def create_trainer(net, optimizer, scheduler, loss_fn, metrics, device):
         net.train()
         optimizer.zero_grad()
         # forward
-        x, y, pos, pos_occ = prepare_batch(batch, device)
-        y_pred = select(net(x, pos, p_tsdf=pos_occ))
+        #x, y, pos, pos_occ = prepare_batch(batch, device)
+        x, y, grasp_query, pos_occ = prepare_batch(batch, device) # <- Changed to predict only grasp quality (check inside)
+        y_pred = select(net(x, grasp_query, p_tsdf=pos_occ))
         loss, loss_dict = loss_fn(y_pred, y)
 
         # backward
@@ -250,8 +254,9 @@ def create_evaluator(net, loss_fn, metrics, device):
 
         net.eval()
         with torch.no_grad():
-            x, y, pos, pos_occ = prepare_batch(batch, device)
-            out = net(x, pos, p_tsdf=pos_occ)
+            #x, y, pos, pos_occ = prepare_batch(batch, device)
+            x, y, grasp_query, pos_occ = prepare_batch(batch, device) # <- Changed to predict only grasp quality (check inside)
+            out = net(x, grasp_query, p_tsdf=pos_occ)
 
             # Out: qual_out, rot_out, width_out, sdf => (4,) => (32, 40, 40, 40)
             y_pred = select(out)
