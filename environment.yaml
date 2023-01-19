@@ -34,7 +34,7 @@ dependencies:
   - pip=21.0.1=py38h06a4308_0
   - python=3.8.8=hdb3f193_4
   - python_abi=3.8=1_cp38
-  # - pytorch=1.7.1=py3.8_cuda11.0.221_cudnn8.0.5_0
+  - pytorch=1.7.1=py3.8_cuda11.0.221_cudnn8.0.5_0
   - readline=8.1=h27cfd23_0
   - setuptools=52.0.0=py38h06a4308_0
   - six=1.15.0=pyh9f0ad1d_0
