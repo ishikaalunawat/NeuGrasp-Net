@@ -1,5 +1,5 @@
 # training
-nohup python scripts/train_giga.py --dataset data/pile/data_pile_train_constructed_4M --dataset_raw data/pile/data_pile_train_random_raw_4M --epochs 100 > nohup_logs/train4M_100ep.out &
+nohup python scripts/train_giga.py --dataset data/pile/data_pile_train_constructed_4M --dataset_raw data/pile/data_pile_train_random_raw_4M > nohup_logs/train4M_20ep.out &
 
 # reconstruction only
 nohup python scripts/eval_geometry_voxel.py --model-path data/runs/22-11-30-13-52_dataset=data_pile_train_constructed_4M,augment=False,net=giga,batch_size=32,lr=2e-04/best_vgn_giga_val_acc=0.8915.pt --type giga --dataset data/pile/data_pile_train_constructed_4M --dataset_raw data/pile/data_pile_train_random_raw_4M

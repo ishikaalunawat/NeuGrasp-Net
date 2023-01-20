@@ -26,11 +26,49 @@ class VGNImplicit(object):
         self.visualize = visualize
         
         self.resolution = resolution
-        x, y, z = torch.meshgrid(torch.linspace(start=-0.5, end=0.5 - 1.0 / self.resolution, steps=self.resolution), torch.linspace(start=-0.5, end=0.5 - 1.0 / self.resolution, steps=self.resolution), torch.linspace(start=-0.5, end=0.5 - 1.0 / self.resolution, steps=self.resolution))
+        self.finger_depth = 0.05
+        #x, y, z = torch.meshgrid(torch.linspace(start=-0.5, end=0.5 - 1.0 / self.resolution, steps=self.resolution), torch.linspace(start=-0.5, end=0.5 - 1.0 / self.resolution, steps=self.resolution), torch.linspace(start=-0.5, end=0.5 - 1.0 / self.resolution, steps=self.resolution))
         # 1, self.resolution, self.resolution, self.resolution, 3
-        pos = torch.stack((x, y, z), dim=-1).float().unsqueeze(0).to(self.device)
-        self.pos = pos.view(1, self.resolution * self.resolution * self.resolution, 3)
+        #pos = torch.stack((x, y, z), dim=-1).float().unsqueeze(0).to(self.device)
+        #self.pos = pos.view(1, self.resolution * self.resolution * self.resolution, 3)
 
+    def sample_grasp_points(point_cloud, finger_depth, eps=0.1):
+        # Use masks instead of while loop
+        points = np.asarray(point_cloud.points)
+        normals = np.asarray(point_cloud.normals)
+        ok = False
+        while not ok:
+            # TODO this could result in an infinite loop, though very unlikely
+            idx = np.random.randint(len(points))
+            point, normal = points[idx], normals[idx]
+            ok = normal[2] > -0.1  # make sure the normal is poitning upwards
+        grasp_depth = np.random.uniform(-eps * finger_depth, (1.0 + eps) * finger_depth)
+        point = point + normal * grasp_depth
+        return points, normals
+    
+    def get_grasp_queries(pos, normal, num_rotations=6):
+        # Make 6 ori for each pos (duplicate pos's)
+        # define initial grasp frame on object surface
+        z_axis = -normal
+        x_axis = np.r_[1.0, 0.0, 0.0]
+        if np.isclose(np.abs(np.dot(x_axis, z_axis)), 1.0, 1e-4):
+            x_axis = np.r_[0.0, 1.0, 0.0]
+        y_axis = np.cross(z_axis, x_axis)
+        x_axis = np.cross(y_axis, z_axis)
+        R = Rotation.from_matrix(np.vstack((x_axis, y_axis, z_axis)).T)
+
+        # try to grasp with different yaw angles
+        #yaws = np.linspace(0.0, np.pi, num_rotations)
+        yaws = np.linspace(0.0, np.pi, len(pos))
+        oris = []
+
+        for yaw in yaws:
+            ori = R * Rotation.from_euler("z", yaw)
+            oris.append(ori.as_quat())
+
+        return (pos, oris)
+        
+    
     def __call__(self, state, scene_mesh=None, aff_kwargs={}):
         if hasattr(state, 'tsdf_process'):
             tsdf_process = state.tsdf_process
@@ -41,22 +79,29 @@ class VGNImplicit(object):
             tsdf_vol = state.tsdf
             voxel_size = 0.3 / self.resolution
             size = 0.3
+            pc_extended = state.pc_extended.get_cloud() # Using extended PC for grasp sampling
+
         else:
             tsdf_vol = state.tsdf.get_grid()
             voxel_size = tsdf_process.voxel_size
             tsdf_process = tsdf_process.get_grid()
             size = state.tsdf.size
+            pc_extended = state.pc_extended.get_cloud() # Using extended PC for grasp sampling
 
         tic = time.time()
+        points, normals = self.sample_grasp_points(pc_extended, self.finger_depth)
+        grasp_queries = self.get_grasp_queries(points, normals)
+
         #qual_vol, rot_vol, width_vol = predict(tsdf_vol, self.pos, self.net, self.device)
-        qual_vol, width_vol = predict(tsdf_vol, self.pos, self.net, self.device)
+        qual_vol, width_vol = predict(tsdf_vol, grasp_queries , self.net, self.device)
         qual_vol = qual_vol.reshape((self.resolution, self.resolution, self.resolution))
         #rot_vol = rot_vol.reshape((self.resolution, self.resolution, self.resolution, 4))
         width_vol = width_vol.reshape((self.resolution, self.resolution, self.resolution))
 
-        qual_vol, rot_vol, width_vol = process(tsdf_process, qual_vol, rot_vol, width_vol, out_th=self.out_th)
+        ## qual_vol, rot_vol, width_vol = process(tsdf_process, qual_vol, rot_vol, width_vol, out_th=self.out_th)
         qual_vol = bound(qual_vol, voxel_size)
         if self.visualize:
+            # Later
             colored_scene_mesh = visual.affordance_visual(qual_vol, rot_vol, scene_mesh, size, self.resolution, **aff_kwargs)
         grasps, scores = select(qual_vol.copy(), self.pos.view(self.resolution, self.resolution, self.resolution, 3).cpu(), rot_vol, width_vol, threshold=self.qual_th, force_detection=self.force_detection, max_filter_size=8 if self.visualize else 4)
         toc = time.time() - tic
@@ -85,6 +130,7 @@ class VGNImplicit(object):
             return grasps, scores, toc, composed_scene
         else:
             return grasps, scores, toc
+    
 
 def bound(qual_vol, voxel_size, limit=[0.02, 0.02, 0.055]):
     # avoid grasp out of bound [0.02  0.02  0.055]

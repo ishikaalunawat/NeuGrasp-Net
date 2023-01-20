@@ -76,7 +76,9 @@ def run(
 
             # scan the scene
             tsdf, pc, timings["integration"] = sim.acquire_tsdf(n=n, N=N, resolution=40)
-            state = argparse.Namespace(tsdf=tsdf, pc=pc)
+            # Also sampling extended scene PC for more grasp queries
+            _, pc_extended, _ = sim.acquire_tsdf(n=6, N=N, resolution=40)
+            state = argparse.Namespace(tsdf=tsdf, pc=pc, pc_extended = pc_extended)
             if resolution != 40:
                 extra_tsdf, _, _ = sim.acquire_tsdf(n=n, N=N, resolution=resolution)
                 state.tsdf_process = extra_tsdf

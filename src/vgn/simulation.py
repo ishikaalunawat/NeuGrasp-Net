@@ -170,6 +170,7 @@ class ClutterRemovalSim(object):
 
         timing = 0.0
         for extrinsic in extrinsics:
+            # Multiple views -> for getting other sides of pc
             depth_img = self.camera.render(extrinsic)[1]
 
             # add noise
@@ -179,6 +180,7 @@ class ClutterRemovalSim(object):
             tsdf.integrate(depth_img, self.camera.intrinsic, extrinsic)
             timing += time.time() - tic
             high_res_tsdf.integrate(depth_img, self.camera.intrinsic, extrinsic)
+
         bounding_box = o3d.geometry.AxisAlignedBoundingBox(self.lower, self.upper)
         pc = high_res_tsdf.get_cloud()
         pc = pc.crop(bounding_box)
