@@ -32,24 +32,23 @@ class VGNImplicit(object):
         #pos = torch.stack((x, y, z), dim=-1).float().unsqueeze(0).to(self.device)
         #self.pos = pos.view(1, self.resolution * self.resolution * self.resolution, 3)
 
-    def sample_grasp_points(point_cloud, finger_depth, eps=0.1):
+    def sample_grasp_points(points, normals, finger_depth=0.05, eps=0.1):
         # Use masks instead of while loop
-        points = np.asarray(point_cloud.points)
-        normals = np.asarray(point_cloud.normals)
-        ok = False
-        while not ok:
-            # TODO this could result in an infinite loop, though very unlikely
-            idx = np.random.randint(len(points))
-            point, normal = points[idx], normals[idx]
-            ok = normal[2] > -0.1  # make sure the normal is poitning upwards
+        # points Shape (N, 3)
+        # normals Shape (N, 3)
+        mask  = normals[:,-1] > -0.1
         grasp_depth = np.random.uniform(-eps * finger_depth, (1.0 + eps) * finger_depth)
-        point = point + normal * grasp_depth
+        points = points[mask] + normals[mask] * grasp_depth
         return points, normals
     
-    def get_grasp_queries(pos, normal, num_rotations=6):
+    def get_grasp_queries(points, normals, num_rotations=6):
+        ### TO-DO
+        
         # Make 6 ori for each pos (duplicate pos's)
         # define initial grasp frame on object surface
-        z_axis = -normal
+        points = np.repeat(points, num_rotations, axis=0)
+
+        z_axis = -normals
         x_axis = np.r_[1.0, 0.0, 0.0]
         if np.isclose(np.abs(np.dot(x_axis, z_axis)), 1.0, 1e-4):
             x_axis = np.r_[0.0, 1.0, 0.0]
@@ -59,7 +58,7 @@ class VGNImplicit(object):
 
         # try to grasp with different yaw angles
         #yaws = np.linspace(0.0, np.pi, num_rotations)
-        yaws = np.linspace(0.0, np.pi, len(pos))
+        yaws = np.linspace(0.0, np.pi, num_rotations)
         oris = []
 
         for yaw in yaws:
