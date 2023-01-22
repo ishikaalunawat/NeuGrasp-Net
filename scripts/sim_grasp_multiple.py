@@ -84,7 +84,7 @@ if __name__ == "__main__":
                         default="pile")
     parser.add_argument("--object-set", type=str, default="blocks")
     parser.add_argument("--num-objects", type=int, default=5)
-    parser.add_argument("--num-view", type=int, default=1)
+    parser.add_argument("--num-view", type=int, default=1) # No need to change
     parser.add_argument("--num-rounds", type=int, default=100)
     parser.add_argument("--seeds", type=int, nargs='+', default=[0, 1, 2, 3, 4])
     parser.add_argument("--sim-gui", action="store_true")

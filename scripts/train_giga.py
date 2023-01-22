@@ -64,7 +64,9 @@ def main(args):
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, mode='min')
 
     metrics = {
-        "accuracy": Accuracy(lambda out: (torch.round(out[1][0]), out[2][0]))
+        "accuracy": Accuracy(lambda out: (torch.round(out[1][0]), out[2][0])) # out[1][0] => y_pred -> quality
+                                                                              # out[2][0] => y -> quality
+                                                                              # ^ Refer def _update() returns
         # "precision": Precision(lambda out: (torch.round(out[1][0]), out[2][0])),
         # "recall": Recall(lambda out: (torch.round(out[1][0]), out[2][0])),
     }
@@ -165,38 +167,40 @@ def create_train_val_loaders(root, root_raw, batch_size, val_split, augment, kwa
 
 def prepare_batch(batch, device): #pc==tsdf
     #pc, (label, rotations, width), pos, pos_occ, occ_value = batch
-    pc, label, (pos, rotations), pos_occ, occ_value = batch
+    pc, (label, width), (pos, rotations), pos_occ, occ_value = batch
     pc = pc.float().to(device)
     label = label.float().to(device)
     rotations = rotations.float().to(device)
-    # width = width.float().to(device)
+    width = width.float().to(device)
     pos.unsqueeze_(1) # B, 1, 3
     pos = pos.float().to(device)
     pos_occ = pos_occ.float().to(device)
     occ_value = occ_value.float().to(device)
-    return pc, (label, occ_value), (pos, rotations), pos_occ
+    #return pc, (label, rotations, width, occ_value), pos, pos_occ
+    return pc, (label, width, occ_value), (pos, rotations), pos_occ
+    #return pc, (label, occ_value), (pos, rotations), pos_occ
 
 
 def select(out):
     #qual_out, rot_out, width_out, sdf = out
-    qual_out, sdf = out     # <- Changed to predict only grasp quality (check inside)
+    qual_out, width_out, sdf = out     # <- Changed to predict only grasp quality (check inside)
     # rot_out = rot_out.squeeze(1)
     occ = torch.sigmoid(sdf) # to probability
     #return qual_out.squeeze(-1), rot_out, width_out.squeeze(-1), occ
-    return qual_out.squeeze(-1), occ
+    return qual_out.squeeze(-1), width_out.squeeze(-1), occ
 
 
 def loss_fn(y_pred, y):
-    label_pred, occ_pred = y_pred
-    label, occ = y
+    label_pred, width_pred, occ_pred = y_pred
+    label, width, occ = y
     loss_qual = _qual_loss_fn(label_pred, label)
     # loss_rot = _rot_loss_fn(rotation_pred, rotations)
-    # loss_width = _width_loss_fn(width_pred, width)
+    loss_width = _width_loss_fn(width_pred, width)
     loss_occ = _occ_loss_fn(occ_pred, occ)
     loss = loss_qual + label * (0.01) + loss_occ # <-label * (loss_rot + 0.01 * loss_width): new one, Changed
     loss_dict = {'loss_qual': loss_qual.mean(),
                 #  'loss_rot': loss_rot.mean(),
-                #  'loss_width': loss_width.mean(),
+                'loss_width': loss_width.mean(),
                 'loss_occ': loss_occ.mean(),
                 'loss_all': loss.mean()
                 }
@@ -217,8 +221,8 @@ def _qual_loss_fn(pred, target):
 #     return 1.0 - torch.abs(torch.sum(pred * target, dim=1))
 
 
-# def _width_loss_fn(pred, target):
-#     return F.mse_loss(40 * pred, 40 * target, reduction="none")
+def _width_loss_fn(pred, target):
+    return F.mse_loss(40 * pred, 40 * target, reduction="none")
 
 def _occ_loss_fn(pred, target):
     return F.binary_cross_entropy(pred, target, reduction="none").mean(-1)
@@ -240,7 +244,7 @@ def create_trainer(net, optimizer, scheduler, loss_fn, metrics, device):
         loss.backward()
         optimizer.step()
 
-        return x, y_pred, y, loss_dict
+        return x, y_pred, y, loss_dict # (32,40,40); pred [(label, width, occ)], true [(label, width, occ)], loss_dict (already defined above)
 
     trainer = Engine(_update)
 

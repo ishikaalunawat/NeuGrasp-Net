@@ -92,7 +92,7 @@ class DatasetVoxelOccFile(torch.utils.data.Dataset):
 
         # return x, y, pos, occ_points, occ
 
-        tsdf, y, rot = voxel_grid[0], label, rotations # <- Changed to predict only grasp quality
+        tsdf, y, rot = voxel_grid[0], (label, width), rotations # <- Changed to predict only grasp quality
 
         occ_points, occ = self.read_occ(scene_id, self.num_point_occ)
         occ_points = occ_points / self.size - 0.5

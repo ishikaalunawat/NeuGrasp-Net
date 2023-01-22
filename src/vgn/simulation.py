@@ -170,6 +170,7 @@ class ClutterRemovalSim(object):
 
         timing = 0.0
         for extrinsic in extrinsics:
+            # Multiple views -> for getting other sides of pc
             depth_img = self.camera.render(extrinsic)[1]
 
             # add noise
