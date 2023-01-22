@@ -13,6 +13,8 @@ from vgn.utils import visual
 from vgn.utils.implicit import as_mesh
 
 LOW_TH = 0.5
+axes_cond = lambda x,z: np.isclose(np.abs(np.dot(x, z)), 1.0, 1e-4)
+
 
 class VGNImplicit(object):
     def __init__(self, model_path, model_type, best=False, force_detection=False, qual_th=0.9, out_th=0.5, visualize=False, resolution=40, **kwargs):
@@ -42,31 +44,33 @@ class VGNImplicit(object):
         return points, normals
     
     def get_grasp_queries(points, normals, num_rotations=6):
-        ### TO-DO
-        
-        # Make 6 ori for each pos (duplicate pos's)
-        # define initial grasp frame on object surface
-        points = np.repeat(points, num_rotations, axis=0)
+        # Initializing axes (PyB cam)
+        z_axes = -normals
+        x_axes = []
+        y_axes = []
 
-        z_axis = -normals
-        x_axis = np.r_[1.0, 0.0, 0.0]
-        if np.isclose(np.abs(np.dot(x_axis, z_axis)), 1.0, 1e-4):
-            x_axis = np.r_[0.0, 1.0, 0.0]
-        y_axis = np.cross(z_axis, x_axis)
-        x_axis = np.cross(y_axis, z_axis)
-        R = Rotation.from_matrix(np.vstack((x_axis, y_axis, z_axis)).T)
+        # Possible x axis
+        x1 = np.r_[1.0, 0.0, 0.0]
+        x2 = np.r_[0.0, 1.0, 0.0]
 
-        # try to grasp with different yaw angles
-        #yaws = np.linspace(0.0, np.pi, num_rotations)
-        yaws = np.linspace(0.0, np.pi, num_rotations)
-        oris = []
+        # Defining x_axis and y_axis for each point based on dot product condition (overlapping x and z)
+        y_axes = [np.cross(z, x2) if axes_cond(x1,z) else np.cross(z, x1) for z in z_axes]
+        x_axes = [np.cross(y, z) for y, z in zip(y_axes, z_axes)]
+        # Defining rotation matrix with fixed (roll, pitch)
+        R = [Rotation.from_matrix(np.vstack((x, y, z)).T) for x,y,z in zip(x_axes, y_axes, z_axes)]
 
-        for yaw in yaws:
-            ori = R * Rotation.from_euler("z", yaw)
-            oris.append(ori.as_quat())
+        # Varying yaws from 0, PI with evenly spaced steps
+        yaws = np.linspace(0, np.pi, num_rotations)
+        queries = []
 
-        return (pos, oris)
-        
+        # Loop for saving queries
+        for i, p in enumerate(points):
+            for yaw in yaws:
+                ori = R[i] * Rotation.from_euler("z", yaw)
+                queries.append((p, ori.as_quat()))
+
+        return queries
+            
     
     def __call__(self, state, scene_mesh=None, aff_kwargs={}):
         if hasattr(state, 'tsdf_process'):
@@ -89,13 +93,14 @@ class VGNImplicit(object):
 
         tic = time.time()
         points, normals = self.sample_grasp_points(pc_extended, self.finger_depth)
-        grasp_queries = self.get_grasp_queries(points, normals)
+        (pos, rot) = self.get_grasp_queries(points, normals) # Grasp queries :: (pos ;xyz, rot ;as quat)
 
-        #qual_vol, rot_vol, width_vol = predict(tsdf_vol, self.pos, self.net, self.device)
-        qual_vol, width_vol = predict(tsdf_vol, grasp_queries , self.net, self.device)
-        qual_vol = qual_vol.reshape((self.resolution, self.resolution, self.resolution))
-        #rot_vol = rot_vol.reshape((self.resolution, self.resolution, self.resolution, 4))
-        width_vol = width_vol.reshape((self.resolution, self.resolution, self.resolution))
+        # Variable rot_vol replaced with ==> rot
+        ## qual_vol, rot_vol, width_vol = predict(tsdf_vol, self.pos, self.net, self.device)
+        qual_vol, width_vol = predict(tsdf_vol, (pos, rot), self.net, self.device)
+        ## qual_vol = qual_vol.reshape((self.resolution, self.resolution, self.resolution))
+        ## rot_vol = rot_vol.reshape((self.resolution, self.resolution, self.resolution, 4))
+        ## width_vol = width_vol.reshape((self.resolution, self.resolution, self.resolution))
 
         ## qual_vol, rot_vol, width_vol = process(tsdf_process, qual_vol, rot_vol, width_vol, out_th=self.out_th)
         qual_vol = bound(qual_vol, voxel_size)
