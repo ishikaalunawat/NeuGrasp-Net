@@ -1,0 +1,4 @@
+Dataset description:
+ Mild perturbations in the view direction (randomized)
+ Total samples: 630220
+ Total number of scenes: 33313
