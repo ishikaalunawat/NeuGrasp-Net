@@ -34,10 +34,12 @@ class VGNImplicit(object):
         #pos = torch.stack((x, y, z), dim=-1).float().unsqueeze(0).to(self.device)
         #self.pos = pos.view(1, self.resolution * self.resolution * self.resolution, 3)
 
-    def sample_grasp_points(points, normals, finger_depth=0.05, eps=0.1):
+    def sample_grasp_points(pcd, finger_depth=0.05, eps=0.1):
         # Use masks instead of while loop
         # points Shape (N, 3)
         # normals Shape (N, 3)
+        points = pcd.points
+        normals = pcd.normals
         mask  = normals[:,-1] > -0.1
         grasp_depth = np.random.uniform(-eps * finger_depth, (1.0 + eps) * finger_depth)
         points = points[mask] + normals[mask] * grasp_depth
@@ -56,6 +58,7 @@ class VGNImplicit(object):
         # Defining x_axis and y_axis for each point based on dot product condition (overlapping x and z)
         y_axes = [np.cross(z, x2) if axes_cond(x1,z) else np.cross(z, x1) for z in z_axes]
         x_axes = [np.cross(y, z) for y, z in zip(y_axes, z_axes)]
+        
         # Defining rotation matrix with fixed (roll, pitch)
         R = [Rotation.from_matrix(np.vstack((x, y, z)).T) for x,y,z in zip(x_axes, y_axes, z_axes)]
 
@@ -82,14 +85,14 @@ class VGNImplicit(object):
             tsdf_vol = state.tsdf
             voxel_size = 0.3 / self.resolution
             size = 0.3
-            pc_extended = state.pc_extended.get_cloud() # Using extended PC for grasp sampling
+            pc_extended = state.pc_extended # Using extended PC for grasp sampling
 
         else:
             tsdf_vol = state.tsdf.get_grid()
             voxel_size = tsdf_process.voxel_size
             tsdf_process = tsdf_process.get_grid()
             size = state.tsdf.size
-            pc_extended = state.pc_extended.get_cloud() # Using extended PC for grasp sampling
+            pc_extended = state.pc_extended # Using extended PC for grasp sampling
 
         tic = time.time()
         points, normals = self.sample_grasp_points(pc_extended, self.finger_depth)
@@ -98,16 +101,21 @@ class VGNImplicit(object):
         # Variable rot_vol replaced with ==> rot
         ## qual_vol, rot_vol, width_vol = predict(tsdf_vol, self.pos, self.net, self.device)
         qual_vol, width_vol = predict(tsdf_vol, (pos, rot), self.net, self.device)
-        ## qual_vol = qual_vol.reshape((self.resolution, self.resolution, self.resolution))
-        ## rot_vol = rot_vol.reshape((self.resolution, self.resolution, self.resolution, 4))
-        ## width_vol = width_vol.reshape((self.resolution, self.resolution, self.resolution))
 
-        ## qual_vol, rot_vol, width_vol = process(tsdf_process, qual_vol, rot_vol, width_vol, out_th=self.out_th)
+        # Truncate and reshape to nearest multiple of 40
+        size = int(pos.shape[0]/40)*40
+        qual_vol = qual_vol.reshape((size, size, size))
+        rot_vol = rot_vol.reshape((size, size, size, 4))
+        width_vol = width_vol.reshape((size, size, size))
+
+        # DOUBT - dimension errors?
+        qual_vol, width_vol = process(tsdf_process, qual_vol, rot_vol, width_vol, out_th=self.out_th)
+        
         qual_vol = bound(qual_vol, voxel_size)
         if self.visualize:
             # Later
-            colored_scene_mesh = visual.affordance_visual(qual_vol, rot_vol, scene_mesh, size, self.resolution, **aff_kwargs)
-        grasps, scores = select(qual_vol.copy(), self.pos.view(self.resolution, self.resolution, self.resolution, 3).cpu(), rot_vol, width_vol, threshold=self.qual_th, force_detection=self.force_detection, max_filter_size=8 if self.visualize else 4)
+            colored_scene_mesh = visual.affordance_visual(qual_vol, rot, scene_mesh, size, self.resolution, **aff_kwargs)
+        grasps, scores = select(qual_vol.copy(), self.pos.view(self.resolution, self.resolution, self.resolution, 3).cpu(), rot, width_vol, threshold=self.qual_th, force_detection=self.force_detection, max_filter_size=8 if self.visualize else 4)
         toc = time.time() - tic
 
         grasps, scores = np.asarray(grasps), np.asarray(scores)
