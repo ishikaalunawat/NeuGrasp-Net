@@ -1,0 +1,8 @@
+# ninja log v5
+0	175	1655728202437770706	/home/hypatia/GIGA-TSDF/GIGA/build/temp.linux-x86_64-3.8/src/vgn/ConvONets/utils/libmcubes/marchingcubes.o	6047fb0c4721318e
+1	775	1655728203038255405	/home/hypatia/GIGA-TSDF/GIGA/build/temp.linux-x86_64-3.8/src/vgn/ConvONets/utils/libmcubes/pywrapper.o	6c346b4837086fba
+1	930	1655728203190372648	/home/hypatia/GIGA-TSDF/GIGA/build/temp.linux-x86_64-3.8/src/vgn/ConvONets/utils/libmcubes/mcubes.o	f832801d0dbe2897
+0	3004	1655728206288250548	/home/hypatia/GIGA-TSDF/GIGA/build/temp.linux-x86_64-3.8/src/vgn/ConvONets/utils/libmesh/triangle_hash.o	22d2156689d2d84b
+0	3471	1655728209843628261	/home/hypatia/GIGA-TSDF/GIGA/build/temp.linux-x86_64-3.8/src/vgn/ConvONets/utils/libmise/mise.o	6b81fd596123b7bf
+0	4082	1655728214008219924	/home/hypatia/GIGA-TSDF/GIGA/build/temp.linux-x86_64-3.8/src/vgn/ConvONets/utils/libsimplify/simplify_mesh.o	bb610a465b187022
+0	2658	1655728216969330203	/home/hypatia/GIGA-TSDF/GIGA/build/temp.linux-x86_64-3.8/src/vgn/ConvONets/utils/libvoxelize/voxelize.o	b9a13eb2387d9cf4
