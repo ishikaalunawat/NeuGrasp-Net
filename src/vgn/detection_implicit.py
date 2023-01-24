@@ -33,7 +33,8 @@ class VGNImplicit(object):
         # 1, self.resolution, self.resolution, self.resolution, 3
         #pos = torch.stack((x, y, z), dim=-1).float().unsqueeze(0).to(self.device)
         #self.pos = pos.view(1, self.resolution * self.resolution * self.resolution, 3)
-
+        
+    @staticmethod
     def sample_grasp_points(pcd, finger_depth=0.05, eps=0.1):
         # Use masks instead of while loop
         # points Shape (N, 3)
