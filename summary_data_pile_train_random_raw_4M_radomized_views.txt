@@ -1,0 +1,4 @@
+Dataset description:
+ Completely randomized view direction
+ Total samples: 630220
+ Total number of scenes: 33313

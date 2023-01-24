@@ -26,7 +26,9 @@ pip install -e .
 
 4. Build ConvONets dependents by running `python scripts/convonet_setup.py build_ext --inplace`.
 
-5. Download the [data](https://utexas.box.com/s/h3ferwjhuzy6ja8bzcm3nu9xq1wkn94s), then unzip and place the data folder under the repo's root. Pretrained models of GIGA, GIGA-Aff and VGN are in `data/models`.
+5. Run `pip install pykdtree --no-binary pykdtree` to install pykdtree
+
+6. Download the [data](https://utexas.box.com/s/h3ferwjhuzy6ja8bzcm3nu9xq1wkn94s), then unzip and place the data folder under the repo's root. Pretrained models of GIGA, GIGA-Aff and VGN are in `data/models`.
 
 ## Self-supervised Data Generation
 

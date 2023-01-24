@@ -2,7 +2,7 @@ import logging
 import numpy as np
 import trimesh
 # from scipy.spatial import cKDTree
-from vgn.ConvONets.utils.libkdtree import KDTree
+from pykdtree.kdtree import KDTree
 from vgn.ConvONets.utils.libmesh import check_mesh_contains
 from vgn.ConvONets.common import compute_iou
 
