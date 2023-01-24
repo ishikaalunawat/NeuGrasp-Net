@@ -180,7 +180,6 @@ class ClutterRemovalSim(object):
             tsdf.integrate(depth_img, self.camera.intrinsic, extrinsic)
             timing += time.time() - tic
             high_res_tsdf.integrate(depth_img, self.camera.intrinsic, extrinsic)
-
         bounding_box = o3d.geometry.AxisAlignedBoundingBox(self.lower, self.upper)
         pc = high_res_tsdf.get_cloud()
         pc = pc.crop(bounding_box)

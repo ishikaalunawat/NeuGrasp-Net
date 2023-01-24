@@ -51,7 +51,12 @@ def main(args, rank):
         n = MAX_VIEWPOINT_COUNT
         depth_imgs, extrinsics = render_images(sim, n)
         depth_imgs_side, extrinsics_side = render_side_images(sim, 1, args.random)
+        
+        # import cv2
+        # cv2.imshow("la", depth_imgs_side[0])
+        # cv2.waitKey(1000)
 
+        # import pdb; pdb.set_trace()
         # reconstrct point cloud using a subset of the images
         tsdf = create_tsdf(sim.size, 120, depth_imgs, sim.camera.intrinsic, extrinsics)
         pc = tsdf.get_cloud()
@@ -192,11 +197,14 @@ if __name__ == "__main__":
     parser.add_argument("--sim-gui", action="store_true")
     args = parser.parse_args()
     args.save_scene = True
-    if args.num_proc > 1:
-        pool = mp.Pool(processes=args.num_proc)
-        for i in range(args.num_proc):
-            pool.apply_async(func=main, args=(args, i))
-        pool.close()
-        pool.join()
-    else:
-        main(args, 0)
+    # Using fix from: https://github.com/UT-Austin-RPL/GIGA/issues/1
+    from joblib import Parallel, delayed
+    Parallel(n_jobs=args.num_proc)(delayed(main)(args, i) for i in range(args.num_proc))
+    # if args.num_proc > 1:
+    #     pool = mp.Pool(processes=args.num_proc)
+    #     for i in range(args.num_proc):
+    #         pool.apply_async(func=main, args=(args, i))
+    #     pool.close()
+    #     pool.join()
+    # else:
+    #     main(args, 0)

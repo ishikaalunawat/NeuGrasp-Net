@@ -1,4 +1,4 @@
-name: GIGA
+name: GIGA-6DoF
 channels:
   - pytorch
   - conda-forge
@@ -141,7 +141,8 @@ dependencies:
     - testpath==0.4.4
     - threadpoolctl==2.1.0
     - tifffile==2021.3.31
-    - torch==1.7.0
+    # - torch==1.7.0
+    - wandb
     - torch-scatter==2.0.6
     - tornado==6.1
     - tqdm==4.59.0
