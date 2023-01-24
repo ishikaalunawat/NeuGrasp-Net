@@ -39,13 +39,14 @@ class VGNImplicit(object):
         # Use masks instead of while loop
         # points Shape (N, 3)
         # normals Shape (N, 3)
-        points = pcd.points
-        normals = pcd.normals
+        points = np.asarray(pcd.points)
+        normals = np.asarray(pcd.normals)
         mask  = normals[:,-1] > -0.1
         grasp_depth = np.random.uniform(-eps * finger_depth, (1.0 + eps) * finger_depth)
         points = points[mask] + normals[mask] * grasp_depth
         return points, normals
     
+    @staticmethod
     def get_grasp_queries(points, normals, num_rotations=6):
         # Initializing axes (PyB cam)
         z_axes = -normals
@@ -65,15 +66,17 @@ class VGNImplicit(object):
 
         # Varying yaws from 0, PI with evenly spaced steps
         yaws = np.linspace(0, np.pi, num_rotations)
-        queries = []
+        pos_queries = []
+        rot_queries = []
 
         # Loop for saving queries
         for i, p in enumerate(points):
             for yaw in yaws:
                 ori = R[i] * Rotation.from_euler("z", yaw)
-                queries.append((p, ori.as_quat()))
+                pos_queries.append(p)
+                rot_queries.append(ori.as_quat())
 
-        return queries
+        return torch.tensor(pos_queries), torch.tensor(rot_queries)
             
     
     def __call__(self, state, scene_mesh=None, aff_kwargs={}):
@@ -97,20 +100,21 @@ class VGNImplicit(object):
 
         tic = time.time()
         points, normals = self.sample_grasp_points(pc_extended, self.finger_depth)
-        (pos, rot) = self.get_grasp_queries(points, normals) # Grasp queries :: (pos ;xyz, rot ;as quat)
+        import pdb; pdb.set_trace()
+        pos, rot = self.get_grasp_queries(points, normals) # Grasp queries :: (pos ;xyz, rot ;as quat)
 
         # Variable rot_vol replaced with ==> rot
         ## qual_vol, rot_vol, width_vol = predict(tsdf_vol, self.pos, self.net, self.device)
-        qual_vol, width_vol = predict(tsdf_vol, (pos, rot), self.net, self.device)
+        qual_vol, width_vol = predict(tsdf_vol, (pos.view((-1,1,3)), rot.view((-1,1,4))), self.net, self.device)
 
         # Truncate and reshape to nearest multiple of 40
         size = int(pos.shape[0]/40)*40
         qual_vol = qual_vol.reshape((size, size, size))
-        rot_vol = rot_vol.reshape((size, size, size, 4))
+        rot = rot.reshape((size, size, size, 4))
         width_vol = width_vol.reshape((size, size, size))
 
         # DOUBT - dimension errors?
-        qual_vol, width_vol = process(tsdf_process, qual_vol, rot_vol, width_vol, out_th=self.out_th)
+        qual_vol, width_vol = process(tsdf_process, qual_vol, rot, width_vol, out_th=self.out_th)
         
         qual_vol = bound(qual_vol, voxel_size)
         if self.visualize:
