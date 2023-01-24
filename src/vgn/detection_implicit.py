@@ -39,8 +39,8 @@ class VGNImplicit(object):
         # Use masks instead of while loop
         # points Shape (N, 3)
         # normals Shape (N, 3)
-        points = pcd.points
-        normals = pcd.normals
+        points = np.asarray(pcd.points)        
+        normals = np.asarray(pcd.normals)
         mask  = normals[:,-1] > -0.1
         grasp_depth = np.random.uniform(-eps * finger_depth, (1.0 + eps) * finger_depth)
         points = points[mask] + normals[mask] * grasp_depth
@@ -66,15 +66,17 @@ class VGNImplicit(object):
 
         # Varying yaws from 0, PI with evenly spaced steps
         yaws = np.linspace(0, np.pi, num_rotations)
-        queries = []
+        pos_queries = []
+        rot_queries = []
 
         # Loop for saving queries
         for i, p in enumerate(points):
             for yaw in yaws:
                 ori = R[i] * Rotation.from_euler("z", yaw)
-                queries.append((p, ori.as_quat()))
+                pos_queries.append(p)
+                rot_queries.append(ori.as_quat())
 
-        return queries
+        return torch.Tensor(pos_queries).view(1, -1, 3), torch.Tensor(rot_queries).view(1, -1, 4)
             
     
     def __call__(self, state, scene_mesh=None, aff_kwargs={}):
@@ -98,26 +100,27 @@ class VGNImplicit(object):
 
         tic = time.time()
         points, normals = self.sample_grasp_points(pc_extended, self.finger_depth)
-        (pos, rot) = self.get_grasp_queries(points, normals) # Grasp queries :: (pos ;xyz, rot ;as quat)
+        pos, rot = self.get_grasp_queries(points, normals) # Grasp queries :: (pos ;xyz, rot ;as quat)
 
         # Variable rot_vol replaced with ==> rot
         ## qual_vol, rot_vol, width_vol = predict(tsdf_vol, self.pos, self.net, self.device)
         qual_vol, width_vol = predict(tsdf_vol, (pos, rot), self.net, self.device)
 
         # Truncate and reshape to nearest multiple of 40
-        size = int(pos.shape[0]/40)*40
-        qual_vol = qual_vol.reshape((size, size, size))
-        rot_vol = rot_vol.reshape((size, size, size, 4))
-        width_vol = width_vol.reshape((size, size, size))
+        size = int(np.cbrt(pos.shape[1]))
+        #print(size, qual_vol.shape, rot.shape, width_vol.shape)
+        qual_vol = qual_vol[:size**3].reshape((size, size, size))
+        rot = rot[:,:size**3,:].reshape((size, size, size, 4))
+        width_vol = width_vol[:size**3].reshape((size, size, size))
 
-        # DOUBT - dimension errors?
-        qual_vol, width_vol = process(tsdf_process, qual_vol, rot_vol, width_vol, out_th=self.out_th)
+        ### DOUBT - dimension errors?
+        #qual_vol, width_vol = process(tsdf_process, qual_vol, rot, width_vol, out_th=self.out_th)
         
         qual_vol = bound(qual_vol, voxel_size)
         if self.visualize:
-            # Later
+            ### DOUBT - check affordance - visual (WEIRD)
             colored_scene_mesh = visual.affordance_visual(qual_vol, rot, scene_mesh, size, self.resolution, **aff_kwargs)
-        grasps, scores = select(qual_vol.copy(), self.pos.view(self.resolution, self.resolution, self.resolution, 3).cpu(), rot, width_vol, threshold=self.qual_th, force_detection=self.force_detection, max_filter_size=8 if self.visualize else 4)
+        grasps, scores = select(qual_vol.copy(), pos[:,:size**3,:].view(size, size, size, 3).cpu(), rot, width_vol, threshold=self.qual_th, force_detection=self.force_detection, max_filter_size=8 if self.visualize else 4)
         toc = time.time() - tic
 
         grasps, scores = np.asarray(grasps), np.asarray(scores)
@@ -137,6 +140,7 @@ class VGNImplicit(object):
         grasps = new_grasps
 
         if self.visualize:
+            # Need coloured mesh from affordance_visual()
             grasp_mesh_list = [visual.grasp2mesh(g, s) for g, s in zip(grasps, scores)]
             composed_scene = trimesh.Scene(colored_scene_mesh)
             for i, g_mesh in enumerate(grasp_mesh_list):
@@ -160,19 +164,19 @@ def bound(qual_vol, voxel_size, limit=[0.02, 0.02, 0.055]):
 
 def predict(tsdf_vol, pos, net, device):
     assert tsdf_vol.shape == (1, 40, 40, 40)
-
+    #_, rot = pos
     # move input to the GPU
     tsdf_vol = torch.from_numpy(tsdf_vol).to(device)
 
     # forward pass
     with torch.no_grad():
-        qual_vol, rot_vol, width_vol = net(tsdf_vol, pos)
+        qual_vol, width_vol = net(tsdf_vol, pos)
 
     # move output back to the CPU
     qual_vol = qual_vol.cpu().squeeze().numpy()
-    rot_vol = rot_vol.cpu().squeeze().numpy()
+    #rot = rot.cpu().squeeze().numpy()
     width_vol = width_vol.cpu().squeeze().numpy()
-    return qual_vol, rot_vol, width_vol
+    return qual_vol, width_vol
 
 def process(
     tsdf_vol,

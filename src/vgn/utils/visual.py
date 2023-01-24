@@ -29,7 +29,7 @@ def affordance_visual(qual_vol,
                       rad=0.02,
                       finger_depth=0.05,
                       finger_offset=0.5,
-                      move_center=True,
+                      move_center=False,
                       aggregation='max'):
     # Transform voxel grid into point cloud
     x = np.linspace(0, size, num=resolution)
@@ -50,7 +50,13 @@ def affordance_visual(qual_vol,
                           axis=-1)
         grid += z_axis * finger_depth * finger_offset
 
-    grid = grid[qual_vol > th]
+    if len(qual_vol)<40:
+        diff = 40 - len(qual_vol)
+        q_vol = np.pad(qual_vol, (0, diff), 'constant')
+    else:
+        q_vol = qual_vol[:len(qual_vol)-40]
+
+    grid = grid[q_vol > th]
     if grid.shape[0] <= 0:
         return scene_mesh
     qual_vol = qual_vol[qual_vol > th]
