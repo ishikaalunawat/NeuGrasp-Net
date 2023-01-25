@@ -46,12 +46,12 @@ class VGNImplicit(object):
         points = points[mask] + normals[mask] * grasp_depth
         return points, normals
     
-    @staticmethod
-    def get_grasp_queries(points, normals, num_rotations=6):
+    def get_grasp_queries(self, points, normals):
         # Initializing axes (PyB cam)
         z_axes = -normals
         x_axes = []
         y_axes = []
+        num_rotations = int(self.resolution**3//len(points)) + 1
 
         # Possible x axis
         x1 = np.r_[1.0, 0.0, 0.0]
@@ -76,6 +76,10 @@ class VGNImplicit(object):
                 pos_queries.append(p)
                 rot_queries.append(ori.as_quat())
 
+        # Truncate and reshape to 64K samples
+        pos_queries = np.array(pos_queries)[:self.resolution**3]
+        rot_queries = np.array(rot_queries)[:self.resolution**3]
+        
         return torch.Tensor(pos_queries).view(1, -1, 3), torch.Tensor(rot_queries).view(1, -1, 4)
             
     
@@ -103,20 +107,15 @@ class VGNImplicit(object):
         pos, rot = self.get_grasp_queries(points, normals) # Grasp queries :: (pos ;xyz, rot ;as quat)
 
         # Variable rot_vol replaced with ==> rot
-        ## qual_vol, rot_vol, width_vol = predict(tsdf_vol, self.pos, self.net, self.device)
         qual_vol, width_vol = predict(tsdf_vol, (pos, rot), self.net, self.device)
+        qual_vol = qual_vol.reshape((self.resolution, self.resolution, self.resolution))
+        rot = rot.reshape((self.resolution, self.resolution, self.resolution, 4))
+        width_vol = width_vol.reshape((self.resolution, self.resolution, self.resolution))
 
-        # Truncate and reshape to nearest multiple of 40
-        size = int(np.cbrt(pos.shape[1]))
-        #print(size, qual_vol.shape, rot.shape, width_vol.shape)
-        qual_vol = qual_vol[:size**3].reshape((size, size, size))
-        rot = rot[:,:size**3,:].reshape((size, size, size, 4))
-        width_vol = width_vol[:size**3].reshape((size, size, size))
 
-        ### DOUBT - dimension errors?
-        #qual_vol, width_vol = process(tsdf_process, qual_vol, rot, width_vol, out_th=self.out_th)
-        
+        qual_vol, width_vol = process(tsdf_process, qual_vol, rot, width_vol, out_th=self.out_th)
         qual_vol = bound(qual_vol, voxel_size)
+
         if self.visualize:
             ### DOUBT - check affordance - visual (WEIRD)
             colored_scene_mesh = visual.affordance_visual(qual_vol, rot, scene_mesh, size, self.resolution, **aff_kwargs)
@@ -183,7 +182,7 @@ def process(
     qual_vol,
     #rot_vol,
     width_vol,
-    gaussian_filter_sigma=1.0,
+    gaussian_filter_sigma=1,
     min_width=0.033,
     max_width=0.233,
     out_th=0.5
@@ -192,7 +191,7 @@ def process(
 
     # smooth quality volume with a Gaussian
     qual_vol = ndimage.gaussian_filter(
-        qual_vol, sigma=gaussian_filter_sigma, mode="nearest"
+        qual_vol, sigma=int(gaussian_filter_sigma), mode="nearest"
     )
 
     # mask out voxels too far away from the surface
