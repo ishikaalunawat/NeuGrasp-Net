@@ -106,10 +106,13 @@ class VGNImplicit(object):
 
         points, normals = self.sample_grasp_points(pc_extended, self.finger_depth)
         pos, rot = self.get_grasp_queries(points, normals) # Grasp queries :: (pos ;xyz, rot ;as quat)
+        
+        # Normalize 3D pos queries
+        pos = pos/size - 0.5
 
         # Variable rot_vol replaced with ==> rot
         qual_vol, width_vol = predict(tsdf_vol, (pos, rot), self.net, self.device)
-
+        
         # reject voxels with predicted widths that are too small or too large
         # qual_vol, width_vol = process(tsdf_process, qual_vol, rot, width_vol, out_th=self.out_th)
         min_width=0.033
@@ -125,7 +128,7 @@ class VGNImplicit(object):
 
         if self.visualize:
             ### TODO - check affordance - visual (WEIRD)
-            pass
+            colored_scene_mesh = scene_mesh
             # colored_scene_mesh = visual.affordance_visual(qual_vol, rot, scene_mesh, size, self.resolution, **aff_kwargs)
         # import pdb; pdb.set_trace()
         grasps, scores = select(qual_vol.copy(), pos.view(self.resolution, self.resolution, self.resolution, 3).cpu(), rot, width_vol, threshold=self.qual_th, force_detection=self.force_detection, max_filter_size=8 if self.visualize else 4)
@@ -141,8 +144,9 @@ class VGNImplicit(object):
                 p = np.random.permutation(len(grasps))
             for g in grasps[p]:
                 pose = g.pose
-                # pose.translation = (pose.translation + 0.5) * size # Needed?
-                width = g.width #* size # Needed ?
+                # Un-normalize
+                pose.translation = (pose.translation + 0.5) * size
+                width = g.width * size
                 new_grasps.append(Grasp(pose, width))
             scores = scores[p]
         grasps = new_grasps
@@ -243,8 +247,9 @@ def select(qual_vol, center_vol, rot_vol, width_vol, threshold=0.90, max_filter_
     sorted_scores = [scores[i] for i in reversed(np.argsort(scores))]
 
     if best_only and len(sorted_grasps) > 0:
-        sorted_grasps = [sorted_grasps[0]]
-        sorted_scores = [sorted_scores[0]]
+        # Take only top 10
+        sorted_grasps = [sorted_grasps[i] for i in range(10)]
+        sorted_scores = [sorted_scores[i] for i in range(10)]
         
     return sorted_grasps, sorted_scores
 
