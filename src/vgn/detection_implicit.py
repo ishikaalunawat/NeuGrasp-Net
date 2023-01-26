@@ -44,7 +44,7 @@ class VGNImplicit(object):
         mask  = normals[:,-1] > -0.1
         grasp_depth = np.random.uniform(-eps * finger_depth, (1.0 + eps) * finger_depth)
         points = points[mask] + normals[mask] * grasp_depth
-        return points, normals
+        return points, normals[mask]
     
     def get_grasp_queries(self, points, normals):
         # Initializing axes (PyB cam)
@@ -76,7 +76,7 @@ class VGNImplicit(object):
                 pos_queries.append(p)
                 rot_queries.append(ori.as_quat())
 
-        # Truncate and reshape to 64K samples
+        # (TODO: Check if needed) Truncate and reshape to 64K samples
         pos_queries = np.array(pos_queries)[:self.resolution**3]
         rot_queries = np.array(rot_queries)[:self.resolution**3]
         
@@ -103,23 +103,32 @@ class VGNImplicit(object):
             pc_extended = state.pc_extended # Using extended PC for grasp sampling
 
         tic = time.time()
+
         points, normals = self.sample_grasp_points(pc_extended, self.finger_depth)
         pos, rot = self.get_grasp_queries(points, normals) # Grasp queries :: (pos ;xyz, rot ;as quat)
 
         # Variable rot_vol replaced with ==> rot
         qual_vol, width_vol = predict(tsdf_vol, (pos, rot), self.net, self.device)
+
+        # reject voxels with predicted widths that are too small or too large
+        # qual_vol, width_vol = process(tsdf_process, qual_vol, rot, width_vol, out_th=self.out_th)
+        min_width=0.033
+        max_width=0.233
+        qual_vol[np.logical_or(width_vol < min_width, width_vol > max_width)] = 0.0
+
+        # qual_vol = bound(qual_vol, voxel_size) # TODO: Check if needed
+
+        # Reshape to 3D grid. TODO: Check if needed
         qual_vol = qual_vol.reshape((self.resolution, self.resolution, self.resolution))
         rot = rot.reshape((self.resolution, self.resolution, self.resolution, 4))
         width_vol = width_vol.reshape((self.resolution, self.resolution, self.resolution))
 
-
-        qual_vol, width_vol = process(tsdf_process, qual_vol, rot, width_vol, out_th=self.out_th)
-        qual_vol = bound(qual_vol, voxel_size)
-
         if self.visualize:
-            ### DOUBT - check affordance - visual (WEIRD)
-            colored_scene_mesh = visual.affordance_visual(qual_vol, rot, scene_mesh, size, self.resolution, **aff_kwargs)
-        grasps, scores = select(qual_vol.copy(), pos[:,:size**3,:].view(size, size, size, 3).cpu(), rot, width_vol, threshold=self.qual_th, force_detection=self.force_detection, max_filter_size=8 if self.visualize else 4)
+            ### TODO - check affordance - visual (WEIRD)
+            pass
+            # colored_scene_mesh = visual.affordance_visual(qual_vol, rot, scene_mesh, size, self.resolution, **aff_kwargs)
+        # import pdb; pdb.set_trace()
+        grasps, scores = select(qual_vol.copy(), pos.view(self.resolution, self.resolution, self.resolution, 3).cpu(), rot, width_vol, threshold=self.qual_th, force_detection=self.force_detection, max_filter_size=8 if self.visualize else 4)
         toc = time.time() - tic
 
         grasps, scores = np.asarray(grasps), np.asarray(scores)
@@ -132,8 +141,8 @@ class VGNImplicit(object):
                 p = np.random.permutation(len(grasps))
             for g in grasps[p]:
                 pose = g.pose
-                pose.translation = (pose.translation + 0.5) * size
-                width = g.width * size
+                # pose.translation = (pose.translation + 0.5) * size # Needed?
+                width = g.width #* size # Needed ?
                 new_grasps.append(Grasp(pose, width))
             scores = scores[p]
         grasps = new_grasps
@@ -180,7 +189,7 @@ def predict(tsdf_vol, pos, net, device):
 def process(
     tsdf_vol,
     qual_vol,
-    #rot_vol,
+    rot_vol,
     width_vol,
     gaussian_filter_sigma=1,
     min_width=0.033,
@@ -210,7 +219,7 @@ def process(
 
 
 def select(qual_vol, center_vol, rot_vol, width_vol, threshold=0.90, max_filter_size=4, force_detection=False):
-    best_only = False
+    best_only = True # TODO: Test this
     qual_vol[qual_vol < LOW_TH] = 0.0
     if force_detection and (qual_vol >= threshold).sum() == 0:
         best_only = True
@@ -218,9 +227,9 @@ def select(qual_vol, center_vol, rot_vol, width_vol, threshold=0.90, max_filter_
         # threshold on grasp quality
         qual_vol[qual_vol < threshold] = 0.0
 
-    # non maximum suppression
-    max_vol = ndimage.maximum_filter(qual_vol, size=max_filter_size)
-    qual_vol = np.where(qual_vol == max_vol, qual_vol, 0.0)
+    # non maximum suppression. TODO: Check if needed
+    # max_vol = ndimage.maximum_filter(qual_vol, size=max_filter_size)
+    # qual_vol = np.where(qual_vol == max_vol, qual_vol, 0.0)
     mask = np.where(qual_vol, 1.0, 0.0)
 
     # construct grasps
