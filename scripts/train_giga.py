@@ -127,7 +127,7 @@ def main(args):
     checkpoint_handler = ModelCheckpoint(
         logdir,
         "vgn",
-        n_saved=1,
+        n_saved=None, # Chnaged from 1. Save everythinggg
         require_empty=True,
     )
     best_checkpoint_handler = ModelCheckpoint(

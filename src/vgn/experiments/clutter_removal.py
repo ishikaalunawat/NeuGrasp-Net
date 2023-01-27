@@ -2,7 +2,7 @@ import collections
 import argparse
 from datetime import datetime
 import uuid
-#import wandb
+import wandb
 
 import numpy as np
 import pandas as pd
@@ -19,7 +19,7 @@ MAX_CONSECUTIVE_FAILURES = 2
 
 
 State = collections.namedtuple("State", ["tsdf", "pc"])
-#wandb.init(project="6dgrasp", entity="irosa-ias")
+wandb.init(project="6dgrasp", entity="irosa-ias")
 
 def run(
     grasp_plan_fn,
@@ -78,7 +78,7 @@ def run(
             # scan the scene
             tsdf, pc, timings["integration"] = sim.acquire_tsdf(n=n, N=N, resolution=40)
             # Also sampling extended scene PC for more grasp queries
-            _, pc_extended, _ = sim.acquire_tsdf(n=6, N=N, resolution=40)
+            _, pc_extended, _ = sim.acquire_tsdf(n=16, N=N, resolution=40)
             state = argparse.Namespace(tsdf=tsdf, pc=pc, pc_extended=pc_extended)
             if resolution != 40:
                 extra_tsdf, _, _ = sim.acquire_tsdf(n=n, N=N, resolution=resolution)
@@ -186,8 +186,8 @@ class Logger(object):
         aff_mesh.export(str(self.mesh_dir / (name + "_aff.stl")), 'stl')
         #trimesh.exchange.export.export_scene(aff_mesh, 'abc1.obj', file_type='obj')
         assert not aff_mesh.is_empty
-        #wandb.log({'Grasps (Scene vs Grasp)' : [wandb.Object3D(open(self.mesh_dir / (name + "_scene.obj"))),
-        #                                        wandb.Object3D(open(self.mesh_dir / (name + "_aff.obj")))]})
+        wandb.log({'Grasps (Scene vs Grasp)' : [wandb.Object3D(open(self.mesh_dir / (name + "_scene.obj"))),
+                                               wandb.Object3D(open(self.mesh_dir / (name + "_aff.obj")))]})
 
     def log_grasp(self, round_id, state, timings, grasp, score, label):
         # log scene
