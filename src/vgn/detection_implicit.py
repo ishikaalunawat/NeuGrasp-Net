@@ -125,8 +125,8 @@ class VGNImplicit(object):
 
         if self.visualize:
             ### TODO - check affordance - visual (WEIRD)
-            pass
-            # colored_scene_mesh = visual.affordance_visual(qual_vol, rot, scene_mesh, size, self.resolution, **aff_kwargs)
+            #pass
+            colored_scene_mesh = visual.affordance_visual(qual_vol, rot, scene_mesh, size, self.resolution, **aff_kwargs)
         # import pdb; pdb.set_trace()
         grasps, scores = select(qual_vol.copy(), pos.view(self.resolution, self.resolution, self.resolution, 3).cpu(), rot, width_vol, threshold=self.qual_th, force_detection=self.force_detection, max_filter_size=8 if self.visualize else 4)
         toc = time.time() - tic
