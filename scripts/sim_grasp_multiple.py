@@ -50,7 +50,8 @@ def main(args):
             add_noise=args.add_noise,
             sideview=args.sideview,
             silence=args.silence,
-            visualize=args.vis)
+            visualize=args.vis,
+            log_wandb=args.wandb)
         gsr.append(success_rate)
         dr.append(declutter_rate)
     results = {
@@ -118,6 +119,8 @@ if __name__ == "__main__":
     parser.add_argument("--vis",
                         action="store_true",
                         help="visualize and save affordance")
-
+    parser.add_argument("--wandb",
+                        action="store_true",
+                        help="log visualizations to wandb")
     args = parser.parse_args()
     main(args)

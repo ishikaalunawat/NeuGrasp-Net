@@ -104,10 +104,13 @@ def affordance_visual(qual_vol,
     return mesh
 
 
-def grasp2mesh(grasp, score, finger_depth=0.05):
+def grasp2mesh(grasp, score, finger_depth=0.05, color='green'):
     # color = cmap(float(score))
     # color = (np.array(color) * 255).astype(np.uint8)
-    color = np.array([0, 250, 0, 180]).astype(np.uint8)
+    if color == 'green':
+        color = np.array([0, 250, 0, 100]).astype(np.uint8)
+    else: # red
+        color = np.array([250, 0, 0, 100]).astype(np.uint8)
     radius = 0.1 * finger_depth
     w, d = grasp.width, finger_depth
     scene = trimesh.Scene()

@@ -27,7 +27,6 @@ dependencies:
   - mkl_random=1.2.0=py38hc5bc63f_1
   - ncurses=6.2=he6710b0_1
   - ninja=1.10.2=py38hff7bd54_0
-  - numpy-base=1.19.2=py38hfa32c7d_0
   - olefile=0.46=pyh9f0ad1d_1
   - openssl=1.1.1k=h27cfd23_0
   - pillow=8.2.0=py38he98fc37_0
@@ -49,6 +48,7 @@ dependencies:
   - pip:
     - absl-py==0.12.0
     - addict==2.4.0
+    - appdirs==1.4.4
     - argon2-cffi==20.1.0
     - async-generator==1.10
     - attrs==20.3.0
@@ -58,15 +58,19 @@ dependencies:
     - catkin-pkg==0.4.23
     - cffi==1.14.5
     - chardet==4.0.0
+    - click==8.1.3
     - cycler==0.10.0
     - cython==0.29.22
     - dataclasses==0.6
     - decorator==4.4.2
     - defusedxml==0.7.1
+    - docker-pycreds==0.4.0
     - docutils==0.17
     - entrypoints==0.3
     - freetype-py==2.2.0
     - future==0.18.2
+    - gitdb==4.0.10
+    - gitpython==3.1.30
     - google-auth==1.28.0
     - google-auth-oauthlib==0.4.4
     - grpcio==1.36.1
@@ -96,19 +100,22 @@ dependencies:
     - nest-asyncio==1.5.1
     - networkx==2.2
     - notebook==6.3.0
-    - numpy==1.20.2
+    - numpy==1.20.0
     - oauthlib==3.1.0
     - open3d==0.12.0
+    - opencv-python==4.7.0.68
     - packaging==20.9
     - pandas==1.2.3
     - pandocfilters==1.4.3
     - parso==0.8.2
+    - pathtools==0.1.2
     - pexpect==4.8.0
     - pickleshare==0.7.5
     - plyfile==0.7.3
     - prometheus-client==0.10.0
     - prompt-toolkit==3.0.18
     - protobuf==3.15.7
+    - psutil==5.9.4
     - ptyprocess==0.7.0
     - pyasn1==0.4.8
     - pyasn1-modules==0.2.8
@@ -117,6 +124,7 @@ dependencies:
     - pycparser==2.20
     - pyglet==1.5.15
     - pygments==2.8.1
+    - pykdtree==1.3.6
     - pyopengl==3.1.0
     - pyparsing==2.4.7
     - pyrender==0.1.45
@@ -134,24 +142,27 @@ dependencies:
     - scikit-learn==0.24.1
     - scipy==1.6.2
     - send2trash==1.5.0
+    - sentry-sdk==1.13.0
+    - setproctitle==1.3.2
     - sklearn==0.0
+    - smmap==5.0.0
     - tensorboard==2.4.1
     - tensorboard-plugin-wit==1.8.0
     - terminado==0.9.4
     - testpath==0.4.4
     - threadpoolctl==2.1.0
     - tifffile==2021.3.31
-    # - torch==1.7.0
-    - wandb
     - torch-scatter==2.0.6
+    - torch-tb-profiler==0.4.1
     - tornado==6.1
     - tqdm==4.59.0
     - traitlets==5.0.5
     - trimesh==3.9.10
     - urdfpy==0.0.22
-    - urllib3==1.26.4
+    - urllib3==1.26.14
+    - wandb==0.13.9
     - wcwidth==0.2.5
     - webencodings==0.5.1
     - werkzeug==1.0.1
     - widgetsnbextension==3.5.1
-prefix: /mnt/data2/zhenyu/anaconda3/envs/GIGA
+prefix: /home/sjauhri/miniconda3/envs/GIGA-6DoF

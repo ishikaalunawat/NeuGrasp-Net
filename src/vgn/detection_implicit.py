@@ -131,12 +131,13 @@ class VGNImplicit(object):
             colored_scene_mesh = scene_mesh
             # colored_scene_mesh = visual.affordance_visual(qual_vol, rot, scene_mesh, size, self.resolution, **aff_kwargs)
         # import pdb; pdb.set_trace()
-        grasps, scores = select(qual_vol.copy(), pos.view(self.resolution, self.resolution, self.resolution, 3).cpu(), rot, width_vol, threshold=self.qual_th, force_detection=self.force_detection, max_filter_size=8 if self.visualize else 4)
+        grasps, scores, bad_grasps, bad_scores = select(qual_vol.copy(), pos.view(self.resolution, self.resolution, self.resolution, 3).cpu(), rot, width_vol, threshold=self.qual_th, force_detection=self.force_detection, max_filter_size=8 if self.visualize else 4)
         toc = time.time() - tic
 
         grasps, scores = np.asarray(grasps), np.asarray(scores)
 
         new_grasps = []
+        new_bad_grasps = []
         if len(grasps) > 0:
             if self.best:
                 p = np.arange(len(grasps))
@@ -148,8 +149,17 @@ class VGNImplicit(object):
                 pose.translation = (pose.translation + 0.5) * size
                 width = g.width * size
                 new_grasps.append(Grasp(pose, width))
+
+            # Debug: Also visualize bad grasps
+            for g in bad_grasps:
+                pose = g.pose
+                # Un-normalize
+                pose.translation = (pose.translation + 0.5) * size
+                width = g.width * size
+                new_bad_grasps.append(Grasp(pose, width))
             scores = scores[p]
         grasps = new_grasps
+        bad_grasps = new_bad_grasps
 
         if self.visualize:
             # Need coloured mesh from affordance_visual()
@@ -157,6 +167,13 @@ class VGNImplicit(object):
             composed_scene = trimesh.Scene(colored_scene_mesh)
             for i, g_mesh in enumerate(grasp_mesh_list):
                 composed_scene.add_geometry(g_mesh, node_name=f'grasp_{i}')
+            # Debug: visualize pcl with normals
+            # import open3d as o3d
+            # o3d.visualization.draw_geometries([pc_extended],point_show_normal=True)
+            # Debug: Also visualize bad grasps
+            bad_grasps_mesh_list = [visual.grasp2mesh(g, s, color='red') for g, s in zip(bad_grasps, bad_scores)]
+            for i, g_mesh in enumerate(bad_grasps_mesh_list):
+                composed_scene.add_geometry(g_mesh, node_name=f'bad_grasp_{i}')
             return grasps, scores, toc, composed_scene
         else:
             return grasps, scores, toc
@@ -223,7 +240,20 @@ def process(
 
 
 def select(qual_vol, center_vol, rot_vol, width_vol, threshold=0.90, max_filter_size=4, force_detection=False):
-    best_only = True # TODO: Test this
+    
+    best_only = True # DEBUG
+    bad_grasps, bad_scores = [], []
+    bad_grasp_mask = np.where(qual_vol<0.5, 1.0, 0.0) # DEBUG
+    bad_indices = np.argwhere(bad_grasp_mask)
+    # Select 10 bad grasps
+    for i in range(10):
+        rand_index = bad_indices[np.random.choice(bad_indices.shape[0])]
+        bad_grasp, bad_score = select_index(qual_vol, center_vol, rot_vol, width_vol, rand_index)
+        bad_grasps.append(bad_grasp)
+        bad_scores.append(bad_score)
+        if len(bad_grasps) >= 10:
+            break
+
     qual_vol[qual_vol < LOW_TH] = 0.0
     if force_detection and (qual_vol >= threshold).sum() == 0:
         best_only = True
@@ -251,7 +281,7 @@ def select(qual_vol, center_vol, rot_vol, width_vol, threshold=0.90, max_filter_
         sorted_grasps = [sorted_grasps[i] for i in range(10)]
         sorted_scores = [sorted_scores[i] for i in range(10)]
         
-    return sorted_grasps, sorted_scores
+    return sorted_grasps, sorted_scores, bad_grasps, bad_scores
 
 
 

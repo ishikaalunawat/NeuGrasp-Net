@@ -13,12 +13,13 @@ from vgn.grasp import *
 from vgn.simulation import ClutterRemovalSim
 from vgn.utils.transform import Rotation, Transform
 from vgn.utils.implicit import get_mesh_pose_list_from_world, get_scene_from_mesh_pose_list
+import trimesh
+import open3d as o3d
 
 MAX_CONSECUTIVE_FAILURES = 2
 
 
 State = collections.namedtuple("State", ["tsdf", "pc"])
-wandb.init(project="6dgrasp", entity="irosa-ias")
 
 def run(
     grasp_plan_fn,
@@ -37,7 +38,8 @@ def run(
     sideview=False,
     resolution=40,
     silence=False,
-    visualize=False
+    visualize=False,
+    log_wandb=False
 ):
     """Run several rounds of simulated clutter removal experiments.
 
@@ -59,7 +61,8 @@ def run(
     no_grasp = 0
     planning_times = []
     total_times = []
-
+    if log_wandb:
+        wandb.init(project="6dgrasp", entity="irosa-ias")
     for _ in tqdm.tqdm(range(num_rounds), disable=silence):
         sim.reset(num_objects)
 
@@ -76,8 +79,15 @@ def run(
 
             # scan the scene
             tsdf, pc, timings["integration"] = sim.acquire_tsdf(n=n, N=N, resolution=40)
+            
             # Also sampling extended scene PC for more grasp queries
-            _, pc_extended, _ = sim.acquire_tsdf(n=16, N=N, resolution=40)
+            # _, pc_extended, _ = sim.acquire_tsdf(n=16, N=N, resolution=40) # Sample with many views
+            mesh_pose_list = get_mesh_pose_list_from_world(sim.world, object_set)
+            scene_mesh = get_scene_from_mesh_pose_list(mesh_pose_list)
+            o3d_scene_mesh = scene_mesh.as_open3d
+            o3d_scene_mesh.compute_vertex_normals()
+            pc_extended = o3d_scene_mesh.sample_points_uniformly(number_of_points=1500) # Sample point cloud and normals from GT mesh
+
             state = argparse.Namespace(tsdf=tsdf, pc=pc, pc_extended=pc_extended)
             if resolution != 40:
                 extra_tsdf, _, _ = sim.acquire_tsdf(n=n, N=N, resolution=resolution)
@@ -92,7 +102,9 @@ def run(
                 scene_mesh = get_scene_from_mesh_pose_list(mesh_pose_list)
                 grasps, scores, timings["planning"], visual_mesh = grasp_plan_fn(state, scene_mesh)
                 assert not visual_mesh.is_empty
-                logger.log_mesh(scene_mesh, visual_mesh, f'round_{round_id:03d}_trial_{trial_id:03d}')
+                # trimesh.viewer.SceneViewer(visual_mesh)
+                visual_mesh.show(resolution=(600, 600))
+                logger.log_mesh(scene_mesh, visual_mesh, f'round_{round_id:03d}_trial_{trial_id:03d}', log_wandb)
                 
             else:
                 grasps, scores, timings["planning"] = grasp_plan_fn(state)
@@ -179,13 +191,14 @@ class Logger(object):
     def log_round(self, round_id, object_count):
         io.append_csv(self.rounds_csv_path, round_id, object_count)
 
-    def log_mesh(self, scene_mesh, aff_mesh, name):
+    def log_mesh(self, scene_mesh, aff_mesh, name, log_wandb=False):
         scene_mesh.export(self.mesh_dir / (name + "_scene.obj"), 'obj')
         aff_mesh = aff_mesh.scaled(4)
         aff_mesh.export(str(self.mesh_dir / (name + "_aff.obj")), 'obj')
         assert not aff_mesh.is_empty
-        wandb.log({'Grasps (Scene vs Grasp)' : [wandb.Object3D(open(self.mesh_dir / (name + "_scene.obj"))),
-                                               wandb.Object3D(open(self.mesh_dir / (name + "_aff.obj")))]})
+        if log_wandb:
+            wandb.log({'Grasps (Scene vs Grasp)' : [wandb.Object3D(open(self.mesh_dir / (name + "_scene.obj"))),
+                                                wandb.Object3D(open(self.mesh_dir / (name + "_aff.obj")))]})
 
     def log_grasp(self, round_id, state, timings, grasp, score, label):
         # log scene
