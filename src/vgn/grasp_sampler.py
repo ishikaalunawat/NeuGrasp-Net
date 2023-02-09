@@ -63,7 +63,7 @@ class GpgGraspSamplerPcl():
 
     __metaclass__ = ABCMeta
 
-    def __init__(self, gripper_hand_depth=0.05, debug_vis=True):
+    def __init__(self, gripper_hand_depth=0.05, debug_vis=False):
         self.params = {
             # 'num_rball_points': 27,  # FIXME: the same as meshpy..surface_normal()
             'num_dy': 10,  # number
@@ -103,7 +103,7 @@ class GpgGraspSamplerPcl():
         self.params['gripper_hand_depth'] = gripper_hand_depth
         self.params['debug_vis'] = debug_vis
 
-    def sample_grasps(self, point_cloud, num_grasps=20, max_num_samples=240, show_final_grasps=False,
+    def sample_grasps(self, point_cloud, num_grasps=20, max_num_samples=180, show_final_grasps=False,
                       **kwargs):
         """
         Returns a list of candidate grasps for the given point cloud.
@@ -133,6 +133,8 @@ class GpgGraspSamplerPcl():
         sampled_surface_amount = 0
         grasps = []
         processed_potential_grasps = []
+        potential_grasps_vgn_pos = []
+        potential_grasps_vgn_rot = []
         processed_potential_grasps_vgn = []
 
         hand_points = self.get_hand_points(np.array([0, 0, 0]), np.array([1, 0, 0]), np.array([0, 1, 0]))
@@ -140,6 +142,8 @@ class GpgGraspSamplerPcl():
         # get all grasps
         while len(grasps) < num_grasps and sampled_surface_amount < max_num_samples:
             ind = np.random.choice(all_points.shape[0], size=1, replace=False)
+            sampled_surface_amount += 1
+            print("No. of sampled surface points:", sampled_surface_amount)
             ok = all_normals[ind, 2] > -0.1  # make sure the normal is pointing upwards
             if not ok:
                 continue
@@ -208,7 +212,7 @@ class GpgGraspSamplerPcl():
                     x, y, z = minor_pc
                     dtheta = np.float64(dtheta)
                     quat = np.array([x, y, z, dtheta / 180 * np.pi])
-                    rotation = Rotation.from_quat(quat).as_matrix()
+                    rotation = Rotation.from_quat(quat).as_matrix() # NOTE this also rotates about the z axis (minor_pc) to get the correct grasping frame
                     for dy in np.arange(-self.params['num_dy'] * self.params['gripper_finger_width'],
                                         (self.params['num_dy'] + 1) * self.params['gripper_finger_width'],
                                         self.params['gripper_finger_width']):
@@ -218,7 +222,7 @@ class GpgGraspSamplerPcl():
                         tmp_grasp_bottom_center = selected_surface + tmp_major_pc * dy
                         # go back a bite after rotation dtheta and translation dy!
                         tmp_grasp_bottom_center = self.params['gripper_init_bite'] * (
-                                tmp_grasp_normal * normal_dir) + tmp_grasp_bottom_center # TODO: Check if minus sign needed
+                                -tmp_grasp_normal * normal_dir) + tmp_grasp_bottom_center
 
                         open_points, _ = self.check_collision_square(tmp_grasp_bottom_center, tmp_grasp_normal,
                                                                      tmp_major_pc, minor_pc, all_points,
@@ -266,16 +270,16 @@ class GpgGraspSamplerPcl():
                         if is_collide:
                             # if collide, go back one step to get a collision free hand position
                             tmp_grasp_bottom_center += (-tmp_grasp_normal) * self.params['approach_step'] * 3
-                            # minus 3 means we want the grasp go back a little bitte more.
+                            # minus 2 means we want the grasp go back a little bit more.
 
-                            # here we check if the gripper collide with the table.
+                            # here we check if the gripper collides with the table.
                             hand_points_ = self.get_hand_points(tmp_grasp_bottom_center,
                                                                 tmp_grasp_normal,
                                                                 tmp_major_pc)[1:]
                             min_finger_end = hand_points_[:, 2].min()
                             min_finger_end_pos_ind = np.where(hand_points_[:, 2] == min_finger_end)[0][0]
 
-                            safety_dis_above_table = 0.01
+                            safety_dis_above_table = 0.02 # 2cm
                             if min_finger_end < safety_dis_above_table:
                                 min_finger_pos = hand_points_[min_finger_end_pos_ind]  # the lowest point in a gripper
                                 x = -min_finger_pos[2]*tmp_grasp_normal[0]/tmp_grasp_normal[2]+min_finger_pos[0]
@@ -284,7 +288,7 @@ class GpgGraspSamplerPcl():
                                 dis_go_back = np.linalg.norm([min_finger_pos, p_table]) + safety_dis_above_table
                                 tmp_grasp_bottom_center_modify = tmp_grasp_bottom_center-tmp_grasp_normal*dis_go_back
                             else:
-                                # if the grasp is not collide with the table, do not change the grasp
+                                # if the grasp does not collide with the table, do not change the grasp
                                 tmp_grasp_bottom_center_modify = tmp_grasp_bottom_center
 
                             # final check
@@ -300,13 +304,17 @@ class GpgGraspSamplerPcl():
                                                                   tmp_major_pc, minor_pc,
                                                                   tmp_grasp_bottom_center_modify])
                                 # Convert grasp to VGN style grasp:
-                                z_axis = -tmp_grasp_normal
-                                x_axis = tmp_major_pc
-                                y_axis = -minor_pc
-                                # y_axis = np.cross(z_axis, x_axis)
+                                z_axis = tmp_grasp_normal
+                                y_axis = tmp_major_pc
+                                x_axis = -minor_pc
                                 # x_axis = np.cross(y_axis, z_axis)
                                 R = Rotation.from_matrix(np.vstack((x_axis, y_axis, z_axis)).T)
-                                curr_grasp = Grasp(Transform(R, tmp_grasp_bottom_center_modify), self.params['gripper_max_width']) # make grasp
+                                curr_grasp_pos = tmp_grasp_bottom_center_modify
+                                curr_grasp_rot = R
+                                curr_grasp = Grasp(Transform(curr_grasp_rot, curr_grasp_pos), self.params['gripper_max_width']) # make grasp
+                                
+                                potential_grasps_vgn_pos.append(curr_grasp_pos)
+                                potential_grasps_vgn_rot.append(curr_grasp_rot)
                                 processed_potential_grasps_vgn.append(curr_grasp)
 
                                 if self.params['debug_vis']:
@@ -320,17 +328,18 @@ class GpgGraspSamplerPcl():
                                 break
                 # logger.info("processed_potential_grasp %d", len(processed_potential_grasps))
 
-            sampled_surface_amount += 1
             # logger.info("current amount of sampled surface %d", sampled_surface_amount)
-            print("No. of sampled surface points:", sampled_surface_amount)
             print("No. of grasp candidates sampled using GPG:", len(processed_potential_grasps_vgn))
             if len(processed_potential_grasps_vgn) >= num_grasps or sampled_surface_amount >= max_num_samples:
                 if show_final_grasps:
                     # Show all grasps and the surface point cloud with open3d
                     self.show_grasps_and_pcl_open3d(processed_potential_grasps_vgn, point_cloud)
-                return processed_potential_grasps_vgn
+                return processed_potential_grasps_vgn, np.array(potential_grasps_vgn_pos), np.array(potential_grasps_vgn_rot)
 
-        return processed_potential_grasps_vgn
+        if show_final_grasps:
+            # Show all grasps and the surface point cloud with open3d
+            self.show_grasps_and_pcl_open3d(processed_potential_grasps_vgn, point_cloud)
+        return processed_potential_grasps_vgn, potential_grasps_vgn_pos, potential_grasps_vgn_rot
 
     def show_grasps_and_pcl_open3d(self, grasps, point_cloud):
         grasps_scene = trimesh.Scene()

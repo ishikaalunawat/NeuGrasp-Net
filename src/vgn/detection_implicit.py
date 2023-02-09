@@ -111,9 +111,7 @@ class VGNImplicit(object):
         
         # Get grasp samples from GPG
         grasp_sampler = GpgGraspSamplerPcl(self.finger_depth)
-        grasps = grasp_sampler.sample_grasps(pc_extended, num_grasps=60, show_final_grasps=True)
-        pos, rot = self.get_grasp_queries(points, normals) # Grasp queries :: (pos ;xyz, rot ;as quat)
-
+        grasps, pos, rot = grasp_sampler.sample_grasps(pc_extended, num_grasps=60, show_final_grasps=False)
         
         # Normalize 3D pos queries
         pos = pos/size - 0.5
