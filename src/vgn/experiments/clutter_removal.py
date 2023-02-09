@@ -65,6 +65,7 @@ def run(
         wandb.init(project="6dgrasp", entity="irosa-ias")
     for _ in tqdm.tqdm(range(num_rounds), disable=silence):
         sim.reset(num_objects)
+        sim.save_state()
 
         round_id = logger.last_round_id() + 1
         logger.log_round(round_id, sim.num_objects)
@@ -87,7 +88,7 @@ def run(
             scene_mesh = get_scene_from_mesh_pose_list(mesh_pose_list)
             o3d_scene_mesh = scene_mesh.as_open3d
             o3d_scene_mesh.compute_vertex_normals()
-            pc_extended = o3d_scene_mesh.sample_points_uniformly(number_of_points=1500) # Sample point cloud and normals from GT mesh
+            pc_extended = o3d_scene_mesh.sample_points_uniformly(number_of_points=1000) # Sample point cloud and normals from GT mesh
             
             state = argparse.Namespace(tsdf=tsdf, pc=pc, pc_extended=pc_extended)
             if resolution != 40:
@@ -119,8 +120,8 @@ def run(
             # execute grasp
             # grasp, score = grasps[0], scores[0]
             for grasp, score in zip(grasps, scores):
+                label, _ = sim.execute_grasp(grasp, allow_contact=True, remove=False)
                 sim.restore_state()
-                label, _ = sim.execute_grasp(grasp, allow_contact=True)
                 cnt += 1
                 if label != Label.FAILURE:
                     success += 1
