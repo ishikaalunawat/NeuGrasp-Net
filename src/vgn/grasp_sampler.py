@@ -81,7 +81,7 @@ class GpgGraspSamplerPcl():
             "gripper_finger_width": 0.02, # Approx
             "gripper_hand_height": 0.030,
             "gripper_hand_outer_diameter": 0.12, # 0.218, the diameter of the robot hand (= maximum aperture plus 2 * finger width)
-            "gripper_hand_depth": 0.05, # 0.125,
+            "gripper_hand_depth": 0.03, # 0.125,
             "gripper_init_bite": 0.01
 
             # Robotiq 2F-85
@@ -123,6 +123,7 @@ class GpgGraspSamplerPcl():
         """
         np.random.seed() # Random seed
         # get all surface points
+        # TODO: For dense point cloud, we can use voxel grid downsampling to reduce the number of points
         all_points = np.asarray(point_cloud.points)
         if point_cloud.normals:
             all_normals = np.asarray(point_cloud.normals)
@@ -269,8 +270,7 @@ class GpgGraspSamplerPcl():
 
                         if is_collide:
                             # if collide, go back one step to get a collision free hand position
-                            tmp_grasp_bottom_center += (-tmp_grasp_normal) * self.params['approach_step'] * 3
-                            # minus 2 means we want the grasp go back a little bit more.
+                            tmp_grasp_bottom_center += (-tmp_grasp_normal) * self.params['approach_step'] #* 2
 
                             # here we check if the gripper collides with the table.
                             hand_points_ = self.get_hand_points(tmp_grasp_bottom_center,
@@ -279,7 +279,7 @@ class GpgGraspSamplerPcl():
                             min_finger_end = hand_points_[:, 2].min()
                             min_finger_end_pos_ind = np.where(hand_points_[:, 2] == min_finger_end)[0][0]
 
-                            safety_dis_above_table = 0.02 # 2cm
+                            safety_dis_above_table = 0.005 # 0.5cm
                             if min_finger_end < safety_dis_above_table:
                                 min_finger_pos = hand_points_[min_finger_end_pos_ind]  # the lowest point in a gripper
                                 x = -min_finger_pos[2]*tmp_grasp_normal[0]/tmp_grasp_normal[2]+min_finger_pos[0]
