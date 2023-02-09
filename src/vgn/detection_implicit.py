@@ -12,6 +12,8 @@ from vgn.networks import load_network
 from vgn.utils import visual
 from vgn.utils.implicit import as_mesh
 
+from vgn.grasp_sampler import GpgGraspSamplerPcl
+
 LOW_TH = 0.5
 axes_cond = lambda x,z: np.isclose(np.abs(np.dot(x, z)), 1.0, 1e-4)
 
@@ -104,8 +106,14 @@ class VGNImplicit(object):
 
         tic = time.time()
 
-        points, normals = self.sample_grasp_points(pc_extended, self.finger_depth)
+        # points, normals = self.sample_grasp_points(pc_extended, self.finger_depth)
+        # pos, rot = self.get_grasp_queries(points, normals) # Grasp queries :: (pos ;xyz, rot ;as quat)
+        
+        # Get grasp samples from GPG
+        grasp_sampler = GpgGraspSamplerPcl(self.finger_depth)
+        grasps = grasp_sampler.sample_grasps(pc_extended, num_grasps=60, show_final_grasps=True)
         pos, rot = self.get_grasp_queries(points, normals) # Grasp queries :: (pos ;xyz, rot ;as quat)
+
         
         # Normalize 3D pos queries
         pos = pos/size - 0.5
@@ -147,7 +155,7 @@ class VGNImplicit(object):
                 pose = g.pose
                 # Un-normalize
                 pose.translation = (pose.translation + 0.5) * size
-                width = g.width * size
+                width = 0.23 * size # Temp: Use only highest width grasps. g.width * size
                 new_grasps.append(Grasp(pose, width))
 
             # Debug: Also visualize bad grasps
@@ -155,7 +163,7 @@ class VGNImplicit(object):
                 pose = g.pose
                 # Un-normalize
                 pose.translation = (pose.translation + 0.5) * size
-                width = g.width * size
+                width = 0.23 * size # Temp: Use only highest width grasps. g.width * size
                 new_bad_grasps.append(Grasp(pose, width))
             scores = scores[p]
         grasps = new_grasps

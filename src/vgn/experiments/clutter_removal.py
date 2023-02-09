@@ -82,12 +82,13 @@ def run(
             
             # Also sampling extended scene PC for more grasp queries
             # _, pc_extended, _ = sim.acquire_tsdf(n=16, N=N, resolution=40) # Sample with many views
+            
             mesh_pose_list = get_mesh_pose_list_from_world(sim.world, object_set)
             scene_mesh = get_scene_from_mesh_pose_list(mesh_pose_list)
             o3d_scene_mesh = scene_mesh.as_open3d
             o3d_scene_mesh.compute_vertex_normals()
             pc_extended = o3d_scene_mesh.sample_points_uniformly(number_of_points=1500) # Sample point cloud and normals from GT mesh
-
+            
             state = argparse.Namespace(tsdf=tsdf, pc=pc, pc_extended=pc_extended)
             if resolution != 40:
                 extra_tsdf, _, _ = sim.acquire_tsdf(n=n, N=N, resolution=resolution)

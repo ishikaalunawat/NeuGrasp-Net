@@ -104,7 +104,7 @@ def affordance_visual(qual_vol,
     return mesh
 
 
-def grasp2mesh(grasp, score, finger_depth=0.05, color='green'):
+def grasp2mesh(grasp, score=0, finger_depth=0.05, color='green'):
     # color = cmap(float(score))
     # color = (np.array(color) * 255).astype(np.uint8)
     if color == 'green':
