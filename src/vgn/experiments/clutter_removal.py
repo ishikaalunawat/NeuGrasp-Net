@@ -117,22 +117,24 @@ def run(
                 break  # no detections found, abort this round
 
             # execute grasp
-            grasp, score = grasps[0], scores[0]
-            label, _ = sim.execute_grasp(grasp, allow_contact=True)
-            cnt += 1
-            if label != Label.FAILURE:
-                success += 1
+            # grasp, score = grasps[0], scores[0]
+            for grasp, score in zip(grasps, scores):
+                sim.restore_state()
+                label, _ = sim.execute_grasp(grasp, allow_contact=True)
+                cnt += 1
+                if label != Label.FAILURE:
+                    success += 1
 
-            # log the grasp
-            logger.log_grasp(round_id, state, timings, grasp, score, label)
+                # log the grasp
+                logger.log_grasp(round_id, state, timings, grasp, score, label)
 
-            if last_label == Label.FAILURE and label == Label.FAILURE:
-                consecutive_failures += 1
-            else:
-                consecutive_failures = 1
-            if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
-                cons_fail += 1
-            last_label = label
+                if last_label == Label.FAILURE and label == Label.FAILURE:
+                    consecutive_failures += 1
+                else:
+                    consecutive_failures = 1
+                if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
+                    cons_fail += 1
+                last_label = label
         left_objs += sim.num_objects
     success_rate = 100.0 * success / cnt
     declutter_rate = 100.0 * success / total_objs

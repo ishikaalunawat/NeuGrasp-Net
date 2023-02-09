@@ -113,76 +113,76 @@ class VGNImplicit(object):
         grasp_sampler = GpgGraspSamplerPcl(self.finger_depth)
         grasps, pos, rot = grasp_sampler.sample_grasps(pc_extended, num_grasps=60, show_final_grasps=False)
         
-        # Normalize 3D pos queries
-        pos = pos/size - 0.5
+        # # Normalize 3D pos queries
+        # pos = pos/size - 0.5
 
-        # Variable rot_vol replaced with ==> rot
-        qual_vol, width_vol = predict(tsdf_vol, (pos, rot), self.net, self.device)
+        # # Variable rot_vol replaced with ==> rot
+        # qual_vol, width_vol = predict(tsdf_vol, (pos, rot), self.net, self.device)
         
-        # reject voxels with predicted widths that are too small or too large
-        # qual_vol, width_vol = process(tsdf_process, qual_vol, rot, width_vol, out_th=self.out_th)
-        min_width=0.033
-        max_width=0.233
-        qual_vol[np.logical_or(width_vol < min_width, width_vol > max_width)] = 0.0
+        # # reject voxels with predicted widths that are too small or too large
+        # # qual_vol, width_vol = process(tsdf_process, qual_vol, rot, width_vol, out_th=self.out_th)
+        # min_width=0.033
+        # max_width=0.233
+        # qual_vol[np.logical_or(width_vol < min_width, width_vol > max_width)] = 0.0
 
-        # qual_vol = bound(qual_vol, voxel_size) # TODO: Check if needed
+        # # qual_vol = bound(qual_vol, voxel_size) # TODO: Check if needed
 
-        # Reshape to 3D grid. TODO: Check if needed
-        qual_vol = qual_vol.reshape((self.resolution, self.resolution, self.resolution))
-        rot = rot.reshape((self.resolution, self.resolution, self.resolution, 4))
-        width_vol = width_vol.reshape((self.resolution, self.resolution, self.resolution))
+        # # Reshape to 3D grid. TODO: Check if needed
+        # qual_vol = qual_vol.reshape((self.resolution, self.resolution, self.resolution))
+        # rot = rot.reshape((self.resolution, self.resolution, self.resolution, 4))
+        # width_vol = width_vol.reshape((self.resolution, self.resolution, self.resolution))
 
-        if self.visualize:
-            ### TODO - check affordance - visual (WEIRD)
-            colored_scene_mesh = scene_mesh
-            # colored_scene_mesh = visual.affordance_visual(qual_vol, rot, scene_mesh, size, self.resolution, **aff_kwargs)
-        # import pdb; pdb.set_trace()
-        grasps, scores, bad_grasps, bad_scores = select(qual_vol.copy(), pos.view(self.resolution, self.resolution, self.resolution, 3).cpu(), rot, width_vol, threshold=self.qual_th, force_detection=self.force_detection, max_filter_size=8 if self.visualize else 4)
+        # if self.visualize:
+        #     ### TODO - check affordance - visual (WEIRD)
+        #     colored_scene_mesh = scene_mesh
+        #     # colored_scene_mesh = visual.affordance_visual(qual_vol, rot, scene_mesh, size, self.resolution, **aff_kwargs)
+        # # import pdb; pdb.set_trace()
+        # grasps, scores, bad_grasps, bad_scores = select(qual_vol.copy(), pos.view(self.resolution, self.resolution, self.resolution, 3).cpu(), rot, width_vol, threshold=self.qual_th, force_detection=self.force_detection, max_filter_size=8 if self.visualize else 4)
         toc = time.time() - tic
-
+        scores = np.zeros(len(grasps))
         grasps, scores = np.asarray(grasps), np.asarray(scores)
 
-        new_grasps = []
-        new_bad_grasps = []
-        if len(grasps) > 0:
-            if self.best:
-                p = np.arange(len(grasps))
-            else:
-                p = np.random.permutation(len(grasps))
-            for g in grasps[p]:
-                pose = g.pose
-                # Un-normalize
-                pose.translation = (pose.translation + 0.5) * size
-                width = 0.23 * size # Temp: Use only highest width grasps. g.width * size
-                new_grasps.append(Grasp(pose, width))
+        # new_grasps = []
+        # new_bad_grasps = []
+        # if len(grasps) > 0:
+        #     if self.best:
+        #         p = np.arange(len(grasps))
+        #     else:
+        #         p = np.random.permutation(len(grasps))
+        #     for g in grasps[p]:
+        #         pose = g.pose
+        #         # Un-normalize
+        #         pose.translation = (pose.translation + 0.5) * size
+        #         width = 0.23 * size # Temp: Use only highest width grasps. g.width * size
+        #         new_grasps.append(Grasp(pose, width))
 
-            # Debug: Also visualize bad grasps
-            for g in bad_grasps:
-                pose = g.pose
-                # Un-normalize
-                pose.translation = (pose.translation + 0.5) * size
-                width = 0.23 * size # Temp: Use only highest width grasps. g.width * size
-                new_bad_grasps.append(Grasp(pose, width))
-            scores = scores[p]
-        grasps = new_grasps
-        bad_grasps = new_bad_grasps
+        #     # Debug: Also visualize bad grasps
+        #     for g in bad_grasps:
+        #         pose = g.pose
+        #         # Un-normalize
+        #         pose.translation = (pose.translation + 0.5) * size
+        #         width = 0.23 * size # Temp: Use only highest width grasps. g.width * size
+        #         new_bad_grasps.append(Grasp(pose, width))
+        #     scores = scores[p]
+        # grasps = new_grasps
+        # bad_grasps = new_bad_grasps
 
-        if self.visualize:
-            # Need coloured mesh from affordance_visual()
-            grasp_mesh_list = [visual.grasp2mesh(g, s) for g, s in zip(grasps, scores)]
-            composed_scene = trimesh.Scene(colored_scene_mesh)
-            for i, g_mesh in enumerate(grasp_mesh_list):
-                composed_scene.add_geometry(g_mesh, node_name=f'grasp_{i}')
-            # Debug: visualize pcl with normals
-            # import open3d as o3d
-            # o3d.visualization.draw_geometries([pc_extended],point_show_normal=True)
-            # Debug: Also visualize bad grasps
-            bad_grasps_mesh_list = [visual.grasp2mesh(g, s, color='red') for g, s in zip(bad_grasps, bad_scores)]
-            for i, g_mesh in enumerate(bad_grasps_mesh_list):
-                composed_scene.add_geometry(g_mesh, node_name=f'bad_grasp_{i}')
-            return grasps, scores, toc, composed_scene
-        else:
-            return grasps, scores, toc
+        # if self.visualize:
+        #     # Need coloured mesh from affordance_visual()
+        #     grasp_mesh_list = [visual.grasp2mesh(g, s) for g, s in zip(grasps, scores)]
+        #     composed_scene = trimesh.Scene(colored_scene_mesh)
+        #     for i, g_mesh in enumerate(grasp_mesh_list):
+        #         composed_scene.add_geometry(g_mesh, node_name=f'grasp_{i}')
+        #     # Debug: visualize pcl with normals
+        #     # import open3d as o3d
+        #     # o3d.visualization.draw_geometries([pc_extended],point_show_normal=True)
+        #     # Debug: Also visualize bad grasps
+        #     bad_grasps_mesh_list = [visual.grasp2mesh(g, s, color='red') for g, s in zip(bad_grasps, bad_scores)]
+        #     for i, g_mesh in enumerate(bad_grasps_mesh_list):
+        #         composed_scene.add_geometry(g_mesh, node_name=f'bad_grasp_{i}')
+        #     return grasps, scores, toc, composed_scene
+        # else:
+        return grasps, scores, toc
     
 
 def bound(qual_vol, voxel_size, limit=[0.02, 0.02, 0.055]):
