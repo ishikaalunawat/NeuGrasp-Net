@@ -285,7 +285,7 @@ class GpgGraspSamplerPcl():
                                 x = -min_finger_pos[2]*tmp_grasp_normal[0]/tmp_grasp_normal[2]+min_finger_pos[0]
                                 y = -min_finger_pos[2]*tmp_grasp_normal[1]/tmp_grasp_normal[2]+min_finger_pos[1]
                                 p_table = np.array([x, y, 0])  # the point that on the table
-                                dis_go_back = np.linalg.norm([min_finger_pos, p_table]) + safety_dis_above_table
+                                dis_go_back = np.linalg.norm([min_finger_pos-p_table]) + safety_dis_above_table
                                 tmp_grasp_bottom_center_modify = tmp_grasp_bottom_center-tmp_grasp_normal*dis_go_back
                             else:
                                 # if the grasp does not collide with the table, do not change the grasp
