@@ -29,7 +29,7 @@ def affordance_visual(qual_vol,
                       rad=0.02,
                       finger_depth=0.05,
                       finger_offset=0.5,
-                      move_center=False,
+                      move_center=True,
                       aggregation='max'):
     # Transform voxel grid into point cloud
     x = np.linspace(0, size, num=resolution)

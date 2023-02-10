@@ -25,7 +25,7 @@ def main(args):
     with open(filename, 'r') as f:
         note = (";").join(f.readlines()[1:5]).replace('\n', '')
 
-    wandb.init(config=args, project="6dgrasp", entity="irosa-ias", notes = note)
+    #wandb.init(config=args, project="6dgrasp", entity="irosa-ias", notes = note)
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
     kwargs = {"num_workers": 16, "pin_memory": True} if use_cuda else {}
@@ -73,7 +73,7 @@ def main(args):
     for k in LOSS_KEYS:
         metrics[k] = Average(lambda out, sk=k: out[3][sk])
     
-    wandb.watch(net, log_freq=100)
+    #wandb.watch(net, log_freq=100)
 
     # create ignite engines for training and validation
     trainer = create_trainer(net, optimizer, scheduler, loss_fn, metrics, device)
@@ -89,7 +89,8 @@ def main(args):
     def log_train_results(engine):
         epoch, metrics = trainer.state.epoch, trainer.state.metrics
         for k, v in metrics.items():
-            wandb.log({'train_'+k:v})
+            #wandb.log({'train_'+k:v})
+            continue
 
         msg = 'Train'
         for k, v in metrics.items():
@@ -104,7 +105,8 @@ def main(args):
         # out = evaluator.state.output
 
         for k, v in metrics.items():
-            wandb.log({'val_'+k:v})
+            #wandb.log({'val_'+k:v})
+            continue
 
         msg = 'Val'
         for k, v in metrics.items():
@@ -197,7 +199,7 @@ def loss_fn(y_pred, y):
     # loss_rot = _rot_loss_fn(rotation_pred, rotations)
     loss_width = _width_loss_fn(width_pred, width)
     loss_occ = _occ_loss_fn(occ_pred, occ)
-    loss = loss_qual + label * (0.01) + loss_occ # <-label * (loss_rot + 0.01 * loss_width): new one, Changed
+    loss = loss_qual + label * (0.01 * loss_width) + loss_occ # <-label * (loss_rot + 0.01 * loss_width): new one, Changed
     loss_dict = {'loss_qual': loss_qual.mean(),
                 #  'loss_rot': loss_rot.mean(),
                 'loss_width': loss_width.mean(),

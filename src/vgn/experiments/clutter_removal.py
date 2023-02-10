@@ -7,6 +7,7 @@ import wandb
 import numpy as np
 import pandas as pd
 import tqdm
+import trimesh
 
 from vgn import io#, vis
 from vgn.grasp import *
@@ -181,8 +182,9 @@ class Logger(object):
 
     def log_mesh(self, scene_mesh, aff_mesh, name):
         scene_mesh.export(self.mesh_dir / (name + "_scene.obj"), 'obj')
-        aff_mesh = aff_mesh.scaled(4)
-        aff_mesh.export(str(self.mesh_dir / (name + "_aff.obj")), 'obj')
+        #aff_mesh = aff_mesh.scaled(4)
+        aff_mesh.export(str(self.mesh_dir / (name + "_aff.stl")), 'stl')
+        #trimesh.exchange.export.export_scene(aff_mesh, 'abc1.obj', file_type='obj')
         assert not aff_mesh.is_empty
         wandb.log({'Grasps (Scene vs Grasp)' : [wandb.Object3D(open(self.mesh_dir / (name + "_scene.obj"))),
                                                wandb.Object3D(open(self.mesh_dir / (name + "_aff.obj")))]})
