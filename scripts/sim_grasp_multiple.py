@@ -87,7 +87,7 @@ if __name__ == "__main__":
     parser.add_argument("--num-objects", type=int, default=5)
     parser.add_argument("--num-view", type=int, default=1) # No need to change
     parser.add_argument("--num-rounds", type=int, default=100)
-    parser.add_argument("--seeds", type=int, nargs='+', default=[9, 8, 7, 6, 5])
+    parser.add_argument("--seeds", type=int, nargs='+', default=[7, 6, 5, 4, 3])
     parser.add_argument("--sim-gui", action="store_true")
     # parser.add_argument("--grad-refine", action="store_true")
     parser.add_argument("--qual-th", type=float, default=0.9)

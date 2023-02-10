@@ -74,68 +74,68 @@ def run(
         last_label = None
         trial_id = -1
 
-        while sim.num_objects > 0 and consecutive_failures < MAX_CONSECUTIVE_FAILURES:
-            trial_id += 1
-            timings = {}
+        # while consecutive_failures < MAX_CONSECUTIVE_FAILURES and sim.num_objects > 0:
+        trial_id += 1
+        timings = {}
 
-            # scan the scene
-            tsdf, pc, timings["integration"] = sim.acquire_tsdf(n=n, N=N, resolution=40)
-            
-            # Also sampling extended scene PC for more grasp queries
-            # _, pc_extended, _ = sim.acquire_tsdf(n=16, N=N, resolution=40) # Sample with many views
-            
+        # scan the scene
+        tsdf, pc, timings["integration"] = sim.acquire_tsdf(n=n, N=N, resolution=40)
+        
+        # Also sampling extended scene PC for more grasp queries
+        # _, pc_extended, _ = sim.acquire_tsdf(n=16, N=N, resolution=40) # Sample with many views
+        
+        mesh_pose_list = get_mesh_pose_list_from_world(sim.world, object_set)
+        scene_mesh = get_scene_from_mesh_pose_list(mesh_pose_list)
+        o3d_scene_mesh = scene_mesh.as_open3d
+        o3d_scene_mesh.compute_vertex_normals()
+        pc_extended = o3d_scene_mesh.sample_points_uniformly(number_of_points=1000) # Sample point cloud and normals from GT mesh
+        
+        state = argparse.Namespace(tsdf=tsdf, pc=pc, pc_extended=pc_extended)
+        if resolution != 40:
+            extra_tsdf, _, _ = sim.acquire_tsdf(n=n, N=N, resolution=resolution)
+            state.tsdf_process = extra_tsdf
+
+        if pc.is_empty():
+            break  # empty point cloud, abort this round TODO this should not happen
+
+        # plan grasps
+        if visualize:
             mesh_pose_list = get_mesh_pose_list_from_world(sim.world, object_set)
             scene_mesh = get_scene_from_mesh_pose_list(mesh_pose_list)
-            o3d_scene_mesh = scene_mesh.as_open3d
-            o3d_scene_mesh.compute_vertex_normals()
-            pc_extended = o3d_scene_mesh.sample_points_uniformly(number_of_points=1000) # Sample point cloud and normals from GT mesh
+            grasps, scores, timings["planning"], visual_mesh = grasp_plan_fn(state, scene_mesh)
+            assert not visual_mesh.is_empty
+            # trimesh.viewer.SceneViewer(visual_mesh)
+            visual_mesh.show(resolution=(600, 600))
+            logger.log_mesh(scene_mesh, visual_mesh, f'round_{round_id:03d}_trial_{trial_id:03d}', log_wandb)
             
-            state = argparse.Namespace(tsdf=tsdf, pc=pc, pc_extended=pc_extended)
-            if resolution != 40:
-                extra_tsdf, _, _ = sim.acquire_tsdf(n=n, N=N, resolution=resolution)
-                state.tsdf_process = extra_tsdf
+        else:
+            grasps, scores, timings["planning"] = grasp_plan_fn(state)
+        planning_times.append(timings["planning"])
+        total_times.append(timings["planning"] + timings["integration"])
 
-            if pc.is_empty():
-                break  # empty point cloud, abort this round TODO this should not happen
+        if len(grasps) == 0:
+            no_grasp += 1
+            break  # no detections found, abort this round
 
-            # plan grasps
-            if visualize:
-                mesh_pose_list = get_mesh_pose_list_from_world(sim.world, object_set)
-                scene_mesh = get_scene_from_mesh_pose_list(mesh_pose_list)
-                grasps, scores, timings["planning"], visual_mesh = grasp_plan_fn(state, scene_mesh)
-                assert not visual_mesh.is_empty
-                # trimesh.viewer.SceneViewer(visual_mesh)
-                visual_mesh.show(resolution=(600, 600))
-                logger.log_mesh(scene_mesh, visual_mesh, f'round_{round_id:03d}_trial_{trial_id:03d}', log_wandb)
-                
+        # execute grasp
+        # grasp, score = grasps[0], scores[0]
+        for grasp, score in zip(grasps, scores):
+            label, _ = sim.execute_grasp(grasp, allow_contact=True, remove=False)
+            sim.restore_state()
+            cnt += 1
+            if label != Label.FAILURE:
+                success += 1
+
+            # log the grasp
+            logger.log_grasp(round_id, state, timings, grasp, score, label)
+
+            if last_label == Label.FAILURE and label == Label.FAILURE:
+                consecutive_failures += 1
             else:
-                grasps, scores, timings["planning"] = grasp_plan_fn(state)
-            planning_times.append(timings["planning"])
-            total_times.append(timings["planning"] + timings["integration"])
-
-            if len(grasps) == 0:
-                no_grasp += 1
-                break  # no detections found, abort this round
-
-            # execute grasp
-            # grasp, score = grasps[0], scores[0]
-            for grasp, score in zip(grasps, scores):
-                label, _ = sim.execute_grasp(grasp, allow_contact=True, remove=False)
-                sim.restore_state()
-                cnt += 1
-                if label != Label.FAILURE:
-                    success += 1
-
-                # log the grasp
-                logger.log_grasp(round_id, state, timings, grasp, score, label)
-
-                if last_label == Label.FAILURE and label == Label.FAILURE:
-                    consecutive_failures += 1
-                else:
-                    consecutive_failures = 1
-                if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
-                    cons_fail += 1
-                last_label = label
+                consecutive_failures = 1
+            if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
+                cons_fail += 1
+            last_label = label
         left_objs += sim.num_objects
     success_rate = 100.0 * success / cnt
     declutter_rate = 100.0 * success / total_objs
