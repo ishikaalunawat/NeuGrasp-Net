@@ -20,6 +20,10 @@ class CameraIntrinsic(object):
         self.width = width
         self.height = height
         self.K = np.array([[fx, 0.0, cx], [0.0, fy, cy], [0.0, 0.0, 1.0]])
+        K_4 = np.zeros((4,4))
+        K_4[:3, :3] = self.K
+        K_4[3,3] = 1
+        self.K_4 = K_4
 
     @property
     def fx(self):

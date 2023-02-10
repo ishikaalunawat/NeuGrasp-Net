@@ -17,7 +17,7 @@ import os
 
 
 OBJECT_COUNT_LAMBDA = 3
-MAX_VIEWPOINT_COUNT = 6
+MAX_VIEWPOINT_COUNT = 24
 
 
 def main(args, rank):
@@ -30,19 +30,10 @@ def main(args, rank):
     grasps_per_worker = args.num_grasps // args.num_proc
     pbar = tqdm(total=grasps_per_worker, disable=rank != 0)
 
-    if rank == 0:
-        # (args.root / "scenes").mkdir(parents=True)
-        # write_setup(
-        #     args.root,
-        #     sim.size,
-        #     sim.camera.intrinsic,
-        #     sim.gripper.max_opening_width,
-        #     sim.gripper.finger_depth,
-        # )
-        if args.save_scene:
-            # ("./" + args.root / "mesh_pose_list").mkdir(parents=True)
-            (args.root / "scan").mkdir(parents=True)
-            (args.root / "scan" / "image").mkdir(parents=True)
+    # if rank == 0:
+    #     if args.save_scene:
+    #         # ("./" + args.root / "mesh_pose_list").mkdir(parents=True)
+    #         (args.root / "scan").mkdir(parents=True)
 
     for scene_id in range(grasps_per_worker // GRASPS_PER_SCENE): # range determines number of scenes
         # generate heap
@@ -51,50 +42,32 @@ def main(args, rank):
         sim.save_state()
 
         # render synthetic depth images
+        # (args.root / f"scan_{scene_id}").mkdir(parents=True)
         n = MAX_VIEWPOINT_COUNT
-        #depth_imgs, extrinsics = 
-        #render_images(sim, n)
+        depth_imgs, extrinsics = render_images(sim, n)
         render_side_images(sim, n, args.random)
-        
-        #np.savez(args.root / "samples" +f'/side_{i}.npz', depth_imgs = depth_imgs_side, extrinsics = extrinsics_side)
 
         # reconstrct point cloud using a subset of the images
-        # tsdf = create_tsdf(sim.size, 120, depth_imgs, sim.camera.intrinsic, extrinsics)
-        # pc = tsdf.get_cloud()
-
-        # # crop surface and borders from point cloud
-        # bounding_box = o3d.geometry.AxisAlignedBoundingBox(sim.lower, sim.upper)
-        # pc = pc.crop(bounding_box)
-        # # o3d.visualization.draw_geometries([pc])
-
-        # if pc.is_empty():
-        #     print("Point cloud empty, skipping scene")
-        #     continue
+        tsdf = create_tsdf(sim.size, 40, depth_imgs, sim.camera.intrinsic, extrinsics)
+        tsdf = tsdf.get_grid()
+        pc = tsdf.get_cloud
 
         # # store the raw data
-        # scene_id = write_sensor_data(args.root, depth_imgs_side, extrinsics_side)
         if args.save_scene:
             mesh_pose_list = get_mesh_pose_list_from_world(sim.world, args.object_set)
-            write_point_cloud(os.getcwd(), scene_id, mesh_pose_list, name="mesh_pose_list")
-
-        # for _ in range(GRASPS_PER_SCENE):
-        #     # sample and evaluate a grasp point
-        #     point, normal = sample_grasp_point(pc, finger_depth)
-        #     grasp, label = evaluate_grasp_point(sim, point, normal)
-
-        #     # store the sample
-        #     write_grasp(args.root, scene_id, grasp, label)
-        #     pbar.update()
+            write_point_cloud(args.root, mesh_pose_list) ## Point cloud save
+            write_voxel_grid(args.root,  tsdf) ## Point cloud save
 
     pbar.close()
     print('Process %d finished!' % rank)
-
 
 def render_images(sim, n):
     height, width = sim.camera.intrinsic.height, sim.camera.intrinsic.width
     origin = Transform(Rotation.identity(), np.r_[sim.size / 2, sim.size / 2, 0.0])
 
-    cameras = {}    #depth_imgs = np.empty((n, height, width), np.float32)
+    extrinsics = np.empty((n, 7), np.float32)
+    depth_imgs = np.empty((n, height, width), np.float32)
+
     for i in range(n):
         r = np.random.uniform(1.6, 2.4) * sim.size
         theta = np.random.uniform(0.0, np.pi / 4.0)
@@ -103,29 +76,19 @@ def render_images(sim, n):
         extrinsic = camera_on_sphere(origin, r, theta, phi)
         depth_img = sim.camera.render(extrinsic)[1]
 
-        path = str(args.root / "scan" / "image") + f'/{i:03}.npy'
+        extrinsics[i] = extrinsic.to_list()
+        depth_imgs[i] = depth_img
 
-        np.save(args.root / "scan" / "image" / + (f'{i:03}.npy'), depth_img)
+    return depth_imgs, extrinsics
 
-        cameras[f'world_mat_{i}'] = extrinsic.to_list()
-        cameras[f'camera_mat_{i}'] = sim.camera.intrinsic.K
-        cameras[f'scale_mat_{i}'] = np.identity(3)
-        # depth_imgs[i] = depth_img
-        
-    np.savez(str(args.root / "scan") + f'/cameras.npz', **cameras)
-
-
-    # return depth_imgs, extrinsics
 
 def render_side_images(sim, n=1, random=False):
     #height, width = sim.camera.intrinsic.height, sim.camera.intrinsic.width
     origin = Transform(Rotation.identity(), np.r_[sim.size / 2, sim.size / 2, sim.size / 3])
-
-    # extrinsics = np.empty((n, 7), np.float32)
-    # depth_imgs = np.empty((n, height, width), np.float32)
-    cameras = {}
     
     for i in range(n):
+        view_path = args.root / f"view_{i}"
+        camera = {}
         if random:
             r = np.random.uniform(1.6, 2.4) * sim.size
             theta = np.random.uniform(np.pi / 4.0, 5.0 * np.pi / 12.0)
@@ -137,15 +100,18 @@ def render_side_images(sim, n=1, random=False):
 
         extrinsic = camera_on_sphere(origin, r, theta, phi)
         depth_img = sim.camera.render(extrinsic)[1]
+        camera[f'world_mat'] = extrinsic.as_matrix()
+        camera[f'camera_mat'] = sim.camera.intrinsic.K_4
 
-        path = ''
-        np.save(str(args.root / "scan" / "image") + f'/{i:03}.npy', depth_img)
+        view_path.mkdir(parents=True)
+        np.save(view_path / 'depth.npy', depth_img)
+        np.savez(view_path / 'camera.npz', **camera)
 
-        cameras[f'world_mat_{i}'] = extrinsic.to_list()
-        cameras[f'camera_mat_{i}'] = sim.camera.intrinsic.K
+        # cameras[f'world_mat_{i}'] = extrinsic.to_list()
+        # cameras[f'camera_mat_{i}'] = sim.camera.intrinsic.K
         #cameras[f'scale_mat_{i}'] = np.identity(3)
 
-    np.savez(str(args.root / "scan") + f'/cameras.npz', **cameras)
+    
 
     #return depth_imgs, extrinsics
 
