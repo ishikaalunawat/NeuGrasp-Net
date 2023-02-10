@@ -63,7 +63,7 @@ class GpgGraspSamplerPcl():
 
     __metaclass__ = ABCMeta
 
-    def __init__(self, gripper_hand_depth=0.05, debug_vis=False):
+    def __init__(self, gripper_hand_depth=0.0425, debug_vis=False):
         self.params = {
             # 'num_rball_points': 27,  # FIXME: the same as meshpy..surface_normal()
             'num_dy': 10,  # number
@@ -81,8 +81,8 @@ class GpgGraspSamplerPcl():
             "gripper_finger_width": 0.02, # Approx
             "gripper_hand_height": 0.030,
             "gripper_hand_outer_diameter": 0.12, # 0.218, the diameter of the robot hand (= maximum aperture plus 2 * finger width)
-            "gripper_hand_depth": 0.03, # 0.125,
-            "gripper_init_bite": 0.01
+            "gripper_hand_depth": 0.0425, # 0.125,
+            "gripper_init_bite": 0.005
 
             # Robotiq 2F-85
             # "gripper_min_width": 0.0,
@@ -103,7 +103,7 @@ class GpgGraspSamplerPcl():
         self.params['gripper_hand_depth'] = gripper_hand_depth
         self.params['debug_vis'] = debug_vis
 
-    def sample_grasps(self, point_cloud, num_grasps=20, max_num_samples=180, show_final_grasps=False,
+    def sample_grasps(self, point_cloud, num_grasps=20, max_num_samples=180, safety_dis_above_table=0.005, show_final_grasps=False,
                       **kwargs):
         """
         Returns a list of candidate grasps for the given point cloud.
@@ -279,13 +279,13 @@ class GpgGraspSamplerPcl():
                             min_finger_end = hand_points_[:, 2].min()
                             min_finger_end_pos_ind = np.where(hand_points_[:, 2] == min_finger_end)[0][0]
 
-                            safety_dis_above_table = 0.005 # 0.5cm
+                            # safety_dis_above_table = 0.005 # 0.5cm
                             if min_finger_end < safety_dis_above_table:
                                 min_finger_pos = hand_points_[min_finger_end_pos_ind]  # the lowest point in a gripper
                                 x = -min_finger_pos[2]*tmp_grasp_normal[0]/tmp_grasp_normal[2]+min_finger_pos[0]
                                 y = -min_finger_pos[2]*tmp_grasp_normal[1]/tmp_grasp_normal[2]+min_finger_pos[1]
                                 p_table = np.array([x, y, 0])  # the point that on the table
-                                dis_go_back = np.linalg.norm([min_finger_pos, p_table]) + safety_dis_above_table
+                                dis_go_back = np.linalg.norm([min_finger_pos-p_table]) + safety_dis_above_table
                                 tmp_grasp_bottom_center_modify = tmp_grasp_bottom_center-tmp_grasp_normal*dis_go_back
                             else:
                                 # if the grasp does not collide with the table, do not change the grasp
