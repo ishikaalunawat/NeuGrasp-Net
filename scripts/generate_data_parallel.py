@@ -49,14 +49,14 @@ def main(args, rank):
 
         # reconstrct point cloud using a subset of the images
         tsdf = create_tsdf(sim.size, 40, depth_imgs, sim.camera.intrinsic, extrinsics)
-        tsdf = tsdf.get_grid()
-        pc = tsdf.get_cloud
+        voxels = tsdf.get_grid()
+        pc = tsdf.get_cloud()
 
         # # store the raw data
         if args.save_scene:
             mesh_pose_list = get_mesh_pose_list_from_world(sim.world, args.object_set)
-            write_point_cloud(args.root, mesh_pose_list) ## Point cloud save
-            write_voxel_grid(args.root,  tsdf) ## Point cloud save
+            write_point_cloud(args.root, pc) ## Point cloud save
+            write_voxel_grid(args.root,  voxels) ## Point cloud save
 
     pbar.close()
     print('Process %d finished!' % rank)

@@ -91,8 +91,9 @@ def write_voxel_grid(root, voxel_grid):
 
 
 def write_point_cloud(root, point_cloud):
+    points, normals = point_cloud.points, point_cloud.normals
     path = root / "pc.npz"
-    np.savez_compressed(path, pc=point_cloud)
+    np.savez_compressed(path, points=points, normals = normals)
 
 def read_voxel_grid(root, scene_id):
     path = root / "unisurf_data_meshes" / (f"scene_{scene_id}" + ".npz")
