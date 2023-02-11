@@ -260,20 +260,20 @@ def evaluate_grasp_gpg(sim, grasp):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("root", type=Path)
-    parser.add_argument("--use-previous-scenes", action="store_true")
-    parser.add_argument("--previous-root", type=Path, default="")
+    parser = argparse.ArgumentParser("Generate grasping data with GPG or optionally point normal sampling")
+    parser.add_argument("--root", type=Path)
+    parser.add_argument("--use_previous_scenes", type=bool, default=False)
+    parser.add_argument("--previous_root", type=Path, default="")
     parser.add_argument("--scene", type=str, choices=["pile", "packed"], default="pile")
-    parser.add_argument("--object-set", type=str, default="blocks")
-    parser.add_argument("--num-grasps", type=int, default=10000)
-    parser.add_argument("--grasps-per-scene", type=int, default=60)
-    parser.add_argument("--grasps-per-scene-gpg", type=int, default=60)
-    parser.add_argument("--num-proc", type=int, default=1)
-    parser.add_argument("--save-scene", action="store_true")
-    parser.add_argument("--random", action="store_true", help="Add distrubation to camera pose")
-    parser.add_argument("--sim-gui", action="store_true")
-    args = parser.parse_args()
+    parser.add_argument("--object_set", type=str, default="pile/train")
+    parser.add_argument("--num_grasps", type=int, default=10000)
+    parser.add_argument("--grasps_per_scene", type=int, default=60)
+    parser.add_argument("--grasps_per_scene_gpg", type=int, default=60)
+    parser.add_argument("--num_proc", type=int, default=1)
+    parser.add_argument("--save_scene", type=bool, default=False)
+    parser.add_argument("--random", type=bool, default=False, help="Add distrubation to camera pose")
+    parser.add_argument("--sim_gui", type=bool, default=False)
+    args, _ = parser.parse_known_args()
     args.save_scene = True
 
     if args.use_previous_scenes:

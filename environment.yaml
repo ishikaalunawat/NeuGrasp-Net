@@ -154,4 +154,3 @@ dependencies:
     - webencodings==0.5.1
     - werkzeug==1.0.1
     - widgetsnbextension==3.5.1
-prefix: /mnt/data2/zhenyu/anaconda3/envs/GIGA
