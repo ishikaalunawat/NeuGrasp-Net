@@ -1,6 +1,8 @@
 import argparse
 from pathlib import Path
 
+import os
+import glob
 import numpy as np
 import open3d as o3d
 import scipy.signal as signal
@@ -88,7 +90,7 @@ def main(args, rank):
         sampler = GpgGraspSamplerPcl(finger_depth-0.0075) # Franka finger depth is actually a little less than 0.05
         safety_dist_above_table = finger_depth # table is spawned at finger_depth
         grasps, _, _ = sampler.sample_grasps(pc, num_grasps=GRASPS_PER_SCENE_GPG, max_num_samples=180,
-                                            safety_dis_above_table=safety_dist_above_table, show_final_grasps=True)
+                                            safety_dis_above_table=safety_dist_above_table, show_final_grasps=False)
         for grasp in grasps:
             label, width = evaluate_grasp_gpg(sim, grasp) # try grasp and get true width
             grasp.width = width
@@ -108,6 +110,50 @@ def main(args, rank):
 
     pbar.close()
     print('Process %d finished!' % rank)
+
+
+def generate_from_existing_scene(mesh_pose_list_path, args):
+    GRASPS_PER_SCENE = args.grasps_per_scene
+    GRASPS_PER_SCENE_GPG = args.grasps_per_scene_gpg
+
+    # Re-create the saved simulation
+    sim = ClutterRemovalSim('pile', 'pile/train', gui=args.sim_gui) # parameters 'pile' and 'pile/train' are not used
+    mesh_pose_list = np.load(mesh_pose_list_path, allow_pickle=True)['pc']
+    scene_id = os.path.basename(mesh_pose_list_path)[:-4] # scene id without .npz extension
+    sim.setup_sim_scene_from_mesh_pose_list(mesh_pose_list)
+
+    sim.save_state()
+
+    # Get scene point cloud and normals using ground truth meshes
+    scene_mesh = get_scene_from_mesh_pose_list(mesh_pose_list)
+    o3d_scene_mesh = scene_mesh.as_open3d
+    o3d_scene_mesh.compute_vertex_normals()
+    pc = o3d_scene_mesh.sample_points_uniformly(number_of_points=1000)
+
+    # # crop surface and borders from point cloud
+    # bounding_box = o3d.geometry.AxisAlignedBoundingBox(sim.lower, sim.upper)
+    # pc = pc.crop(bounding_box)
+    # o3d.visualization.draw_geometries([pc], point_show_normal=True)
+
+    # sample grasps with GPG:
+    sampler = GpgGraspSamplerPcl(sim.gripper.finger_depth-0.0075) # Franka finger depth is actually a little less than 0.05
+    safety_dist_above_table = sim.gripper.finger_depth # table is spawned at finger_depth
+    grasps, _, _ = sampler.sample_grasps(pc, num_grasps=GRASPS_PER_SCENE_GPG, max_num_samples=180,
+                                        safety_dis_above_table=safety_dist_above_table, show_final_grasps=False)
+    for grasp in grasps:
+        label, width = evaluate_grasp_gpg(sim, grasp) # try grasp and get true width
+        grasp.width = width
+        # store the sample
+        write_grasp(args.root, scene_id, grasp, label)
+
+    # Optional: sample remaining grasps with regular sampling
+    # for _ in range(GRASPS_PER_SCENE-len(grasps)):
+    #     # sample and evaluate a grasp point
+    #     point, normal = sample_grasp_point(pc, sim.gripper.finger_depth)
+    #     grasp, label = evaluate_grasp_point(sim, point, normal)
+
+    #     # store the sample
+    #     write_grasp(args.root, scene_id, grasp, label)
 
 
 def render_images(sim, n):
@@ -210,18 +256,18 @@ def evaluate_grasp_gpg(sim, grasp):
     grasp.width = sim.gripper.max_opening_width
     outcome, width = sim.execute_grasp(grasp, remove=False, allow_contact=True)
 
-    return outcome, width
+    return int(outcome), width
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("root", type=Path)
     parser.add_argument("--use-previous-scenes", action="store_true")
-    parser.add_argument("--previous-root", type=Path, default="./")
+    parser.add_argument("--previous-root", type=Path, default="")
     parser.add_argument("--scene", type=str, choices=["pile", "packed"], default="pile")
     parser.add_argument("--object-set", type=str, default="blocks")
     parser.add_argument("--num-grasps", type=int, default=10000)
-    parser.add_argument("--grasps-per-scene", type=int, default=61)
+    parser.add_argument("--grasps-per-scene", type=int, default=60)
     parser.add_argument("--grasps-per-scene-gpg", type=int, default=60)
     parser.add_argument("--num-proc", type=int, default=1)
     parser.add_argument("--save-scene", action="store_true")
@@ -234,10 +280,30 @@ if __name__ == "__main__":
         if args.previous_root is None:
             raise ValueError("Previous root directory is not specified")
         
-        # Data generation using samples from GPG on existing/previous scenes:
+        # Write GPG grasp sampler parameters
+        (args.root).mkdir(parents=True)
+        write_json(GpgGraspSamplerPcl().params, args.root / "gpg_setup.json")
+        
+        mesh_list_files = glob.glob(os.path.join(args.previous_root, 'mesh_pose_list', '*.npz'))
+        global g_completed_jobs
+        global g_num_total_jobs
+        global g_starting_time
+        g_num_total_jobs = len(mesh_list_files)
+        g_completed_jobs = []
+        g_starting_time = time.time()
 
-
-
+        print('Total jobs: %d, CPU num: %d' % (g_num_total_jobs, args.num_proc))
+        from joblib import Parallel, delayed
+        results = Parallel(n_jobs=args.num_proc)(delayed(generate_from_existing_scene)(f, args) for f in mesh_list_files)
+        
+        for result in results:
+            g_completed_jobs.append(result)
+            elapsed_time = time.time() - g_starting_time
+            if len(g_completed_jobs) % 1000 == 0:
+                msg = "%05d/%05d %s finished! " % (len(g_completed_jobs), g_num_total_jobs, result)
+                msg = msg + 'Elapsed time: ' + \
+                        time.strftime("%H:%M:%S", time.gmtime(elapsed_time)) + '. '
+                print(msg)
     else:
         # Regular data generation with some samples from GPG:
 

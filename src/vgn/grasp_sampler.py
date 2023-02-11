@@ -144,7 +144,7 @@ class GpgGraspSamplerPcl():
         while len(grasps) < num_grasps and sampled_surface_amount < max_num_samples:
             ind = np.random.choice(all_points.shape[0], size=1, replace=False)
             sampled_surface_amount += 1
-            print("No. of sampled surface points:", sampled_surface_amount)
+            # print("No. of sampled surface points:", sampled_surface_amount)
             ok = all_normals[ind, 2] > -0.1  # make sure the normal is pointing upwards
             if not ok:
                 continue
@@ -329,7 +329,7 @@ class GpgGraspSamplerPcl():
                 # logger.info("processed_potential_grasp %d", len(processed_potential_grasps))
 
             # logger.info("current amount of sampled surface %d", sampled_surface_amount)
-            print("No. of grasp candidates sampled using GPG:", len(processed_potential_grasps_vgn))
+            # print("No. of grasp candidates sampled using GPG:", len(processed_potential_grasps_vgn))
             if len(processed_potential_grasps_vgn) >= num_grasps or sampled_surface_amount >= max_num_samples:
                 if show_final_grasps:
                     # Show all grasps and the surface point cloud with open3d
