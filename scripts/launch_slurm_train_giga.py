@@ -48,7 +48,7 @@ launcher.add_experiment(
     dataset="/home/jauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/pile/data_pile_train_constructed_4M_HighRes_radomized_views",
     dataset_raw="/home/jauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/pile/data_pile_train_random_raw_4M_radomized_views",
     epochs=30,
-    batch_size=64,
+    batch_size=128,
     )
 
 launcher.run(LOCAL, TEST)
