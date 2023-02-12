@@ -12,7 +12,6 @@ from scipy.spatial.transform import Rotation
 import matplotlib.pyplot as plt
 from vgn.utils.transform import Rotation, Transform
 from vgn.grasp import Grasp
-from vgn.utils import visual
 from vgn.utils.implicit import as_mesh
 # import os, IPython, sys
 # import random
@@ -343,6 +342,7 @@ class GpgGraspSamplerPcl():
 
     def show_grasps_and_pcl_open3d(self, grasps, point_cloud):
         grasps_scene = trimesh.Scene()
+        from vgn.utils import visual
         grasp_mesh_list = [visual.grasp2mesh(g) for g in grasps]
         for i, g_mesh in enumerate(grasp_mesh_list):
             grasps_scene.add_geometry(g_mesh, node_name=f'grasp_{i}')
