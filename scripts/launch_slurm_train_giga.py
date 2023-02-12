@@ -13,12 +13,12 @@ N_SEEDS = 1
 # else:
 #     N_EXPS_IN_PARALLEL = 3
 
-N_CORES = 6 #N_EXPS_IN_PARALLEL # HRZ nodes have 96 cores
+N_CORES = 5 #N_EXPS_IN_PARALLEL # HRZ nodes have 96 cores
 # MEMORY_SINGLE_JOB = 1000
 # MEMORY_PER_CORE = N_EXPS_IN_PARALLEL * MEMORY_SINGLE_JOB // N_CORES
 MEMORY_PER_CORE = 3500
 PARTITION = 'dgx' # 'amd2,amd'  # 'amd', 'rtx'
-GRES = 'gpu:1'# if USE_CUDA else None  # gpu:rtx2080:1, gpu:rtx3080:1
+GRES = 'gpu:1' # if USE_CUDA else None  # gpu:rtx2080:1, gpu:rtx3080:1
 CONDA_ENV = 'GIGA-6DoF'
 
 launcher = Launcher(
@@ -49,6 +49,7 @@ launcher.add_experiment(
     dataset_raw="/home/jauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/pile/data_pile_train_random_raw_4M_radomized_views",
     epochs=30,
     batch_size=128,
+    num_workers=N_CORES
     )
 
 launcher.run(LOCAL, TEST)

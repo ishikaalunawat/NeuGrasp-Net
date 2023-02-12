@@ -28,7 +28,7 @@ def main(args):
     wandb.init(config=args, project="6dgrasp", entity="irosa-ias", notes = note)
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
-    kwargs = {"num_workers": 16, "pin_memory": True} if use_cuda else {}
+    kwargs = {"num_workers": args.num_workers, "pin_memory": True} if use_cuda else {}
 
     # create log directory
     if args.savedir == '':
@@ -297,6 +297,7 @@ if __name__ == "__main__":
     parser.add_argument("--net", default="giga")
     parser.add_argument("--dataset", type=Path, required=True)
     parser.add_argument("--dataset_raw", type=Path, required=True)
+    parser.add_argument("--num_workers", type=int, default=16)
     parser.add_argument("--logdir", type=Path, default="data/runs")
     parser.add_argument("--description", type=str, default="")
     parser.add_argument("--savedir", type=str, default="")
