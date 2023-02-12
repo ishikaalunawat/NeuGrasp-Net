@@ -25,7 +25,7 @@ def main(args):
     with open(filename, 'r') as f:
         note = (";").join(f.readlines()[1:5]).replace('\n', '')
 
-    #wandb.init(config=args, project="6dgrasp", entity="irosa-ias", notes = note)
+    wandb.init(config=args, project="6dgrasp", entity="irosa-ias", notes = note)
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
     kwargs = {"num_workers": 16, "pin_memory": True} if use_cuda else {}
@@ -73,7 +73,7 @@ def main(args):
     for k in LOSS_KEYS:
         metrics[k] = Average(lambda out, sk=k: out[3][sk])
     
-    #wandb.watch(net, log_freq=100)
+    wandb.watch(net, log_freq=100)
 
     # create ignite engines for training and validation
     trainer = create_trainer(net, optimizer, scheduler, loss_fn, metrics, device)
@@ -89,7 +89,7 @@ def main(args):
     def log_train_results(engine):
         epoch, metrics = trainer.state.epoch, trainer.state.metrics
         for k, v in metrics.items():
-            #wandb.log({'train_'+k:v})
+            wandb.log({'train_'+k:v})
             continue
 
         msg = 'Train'
@@ -105,7 +105,7 @@ def main(args):
         # out = evaluator.state.output
 
         for k, v in metrics.items():
-            #wandb.log({'val_'+k:v})
+            wandb.log({'val_'+k:v})
             continue
 
         msg = 'Val'
@@ -127,7 +127,7 @@ def main(args):
     checkpoint_handler = ModelCheckpoint(
         logdir,
         "vgn",
-        n_saved=None, # Chnaged from 1. Save everythinggg
+        n_saved=None, # Changed from 1. Save everythinggg
         require_empty=True,
     )
     best_checkpoint_handler = ModelCheckpoint(
@@ -301,12 +301,12 @@ if __name__ == "__main__":
     parser.add_argument("--description", type=str, default="")
     parser.add_argument("--savedir", type=str, default="")
     parser.add_argument("--epochs", type=int, default=20)
-    parser.add_argument("--batch-size", type=int, default=32)
+    parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--lr", type=float, default=2e-4)
-    parser.add_argument("--val-split", type=float, default=0.1)
+    parser.add_argument("--val_split", type=float, default=0.1)
     parser.add_argument("--augment", action="store_true")
     parser.add_argument("--silence", action="store_true")
-    parser.add_argument("--load-path", type=str, default='')
-    args = parser.parse_args()
+    parser.add_argument("--load_path", type=str, default='')
+    args, _ = parser.parse_known_args()
     print(args)
     main(args)
