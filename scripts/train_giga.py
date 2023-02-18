@@ -17,18 +17,24 @@ import torch.nn.functional as F
 from vgn.dataset_voxel import DatasetVoxelOccFile
 from vgn.networks import get_network, load_network
 
-LOSS_KEYS = ['loss_all', 'loss_qual', 'loss_occ']
+# Profiling
+import torch.autograd.profiler as profiler
 
+
+LOSS_KEYS = ['loss_all', 'loss_qual', 'loss_occ']
+N_CORES = 6
 def main(args):
 
     filename = 'summary_%s.txt' % (args.dataset_raw.name)
     with open(filename, 'r') as f:
         note = (";").join(f.readlines()[1:5]).replace('\n', '')
 
-    wandb.init(config=args, project="6dgrasp", entity="irosa-ias", notes = note)
+    if args.log_wandb:
+        wandb.init(config=args, project="6dgrasp", entity="irosa-ias", notes = note)
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
     kwargs = {"num_workers": args.num_workers, "pin_memory": True} if use_cuda else {}
+    if use_cuda: torch.backends.cudnn.benchmark = True # Gives 30-60ms speedup per batch
 
     # create log directory
     if args.savedir == '':
@@ -73,7 +79,8 @@ def main(args):
     for k in LOSS_KEYS:
         metrics[k] = Average(lambda out, sk=k: out[3][sk])
     
-    wandb.watch(net, log_freq=100)
+    if args.log_wandb:
+        wandb.watch(net, log_freq=100)
 
     # create ignite engines for training and validation
     trainer = create_trainer(net, optimizer, scheduler, loss_fn, metrics, device)
@@ -89,7 +96,8 @@ def main(args):
     def log_train_results(engine):
         epoch, metrics = trainer.state.epoch, trainer.state.metrics
         for k, v in metrics.items():
-            wandb.log({'train_'+k:v})
+            if args.log_wandb:
+                wandb.log({'train_'+k:v})
             continue
 
         msg = 'Train'
@@ -105,7 +113,8 @@ def main(args):
         # out = evaluator.state.output
 
         for k, v in metrics.items():
-            wandb.log({'val_'+k:v})
+            if args.log_wandb:
+                wandb.log({'val_'+k:v})
             continue
 
         msg = 'Val'
@@ -146,7 +155,9 @@ def main(args):
     )
 
     # run the training loop
-    trainer.run(train_loader, max_epochs=args.epochs)
+    with profiler.record_function("MAIN TRAINER RUN"):
+        trainer.logdir = logdir
+        trainer.run(train_loader, max_epochs=args.epochs)
 
 
 def create_train_val_loaders(root, root_raw, batch_size, val_split, augment, kwargs):
@@ -234,17 +245,20 @@ def _occ_loss_fn(pred, target):
 
 def create_trainer(net, optimizer, scheduler, loss_fn, metrics, device):
     def _update(_, batch):
-        net.train()
-        optimizer.zero_grad()
-        # forward
-        #x, y, pos, pos_occ = prepare_batch(batch, device)
-        x, y, grasp_query, pos_occ = prepare_batch(batch, device) # <- Changed to predict only grasp quality (check inside)
-        y_pred = select(net(x, grasp_query, p_tsdf=pos_occ))
-        loss, loss_dict = loss_fn(y_pred, y)
+        with profiler.record_function("TRAINER UPDATE 1: NET TRAIN"):
+            net.train()
+            optimizer.zero_grad(set_to_none=True) # set_to_none can sometimes give a small performance boost
+            # forward
+            #x, y, pos, pos_occ = prepare_batch(batch, device)
+            x, y, grasp_query, pos_occ = prepare_batch(batch, device) # <- Changed to predict only grasp quality (check inside)
+            y_pred = select(net(x, grasp_query, p_tsdf=pos_occ))
+        with profiler.record_function("TRAINER UPDATE 2: LOSS FUNC"):
+            loss, loss_dict = loss_fn(y_pred, y)
 
-        # backward
-        loss.backward()
-        optimizer.step()
+        with profiler.record_function("TRAINER UPDATE 3: BACKWARD PASS & STEP"):
+            # backward
+            loss.backward()
+            optimizer.step()
 
         return x, y_pred, y, loss_dict # (32,40,40); pred [(label, width, occ)], true [(label, width, occ)], loss_dict (already defined above)
 
@@ -308,6 +322,7 @@ if __name__ == "__main__":
     parser.add_argument("--augment", action="store_true")
     parser.add_argument("--silence", action="store_true")
     parser.add_argument("--load_path", type=str, default='')
+    parser.add_argument("--log_wandb", action="store_true")
     args, _ = parser.parse_known_args()
     print(args)
     main(args)
