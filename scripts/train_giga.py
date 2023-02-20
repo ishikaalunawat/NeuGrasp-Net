@@ -177,17 +177,28 @@ def create_train_val_loaders(root, root_raw, batch_size, val_split, augment, kwa
         val_set, batch_size=batch_size, shuffle=False, drop_last=True, **kwargs
     )
 
-    # from time import time
-    # import multiprocessing as mp
-    # for num_workers in range(2, mp.cpu_count(), 2):  
-    #     train_loader = DataLoader(train_reader,shuffle=True,num_workers=num_workers,batch_size=64,pin_memory=True)
-    # start = time()
-    #     for epoch in range(1, 3):
-    #         for i, data in enumerate(train_loader, 0):
-    #             pass
-    #     end = time()
-    #     print("Finish with:{} second, num_workers={}".format(end - start, num_workers))
+    # Perform a num_workers search
+    
+    # import nws
+    # optimal_num_workers = nws.search(train_set, batch_size=batch_size, max_load_iters=100, shuffle=True, pin_memory=True, persistent_workers=False)
 
+    import time, os
+    max_load_iters = 200
+    batch_size_list = [4, 8, 16, 32, 48, 64, 128]
+    for b in range(len(batch_size_list)):
+        print("Batch size: ", batch_size_list[b])
+        for num_workers in range(2, os.cpu_count(), 2):  
+            train_loader =  torch.utils.data.DataLoader(train_set,batch_size=batch_size_list[b], shuffle=True, pin_memory=True, persistent_workers=False)
+            start = time.time()
+            for epoch in range(1, 3):
+                for i, data in enumerate(train_loader, 0):
+                    if i > max_load_iters:
+                        break
+                    pass
+            end = time.time()
+            print("Finish with:{} second, num_workers={}".format(end - start, num_workers))
+
+    import pdb; pdb.set_trace()
 
     return train_loader, val_loader
 
