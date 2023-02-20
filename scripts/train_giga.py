@@ -188,7 +188,7 @@ def create_train_val_loaders(root, root_raw, batch_size, val_split, augment, kwa
     for b in range(len(batch_size_list)):
         print("Batch size: ", batch_size_list[b])
         for num_workers in range(2, os.cpu_count(), 2):  
-            train_loader =  torch.utils.data.DataLoader(train_set,batch_size=batch_size_list[b], shuffle=True, pin_memory=True, persistent_workers=False)
+            train_loader =  torch.utils.data.DataLoader(train_set,num_workers=num_workers,batch_size=batch_size_list[b], shuffle=True, pin_memory=True, persistent_workers=False)
             start = time.time()
             for epoch in range(1, 3):
                 for i, data in enumerate(train_loader, 0):
