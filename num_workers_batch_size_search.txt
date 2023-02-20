@@ -1,0 +1,90 @@
+import libmesh failed!
+import utils failed
+Namespace(augment=False, batch_size=32, dataset=PosixPath('/home/sjauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/pile/data_pile_train_constructed_4M_HighRes_radomized_views'), dataset_raw=PosixPath('/home/sjauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/pile/data_pile_train_random_raw_4M_radomized_views'), description='', epochs=1, load_path='', log_wandb=False, logdir=PosixPath('data/runs'), lr=0.0002, net='giga_hr', num_workers=16, savedir='', silence=False, val_split=0.1)
+Batch size:  4
+Finish with:6.6743693351745605 second, num_workers=2
+Finish with:3.386308193206787 second, num_workers=4
+Finish with:2.770742893218994 second, num_workers=6
+Finish with:2.840620279312134 second, num_workers=8
+Finish with:2.765223741531372 second, num_workers=10
+Finish with:2.800825595855713 second, num_workers=12
+Finish with:3.009352445602417 second, num_workers=14
+Finish with:2.904607057571411 second, num_workers=16
+Finish with:3.0316100120544434 second, num_workers=18
+Finish with:3.2014684677124023 second, num_workers=20
+Finish with:3.4043054580688477 second, num_workers=22
+Batch size:  8
+Finish with:5.72712779045105 second, num_workers=2
+Finish with:3.364675998687744 second, num_workers=4
+Finish with:2.710095167160034 second, num_workers=6
+Finish with:2.5232131481170654 second, num_workers=8
+Finish with:2.509223461151123 second, num_workers=10
+Finish with:2.6651864051818848 second, num_workers=12
+Finish with:2.8812978267669678 second, num_workers=14
+Finish with:2.8913631439208984 second, num_workers=16
+Finish with:3.094003915786743 second, num_workers=18
+Finish with:3.183919668197632 second, num_workers=20
+Finish with:3.4036192893981934 second, num_workers=22
+Batch size:  16
+Finish with:5.942368030548096 second, num_workers=2
+Finish with:3.5447657108306885 second, num_workers=4
+Finish with:2.7665462493896484 second, num_workers=6
+Finish with:2.6024880409240723 second, num_workers=8
+Finish with:2.5362915992736816 second, num_workers=10
+Finish with:2.700029134750366 second, num_workers=12
+Finish with:2.7936089038848877 second, num_workers=14
+Finish with:2.975477933883667 second, num_workers=16
+Finish with:3.266637086868286 second, num_workers=18
+Finish with:3.3647332191467285 second, num_workers=20
+Finish with:3.561990261077881 second, num_workers=22
+Batch size:  32
+Finish with:6.253288984298706 second, num_workers=2
+Finish with:3.807436943054199 second, num_workers=4
+Finish with:3.135403633117676 second, num_workers=6
+Finish with:2.931025505065918 second, num_workers=8
+Finish with:2.8786780834198 second, num_workers=10
+Finish with:2.876710891723633 second, num_workers=12
+Finish with:3.1226980686187744 second, num_workers=14
+Finish with:3.231217622756958 second, num_workers=16
+Finish with:3.473926305770874 second, num_workers=18
+Finish with:3.9584851264953613 second, num_workers=20
+Finish with:4.338019847869873 second, num_workers=22
+Batch size:  48
+Finish with:6.7395384311676025 second, num_workers=2
+Finish with:4.020651578903198 second, num_workers=4
+Finish with:3.242281913757324 second, num_workers=6
+Finish with:2.975600242614746 second, num_workers=8
+Finish with:3.233330011367798 second, num_workers=10
+Finish with:3.0875256061553955 second, num_workers=12
+Finish with:3.5094947814941406 second, num_workers=14
+Finish with:3.772296667098999 second, num_workers=16
+Finish with:4.1309826374053955 second, num_workers=18
+Finish with:4.709759473800659 second, num_workers=20
+Finish with:5.116466045379639 second, num_workers=22
+Batch size:  64
+Finish with:6.958807706832886 second, num_workers=2
+Finish with:4.619245290756226 second, num_workers=4
+Finish with:3.4446234703063965 second, num_workers=6
+Finish with:3.7709248065948486 second, num_workers=8
+Finish with:3.4093260765075684 second, num_workers=10
+Finish with:3.6121013164520264 second, num_workers=12
+Finish with:3.743504047393799 second, num_workers=14
+Finish with:4.267848253250122 second, num_workers=16
+Finish with:4.3569207191467285 second, num_workers=18
+Finish with:4.798613786697388 second, num_workers=20
+Finish with:5.456688642501831 second, num_workers=22
+Batch size:  128
+Finish with:8.149071455001831 second, num_workers=2
+Finish with:5.990628957748413 second, num_workers=4
+Finish with:4.85911226272583 second, num_workers=6
+Finish with:5.259509801864624 second, num_workers=8
+Finish with:4.006652116775513 second, num_workers=10
+Finish with:4.495091438293457 second, num_workers=12
+Finish with:5.078331232070923 second, num_workers=14
+Finish with:5.635798215866089 second, num_workers=16
+Finish with:6.346837520599365 second, num_workers=18
+Finish with:6.829145908355713 second, num_workers=20
+Finish with:8.641921520233154 second, num_workers=22
+> /home/sjauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/scripts/train_giga.py(203)create_train_val_loaders()
+-> return train_loader, val_loader
+(Pdb) 
