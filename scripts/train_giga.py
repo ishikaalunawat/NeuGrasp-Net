@@ -157,6 +157,7 @@ def main(args):
     # run the training loop
     with profiler.record_function("MAIN TRAINER RUN"):
         trainer.logdir = logdir
+        evaluator.logdir = logdir
         trainer.run(train_loader, max_epochs=args.epochs)
 
 
@@ -175,6 +176,19 @@ def create_train_val_loaders(root, root_raw, batch_size, val_split, augment, kwa
     val_loader = torch.utils.data.DataLoader(
         val_set, batch_size=batch_size, shuffle=False, drop_last=True, **kwargs
     )
+
+    # from time import time
+    # import multiprocessing as mp
+    # for num_workers in range(2, mp.cpu_count(), 2):  
+    #     train_loader = DataLoader(train_reader,shuffle=True,num_workers=num_workers,batch_size=64,pin_memory=True)
+    # start = time()
+    #     for epoch in range(1, 3):
+    #         for i, data in enumerate(train_loader, 0):
+    #             pass
+    #     end = time()
+    #     print("Finish with:{} second, num_workers={}".format(end - start, num_workers))
+
+
     return train_loader, val_loader
 
 
