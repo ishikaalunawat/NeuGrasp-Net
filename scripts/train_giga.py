@@ -181,24 +181,26 @@ def create_train_val_loaders(root, root_raw, batch_size, val_split, augment, kwa
     
     # import nws
     # optimal_num_workers = nws.search(train_set, batch_size=batch_size, max_load_iters=100, shuffle=True, pin_memory=True, persistent_workers=False)
-
-    import time, os
-    max_load_iters = 200
+    import time
+    import os
+    print("\nSTARTING NUM WORKER SEARCH\n",flush=True)
+    max_load_iters = 1024
     batch_size_list = [4, 8, 16, 32, 48, 64, 128]
     for b in range(len(batch_size_list)):
-        print("Batch size: ", batch_size_list[b])
+        print("Batch size: ", batch_size_list[b],"\n",flush=True)
         for num_workers in range(2, os.cpu_count(), 2):  
             train_loader =  torch.utils.data.DataLoader(train_set,num_workers=num_workers,batch_size=batch_size_list[b], shuffle=True, pin_memory=True, persistent_workers=False)
             start = time.time()
-            for epoch in range(1, 3):
+            for epoch in range(1,3):
                 for i, data in enumerate(train_loader, 0):
-                    if i > max_load_iters:
+                    if i*batch_size_list[b] >= max_load_iters:
                         break
                     pass
             end = time.time()
-            print("Finish with:{} second, num_workers={}".format(end - start, num_workers))
-
-    import pdb; pdb.set_trace()
+            finish = end - start
+            print("Finish with:", finish, "seconds, num_workers=",num_workers,"\n",flush=True)            
+        # sys.stdout = original_stdout
+    exit()
 
     return train_loader, val_loader
 

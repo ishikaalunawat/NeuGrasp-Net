@@ -1,0 +1,34 @@
+import libmesh failed!
+import utils failed
+Namespace(augment=False, batch_size=32, dataset=PosixPath('/home/sjauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/pile/data_pile_train_constructed_4M_HighRes_radomized_views'), dataset_raw=PosixPath('/home/sjauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/pile/data_pile_train_random_raw_4M_radomized_views'), description='', epochs=1, load_path='', log_wandb=False, logdir=PosixPath('data/runs'), lr=0.0002, net='giga_hr', num_workers=16, savedir='', silence=False, val_split=0.1)
+
+STARTING NUM WORKER SEARCH
+
+Batch size:  4 
+
+Finish with: 11.083006858825684 seconds, num_workers= 0 
+
+Batch size:  8 
+
+Finish with: 10.007662057876587 seconds, num_workers= 0 
+
+Batch size:  16 
+
+Finish with: 10.176291942596436 seconds, num_workers= 0 
+
+Batch size:  32 
+
+Finish with: 10.542484760284424 seconds, num_workers= 0 
+
+Batch size:  48 
+
+Finish with: 10.94515061378479 seconds, num_workers= 0 
+
+Batch size:  64 
+
+Finish with: 10.701314449310303 seconds, num_workers= 0 
+
+Batch size:  128 
+
+Finish with: 11.296546936035156 seconds, num_workers= 0 
+
