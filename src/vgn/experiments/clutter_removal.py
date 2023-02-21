@@ -94,7 +94,6 @@ def run(
                 scene_mesh = get_scene_from_mesh_pose_list(mesh_pose_list)
                 grasps, scores, timings["planning"], visual_mesh = grasp_plan_fn(state, scene_mesh)
                 assert not visual_mesh.is_empty
-                visual_mesh.show()
                 # o3d.visualization.draw_geometries([visual_mesh.as_open3d])
                 logger.log_mesh(scene_mesh, visual_mesh, f'round_{round_id:03d}_trial_{trial_id:03d}')
                 

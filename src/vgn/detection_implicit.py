@@ -191,6 +191,8 @@ class VGNImplicit(object):
             bad_grasp_mesh_list = [visual.grasp2mesh(g, s, color='red') for g, s in zip(bad_grasps, bad_scores)]
             for i, g_mesh in enumerate(bad_grasp_mesh_list):
                 composed_scene.add_geometry(g_mesh, node_name=f'bad_grasp_{i}')
+            # Optional: Show grasps (for debugging)
+            # composed_scene.show()
             return grasps, scores, toc, composed_scene
         else:
             return grasps, scores, toc
