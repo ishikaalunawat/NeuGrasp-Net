@@ -102,7 +102,7 @@ class GpgGraspSamplerPcl():
         self.params['gripper_hand_depth'] = gripper_hand_depth
         self.params['debug_vis'] = debug_vis
 
-    def sample_grasps(self, point_cloud, num_grasps=20, max_num_samples=180, safety_dis_above_table=0.005, show_final_grasps=False,
+    def sample_grasps(self, point_cloud, num_grasps=20, max_num_samples=180, safety_dis_above_table=0.005, show_final_grasps=False, verbose=False,
                       **kwargs):
         """
         Returns a list of candidate grasps for the given point cloud.
@@ -134,7 +134,7 @@ class GpgGraspSamplerPcl():
         grasps = []
         processed_potential_grasps = []
         potential_grasps_vgn_pos = []
-        potential_grasps_vgn_rot = []
+        potential_grasps_vgn_rot_quat = []
         processed_potential_grasps_vgn = []
 
         hand_points = self.get_hand_points(np.array([0, 0, 0]), np.array([1, 0, 0]), np.array([0, 1, 0]))
@@ -313,7 +313,7 @@ class GpgGraspSamplerPcl():
                                 curr_grasp = Grasp(Transform(curr_grasp_rot, curr_grasp_pos), self.params['gripper_max_width']) # make grasp
                                 
                                 potential_grasps_vgn_pos.append(curr_grasp_pos)
-                                potential_grasps_vgn_rot.append(curr_grasp_rot)
+                                potential_grasps_vgn_rot_quat.append(curr_grasp_rot.as_quat())  # quaternion
                                 processed_potential_grasps_vgn.append(curr_grasp)
 
                                 if self.params['debug_vis']:
@@ -328,17 +328,19 @@ class GpgGraspSamplerPcl():
                 # logger.info("processed_potential_grasp %d", len(processed_potential_grasps))
 
             # logger.info("current amount of sampled surface %d", sampled_surface_amount)
-            # print("No. of grasp candidates sampled using GPG:", len(processed_potential_grasps_vgn))
+            if verbose:
+                print("No. of sampled surface points:", sampled_surface_amount)
+                print("No. of grasp candidates sampled using GPG:", len(processed_potential_grasps_vgn))
             if len(processed_potential_grasps_vgn) >= num_grasps or sampled_surface_amount >= max_num_samples:
                 if show_final_grasps:
                     # Show all grasps and the surface point cloud with open3d
                     self.show_grasps_and_pcl_open3d(processed_potential_grasps_vgn, point_cloud)
-                return processed_potential_grasps_vgn, np.array(potential_grasps_vgn_pos), np.array(potential_grasps_vgn_rot)
+                return processed_potential_grasps_vgn, potential_grasps_vgn_pos, potential_grasps_vgn_rot_quat
 
         if show_final_grasps:
             # Show all grasps and the surface point cloud with open3d
             self.show_grasps_and_pcl_open3d(processed_potential_grasps_vgn, point_cloud)
-        return processed_potential_grasps_vgn, potential_grasps_vgn_pos, potential_grasps_vgn_rot
+        return processed_potential_grasps_vgn, potential_grasps_vgn_pos, potential_grasps_vgn_rot_quat
 
     def show_grasps_and_pcl_open3d(self, grasps, point_cloud):
         grasps_scene = trimesh.Scene()

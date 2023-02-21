@@ -101,11 +101,23 @@ class VGNImplicit(object):
 
         tic = time.time()
 
-        # sampler = GpgGraspSamplerPcl()
-        # grasps, _, _ = sampler.sample_grasps(pc_extended, num_grasps=30, max_num_samples=180,
-                                            # safety_dis_above_table=0.05, show_final_grasps=True)
-        points, normals = self.sample_grasp_points(pc_extended, self.finger_depth)
-        pos_queries, rot_queries = self.get_grasp_queries(points, normals) # Grasp queries :: (pos ;xyz, rot ;as quat)
+        # Use GPG grasp sampling:
+        # Optional: Get GT point cloud from scene mesh:
+        # Get scene point cloud and normals using ground truth meshes
+        o3d_scene_mesh = scene_mesh.as_open3d
+        o3d_scene_mesh.compute_vertex_normals()
+        pc_extended = o3d_scene_mesh.sample_points_uniformly(number_of_points=1000)
+
+        sampler = GpgGraspSamplerPcl(0.05-0.0075) # Franka finger depth is actually a little less than 0.05
+        safety_dist_above_table = 0.05 # table is spawned at finger_depth
+        grasps, pos_queries, rot_queries = sampler.sample_grasps(pc_extended, num_grasps=40, max_num_samples=180,
+                                            safety_dis_above_table=safety_dist_above_table, show_final_grasps=False, verbose=False)
+        self.qual_th = 0.5        
+        best_only = False # Show all grasps and not just the best one
+        # Use standard GIGA grasp sampling:
+        # points, normals = self.sample_grasp_points(pc_extended, self.finger_depth)
+        # pos_queries, rot_queries = self.get_grasp_queries(points, normals) # Grasp queries :: (pos ;xyz, rot ;as quat)
+        # best_only = True
         
         # Convert to torch tensor
         pos_queries = torch.Tensor(pos_queries).view(1, -1, 3)
@@ -138,7 +150,7 @@ class VGNImplicit(object):
             ### TODO - check affordance - visual (WEIRD)
             colored_scene_mesh = scene_mesh
             # colored_scene_mesh = visual.affordance_visual(qual_vol, rot, scene_mesh, size, self.resolution, **aff_kwargs)
-        grasps, scores, bad_grasps, bad_scores = select(qual_vol.copy(), pos_queries[0].squeeze(), rot_queries[0].squeeze(), width_vol, threshold=self.qual_th, force_detection=self.force_detection, max_filter_size=8 if self.visualize else 4)
+        grasps, scores, bad_grasps, bad_scores = select(qual_vol.copy(), pos_queries[0].squeeze(), rot_queries[0].squeeze(), width_vol, best_only=best_only, threshold=self.qual_th, force_detection=self.force_detection, max_filter_size=8 if self.visualize else 4)
         toc = time.time() - tic
 
         bad_grasps, bad_scores = np.asarray(bad_grasps), np.asarray(bad_scores)
@@ -243,14 +255,14 @@ def process(
     return qual_vol, width_vol
 
 
-def select(qual_vol, center_vol, rot_vol, width_vol, threshold=0.90, max_filter_size=4, force_detection=False):
-    best_only = True # TODO: Test this
+def select(qual_vol, center_vol, rot_vol, width_vol, threshold=0.90, max_filter_size=4, force_detection=False, best_only=False):
     
     bad_mask = np.where(qual_vol<LOW_TH, 1.0, 0.0)
 
     qual_vol[qual_vol < LOW_TH] = 0.0
     if force_detection and (qual_vol >= threshold).sum() == 0:
-        best_only = True
+        pass
+        # best_only = True
     else:
         # threshold on grasp quality
         qual_vol[qual_vol < threshold] = 0.0
@@ -286,13 +298,18 @@ def select(qual_vol, center_vol, rot_vol, width_vol, threshold=0.90, max_filter_
     sorted_grasps = [grasps[i] for i in reversed(np.argsort(scores))]
     sorted_scores = [scores[i] for i in reversed(np.argsort(scores))]
 
-    if best_only and len(sorted_grasps) > 0:
-        # Take only top 10
-        sorted_grasps = [sorted_grasps[i] for i in range(10)]
-        sorted_scores = [sorted_scores[i] for i in range(10)]
+    if best_only:
+        # Take only best grasp(s)
+        if len(sorted_grasps) >= 100:
+            max_grasps = 10
+        else:
+            max_grasps = 1
 
-        sorted_bad_grasps = [sorted_bad_grasps[i] for i in range(10)]
-        sorted_bad_scores = [sorted_bad_scores[i] for i in range(10)]
+        sorted_grasps = [sorted_grasps[i] for i in range(max_grasps)]
+        sorted_scores = [sorted_scores[i] for i in range(max_grasps)]
+
+        sorted_bad_grasps = [sorted_bad_grasps[i] for i in range(max_grasps)]
+        sorted_bad_scores = [sorted_bad_scores[i] for i in range(max_grasps)]
 
         
     return sorted_grasps, sorted_scores, sorted_bad_grasps, sorted_bad_scores
