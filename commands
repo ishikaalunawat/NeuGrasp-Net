@@ -17,3 +17,5 @@ nohup python scripts/construct_dataset_parallel.py --num-proc 40 --single-view -
 nohup python scripts/save_occ_data_parallel.py ./data/pile/data_pile_train_random_raw_4M 100000 2 --num-proc 40 > nohup_logs/dataset4M_4.out &
 
 python scripts/sim_grasp_multiple.py --num-view 1 --object-set pile/test --scene pile --num-rounds 100 --add-noise dex --force --best --model data/runs/23-01-19-13-12_dataset=data_pile_train_constructed_4M,augment=False,net=6d_giga,batch_size=32,lr=2e-04/best_vgn_giga_val_acc=0.9986.pt --type giga --result-path data/grasps --vis
+
+python scripts/sim_grasp_multiple.py --num-view 1 --object-set pile/test --scene pile --num-rounds 20 --add-noise dex --force --best --model data/runs_relevant/23-02-14-12-45_dataset\=data_pile_train_constructed_4M_HighRes_radomized_views\,augment\=False\,net\=6d_giga_hr\,batch_size\=48\,lr\=2e-04/best_vgn_giga_hr_val_acc\=0.8891.pt --resolution=64 --type giga_hr --result-path data/grasps --vis --sim-gui

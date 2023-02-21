@@ -134,7 +134,7 @@ class LocalDecoder(nn.Module):
 
         if isinstance(p, tuple):
             p, r = p
-            p.float()
+            p = p.float()
             r = r.float()
             #print(p.size(), r.size())
             f = torch.cat([p,r], dim = 2) # <- Changed to predict only grasp quality
