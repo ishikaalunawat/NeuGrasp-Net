@@ -120,7 +120,7 @@ class GpgGraspSamplerPcl():
         -------
         potential_grasps: list of generated grasps
         """
-        np.random.seed() # Random seed
+        # np.random.seed() # Random seed
         # get all surface points
         # TODO: For dense point cloud, we can use voxel grid downsampling to reduce the number of points
         all_points = np.asarray(point_cloud.points)

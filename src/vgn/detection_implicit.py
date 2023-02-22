@@ -104,21 +104,31 @@ class VGNImplicit(object):
         # Use GPG grasp sampling:
         # Optional: Get GT point cloud from scene mesh:
         # Get scene point cloud and normals using ground truth meshes
-        o3d_scene_mesh = scene_mesh.as_open3d
-        o3d_scene_mesh.compute_vertex_normals()
-        pc_extended = o3d_scene_mesh.sample_points_uniformly(number_of_points=1000)
+        # o3d_scene_mesh = scene_mesh.as_open3d
+        # o3d_scene_mesh.compute_vertex_normals()
+        # pc_extended = o3d_scene_mesh.sample_points_uniformly(number_of_points=1000)
+        # Optional: Downsample point cloud if too large
+        pc_extended_down = pc_extended.voxel_down_sample(voxel_size=0.005)
 
         sampler = GpgGraspSamplerPcl(0.05-0.0075) # Franka finger depth is actually a little less than 0.05
         safety_dist_above_table = 0.05 # table is spawned at finger_depth
-        grasps, pos_queries, rot_queries = sampler.sample_grasps(pc_extended, num_grasps=40, max_num_samples=180,
+        grasps, pos_queries, rot_queries = sampler.sample_grasps(pc_extended_down, num_grasps=40, max_num_samples=180,
                                             safety_dis_above_table=safety_dist_above_table, show_final_grasps=False, verbose=False)
-        self.qual_th = 0.5        
+        self.qual_th = 0.5
         best_only = False # Show all grasps and not just the best one
+
         # Use standard GIGA grasp sampling:
         # points, normals = self.sample_grasp_points(pc_extended, self.finger_depth)
         # pos_queries, rot_queries = self.get_grasp_queries(points, normals) # Grasp queries :: (pos ;xyz, rot ;as quat)
         # best_only = True
-        
+
+        if (len(pos_queries) == 0):
+            print("[Warning]: No grasps found by GPG")
+            if self.visualize:
+                return [], [], 0.0, scene_mesh
+            else:
+                return [], [], 0.0
+
         # Convert to torch tensor
         pos_queries = torch.Tensor(pos_queries).view(1, -1, 3)
         rot_queries = torch.Tensor(rot_queries).view(1, -1, 4)
@@ -183,15 +193,16 @@ class VGNImplicit(object):
         grasps = new_grasps
 
         if self.visualize:
-            # Need coloured mesh from affordance_visual()
-            grasp_mesh_list = [visual.grasp2mesh(g, s) for g, s in zip(grasps, scores)]
-            composed_scene = trimesh.Scene(colored_scene_mesh)
-            for i, g_mesh in enumerate(grasp_mesh_list):
-                composed_scene.add_geometry(g_mesh, node_name=f'grasp_{i}')
-            bad_grasp_mesh_list = [visual.grasp2mesh(g, s, color='red') for g, s in zip(bad_grasps, bad_scores)]
-            for i, g_mesh in enumerate(bad_grasp_mesh_list):
-                composed_scene.add_geometry(g_mesh, node_name=f'bad_grasp_{i}')
-            # Optional: Show grasps (for debugging)
+            composed_scene = colored_scene_mesh
+            # # Need coloured mesh from affordance_visual()
+            # grasp_mesh_list = [visual.grasp2mesh(g, s) for g, s in zip(grasps, scores)]
+            # composed_scene = trimesh.Scene(colored_scene_mesh)
+            # for i, g_mesh in enumerate(grasp_mesh_list):
+            #     composed_scene.add_geometry(g_mesh, node_name=f'grasp_{i}')
+            # bad_grasp_mesh_list = [visual.grasp2mesh(g, s, color='red') for g, s in zip(bad_grasps, bad_scores)]
+            # for i, g_mesh in enumerate(bad_grasp_mesh_list):
+            #     composed_scene.add_geometry(g_mesh, node_name=f'bad_grasp_{i}')
+            # # Optional: Show grasps (for debugging)
             # composed_scene.show()
             return grasps, scores, toc, composed_scene
         else:
