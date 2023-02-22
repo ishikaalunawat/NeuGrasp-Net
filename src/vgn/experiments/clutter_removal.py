@@ -80,7 +80,7 @@ def run(
             tsdf, pc, timings["integration"] = sim.acquire_tsdf(n=n, N=N, resolution=resolution)
             # Also sampling extended scene PC for more grasp queries
             while True:
-                _, pc_extended, _ = sim.acquire_tsdf(n=16, N=N, resolution=resolution)
+                _, pc_extended, _ = sim.acquire_tsdf(n=6, N=N, resolution=resolution)
                 if len(pc_extended.points) >= 1000:
                     break
 

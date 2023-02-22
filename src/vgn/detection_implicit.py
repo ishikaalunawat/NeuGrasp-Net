@@ -113,7 +113,7 @@ class VGNImplicit(object):
         sampler = GpgGraspSamplerPcl(0.05-0.0075) # Franka finger depth is actually a little less than 0.05
         safety_dist_above_table = 0.05 # table is spawned at finger_depth
         grasps, pos_queries, rot_queries = sampler.sample_grasps(pc_extended_down, num_grasps=40, max_num_samples=180,
-                                            safety_dis_above_table=safety_dist_above_table, show_final_grasps=False, verbose=True)
+                                            safety_dis_above_table=safety_dist_above_table, show_final_grasps=False, verbose=False)
         self.qual_th = 0.5
         best_only = False # Show all grasps and not just the best one
 
