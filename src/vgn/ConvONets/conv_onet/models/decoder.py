@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from vgn.ConvONets.layers import ResnetBlockFC
 from vgn.ConvONets.common import normalize_coordinate, normalize_3d_coordinate, map2local
+from dgcnn_cls import DGCNN
+from pointnet_cls import PointNet
 
 class FCDecoder(nn.Module):
     '''Decoder.
@@ -397,5 +399,69 @@ class LocalPointDecoder(nn.Module):
 
         out = self.fc_out(self.actvn(net))
         out = out.squeeze(-1)
+
+        return out
+
+class PickedPointDecoder(nn.Module):
+    def __init__(self, dim=7, c_dim=32,
+                 out_dim=1,
+                 point_network='pointnet',
+                 sample_mode='bilinear', 
+                 padding=0.1,
+                 concat_feat=True):
+        super().__init__()
+        
+        # TODO: Check shapes and batch the c_planes
+        self.dim = dim # input
+        self.out_dim= out_dim
+        self.concat_feat = concat_feat
+        if concat_feat:
+            c_dim *= 3
+        self.c_dim = c_dim
+        self.sample_mode = sample_mode
+        self.padding = padding
+
+        if point_network == 'pointnet':
+            self.point_network = PointNet(input_dim=c_dim+dim, num_class=out_dim)
+        else: # dgcnn
+            self.point_network = DGCNN(input_dim=c_dim+dim, num_class=out_dim, n_knn=20)
+
+    def sample_plane_feature(self, p, c, plane='xz'):
+        xy = normalize_coordinate(p.clone(), plane=plane, padding=self.padding) # normalize to the range of (0, 1)
+        xy = xy[:, :, None].float()
+        vgrid = 2.0 * xy - 1.0 # normalize to (-1, 1)
+        c = F.grid_sample(c, vgrid, padding_mode='border', align_corners=True, mode=self.sample_mode).squeeze(-1)
+        return c
+
+    def forward(self, p, c_plane):
+        if isinstance(p, tuple):
+            p, r = p
+            p = p.float()
+            r = r.float()
+            #print(p.size(), r.size())
+            f = torch.cat([p,r], dim = 2) # <- Changed to predict only grasp quality
+            #print(p.size())
+        else:
+            #print(p.size())
+            f = p
+
+        if self.c_dim != 0:
+            plane_type = list(c_plane.keys())
+            if self.concat_feat:
+                c = [f]
+                if 'xz' in plane_type:
+                    c.append(self.sample_plane_feature(p, c_plane['xz'], plane='xz'))
+                if 'xy' in plane_type:
+                    c.append(self.sample_plane_feature(p, c_plane['xy'], plane='xy'))
+                if 'yz' in plane_type:
+                    c.append(self.sample_plane_feature(p, c_plane['yz'], plane='yz'))
+                c = torch.cat(c, dim=1)
+                c = c.transpose(1, 2)
+            else:
+                raise NotImplementedError
+        else:
+            raise NotImplementedError
+        
+        out = self.point_network(c)
 
         return out
