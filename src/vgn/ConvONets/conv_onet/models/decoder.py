@@ -3,8 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from vgn.ConvONets.layers import ResnetBlockFC
 from vgn.ConvONets.common import normalize_coordinate, normalize_3d_coordinate, map2local
-from dgcnn_cls import DGCNN
-from pointnet_cls import PointNet
+from .dgcnn_cls import DGCNN
+from .pointnet_cls import PointNet#, PointNetResNet
 
 class FCDecoder(nn.Module):
     '''Decoder.
@@ -423,7 +423,11 @@ class PickedPointDecoder(nn.Module):
 
         if point_network == 'pointnet':
             self.point_network = PointNet(input_dim=c_dim+dim, num_class=out_dim)
-        else: # dgcnn
+        elif point_network == 'pointnet_resnet':
+            # TODO
+            raise NotImplementedError
+            # self.point_network = PointNetResNet(input_dim=c_dim+dim, num_class=out_dim)
+        elif point_network == 'dgcnn':
             self.point_network = DGCNN(input_dim=c_dim+dim, num_class=out_dim, n_knn=20)
 
     def sample_plane_feature(self, p, c, plane='xz'):
