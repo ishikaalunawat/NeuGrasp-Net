@@ -54,7 +54,7 @@ class ClutterRemovalSim(object):
     def restore_state(self):
         self.world.restore_state(self._snapshot_id)
 
-    def setup_sim_scene_from_mesh_pose_list(self, mesh_pose_list, data_root=None):
+    def setup_sim_scene_from_mesh_pose_list(self, mesh_pose_list, table=True, data_root=None):
         self.world.reset()
         self.world.set_gravity([0.0, 0.0, -9.81])
         self.draw_workspace()
@@ -66,9 +66,9 @@ class ClutterRemovalSim(object):
                 cameraPitch=-45,
                 cameraTargetPosition=[0.15, 0.50, -0.3],
             )
-
-        table_height = self.gripper.finger_depth
-        self.place_table(table_height)
+        if table:
+            table_height = self.gripper.finger_depth
+            self.place_table(table_height)
 
         for mesh_path, scale, pose in mesh_pose_list:
             if data_root is not None:
