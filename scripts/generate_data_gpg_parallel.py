@@ -300,7 +300,7 @@ if __name__ == "__main__":
             g_completed_jobs.append(result)
             elapsed_time = time.time() - g_starting_time
             if len(g_completed_jobs) % 1000 == 0:
-                msg = "%05d/%05d %s finished! " % (len(g_completed_jobs), g_num_total_jobs, result)
+                msg = "%05d/%05d finished! " % (len(g_completed_jobs), g_num_total_jobs)
                 msg = msg + 'Elapsed time: ' + \
                         time.strftime("%H:%M:%S", time.gmtime(elapsed_time)) + '. '
                 print(msg)
