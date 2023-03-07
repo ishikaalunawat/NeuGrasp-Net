@@ -15,7 +15,7 @@ from vgn.utils.implicit import get_scene_from_mesh_pose_list
 #         self.num_point = num_point
 #         self.raw_root = raw_root
 #         self.num_th = 32
-#         self.df = read_df(raw_root)
+#         self.df = read_df_with_surface_clouds(raw_root)
 #         self.size, _, _, _ = read_setup(raw_root)
 
 #     def __len__(self):
@@ -60,7 +60,7 @@ class DatasetVoxelOccGraspPCFile(torch.utils.data.Dataset):
         self.num_point_occ = num_point_occ
         self.raw_root = raw_root
         self.num_th = 32 # Unused?
-        self.df = read_df(raw_root)
+        self.df = read_df_with_surface_clouds(raw_root)
         self.size, _, _, _ = read_setup(raw_root)
 
     def __len__(self):
