@@ -9,7 +9,7 @@ decoder_dict = {
     'simple_local': decoder.LocalDecoder,
     'simple_local_crop': decoder.PatchLocalDecoder,
     'simple_local_point': decoder.LocalPointDecoder,
-    'picked_point_net': decoder.PickedPointDecoder,
+    'picked_points': decoder.PickedPointDecoder,
 }
 
 
