@@ -14,7 +14,7 @@ from torch.utils import tensorboard
 import torch.nn.functional as F
 
 #from vgn.dataset_pc import DatasetPCOcc
-from vgn.dataset_voxel_grasp_pc import DatasetVoxelOccGraspPCFile
+from vgn.dataset_voxel_grasp_pc import DatasetVoxelGraspPCOcc
 from vgn.networks import get_network, load_network
 
 LOSS_KEYS = ['loss_all', 'loss_qual', 'loss_occ']
@@ -151,7 +151,7 @@ def main(args):
 def create_train_val_loaders(root, root_raw, batch_size, val_split, augment, kwargs):
     # load the dataset
 
-    dataset = DatasetVoxelOccGraspPCFile(root, root_raw)
+    dataset = DatasetVoxelGraspPCOcc(root, root_raw)
 
     # split into train and validation sets
     val_size = int(val_split * len(dataset))
@@ -167,20 +167,21 @@ def create_train_val_loaders(root, root_raw, batch_size, val_split, augment, kwa
     return train_loader, val_loader
 
 
-def prepare_batch(batch, device): #pc==tsdf
-    #pc, (label, rotations, width), pos, pos_occ, occ_value = batch
-    pc, (label, width), (pos, rotations), pos_occ, occ_value = batch
+def prepare_batch(batch, device):
+    # pc==tsdf
+    pc, (label, width), (pos, rotations, grasps_pc_local, grasps_pc), pos_occ, occ_value = batch
+
     pc = pc.float().to(device)
     label = label.float().to(device)
-    rotations = rotations.float().to(device)
     width = width.float().to(device)
-    pos.unsqueeze_(1) # B, 1, 3
     pos = pos.float().to(device)
+    rotations = rotations.float().to(device)
+    grasps_pc_local = grasps_pc_local.float().to(device)
+    grasps_pc = grasps_pc.float().to(device)
     pos_occ = pos_occ.float().to(device)
     occ_value = occ_value.float().to(device)
-    #return pc, (label, rotations, width, occ_value), pos, pos_occ
-    return pc, (label, width, occ_value), (pos, rotations), pos_occ
-    #return pc, (label, occ_value), (pos, rotations), pos_occ
+
+    return pc, (label, width, occ_value), (pos, rotations, grasps_pc_local, grasps_pc), pos_occ
 
 
 def select(out):
