@@ -208,17 +208,18 @@ def generate_from_existing_grasps(grasp_data_entry, args):
         # viz original pc and gripper
         down_surface_pc.colors = o3d.utility.Vector3dVector(np.tile(np.array([1.0, 0.45, 0.]), (np.asarray(down_surface_pc.points).shape[0], 1)))
         o3d.visualization.draw_geometries([down_surface_pc, gripper_pc, pc])
-
-    ## Save grasp & surface point cloud
-    grasp_id = grasp_data_entry['grasp_id']
-    # save grasp to another grasps_with_clouds csv
-    grasp_data_entry["qx"]
-    append_csv(args.csv_path,
-               grasp_id, scene_id, grasp_data_entry["qx"], grasp_data_entry["qy"], grasp_data_entry["qz"], grasp_data_entry["qw"],
-               grasp_data_entry['x'], grasp_data_entry['y'], grasp_data_entry['z'], grasp_data_entry['width'], grasp_data_entry['label'])
-    # save surface point cloud
-    surface_pc_path = args.raw_root / "grasp_point_clouds" / f"{grasp_id}.npz"
-    np.savez_compressed(surface_pc_path, pc=np.asarray(down_surface_pc.points))
+    
+    if not args.debug:
+        ## Save grasp & surface point cloud
+        grasp_id = grasp_data_entry['grasp_id']
+        # save grasp to another grasps_with_clouds csv
+        grasp_data_entry["qx"]
+        append_csv(args.csv_path,
+                grasp_id, scene_id, grasp_data_entry["qx"], grasp_data_entry["qy"], grasp_data_entry["qz"], grasp_data_entry["qw"],
+                grasp_data_entry['x'], grasp_data_entry['y'], grasp_data_entry['z'], grasp_data_entry['width'], grasp_data_entry['label'])
+        # save surface point cloud
+        surface_pc_path = args.raw_root / "grasp_point_clouds" / f"{grasp_id}.npz"
+        np.savez_compressed(surface_pc_path, pc=np.asarray(down_surface_pc.points))
 
     if args.sim_gui:
         sim.world.p.disconnect()
@@ -238,7 +239,7 @@ if __name__ == "__main__":
     parser.add_argument("--render_table", type=bool, default=False, help="Also render table in depth images")
     parser.add_argument("--voxel_downsample_size", type=float, default=0.002) # 2mm
     parser.add_argument("--max_points", type=int, default=1024)
-    parser.add_argument("--min_points", type=int, default=100)
+    parser.add_argument("--min_points", type=int, default=50)
     parser.add_argument("--add_noise", type=bool, default=False, help="Add dex noise to point clouds and depth images")
     parser.add_argument("--sim_gui", type=bool, default=False)
     args, _ = parser.parse_known_args()
@@ -265,11 +266,14 @@ if __name__ == "__main__":
     if 'grasp_id' not in df.columns:
         # Add a column for grasp id. Use index values
         df.insert(0,'grasp_id',df.index)
-    # Create a directory for storing grasp point clouds
-    os.makedirs(args.raw_root / "grasp_point_clouds", exist_ok=True)
-    # Crate another csv file for storing grasps that have point clouds
-    args.csv_path = args.raw_root / "grasps_with_clouds.csv"
-    if not args.csv_path.exists():
+    if not args.debug:
+        # Create a directory for storing grasp point clouds
+        os.makedirs(args.raw_root / "grasp_point_clouds", exist_ok=True)
+        # Crate another csv file for storing grasps that have point clouds
+        args.csv_path = args.raw_root / "grasps_with_clouds.csv"
+        if args.csv_path.exists():
+            print("[Error]: CSV file with same name already exists. Exiting...")
+            exit()
         create_csv(
             args.csv_path,
             ["grasp_id", "scene_id", "qx", "qy", "qz", "qw", "x", "y", "z", "width", "label"],
