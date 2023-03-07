@@ -7,7 +7,7 @@ import numpy as np
 import torch.nn.functional as F
 
 class PointNet(nn.Module):
-    def __init__(self, input_dim=32, num_class=1, normal_channel=False):
+    def __init__(self, input_dim=99, num_class=1):
         super(PointNet, self).__init__()
 
         self.feat = PointNetEncoder(global_feat=True, feature_transform=False, input_dim=input_dim)
@@ -145,7 +145,7 @@ class STNkd(nn.Module):
 
 
 class PointNetEncoder(nn.Module):
-    def __init__(self, global_feat=True, feature_transform=False, input_dim=32):
+    def __init__(self, global_feat=True, feature_transform=False, input_dim=99):
         super(PointNetEncoder, self).__init__()
         # self.stn = STN3d(channel) # Not required
         self.conv1 = torch.nn.Conv1d(input_dim, 64, 1)

@@ -238,7 +238,7 @@ if __name__ == "__main__":
     parser.add_argument("--camera_image_res", type=int, default=128)
     parser.add_argument("--render_table", type=bool, default=False, help="Also render table in depth images")
     parser.add_argument("--voxel_downsample_size", type=float, default=0.002) # 2mm
-    parser.add_argument("--max_points", type=int, default=1024)
+    parser.add_argument("--max_points", type=int, default=1023)
     parser.add_argument("--min_points", type=int, default=50)
     parser.add_argument("--add_noise", type=bool, default=False, help="Add dex noise to point clouds and depth images")
     parser.add_argument("--sim_gui", type=bool, default=False)

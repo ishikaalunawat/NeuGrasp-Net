@@ -13,7 +13,6 @@ import torch
 from torch.utils import tensorboard
 import torch.nn.functional as F
 
-#from vgn.dataset_pc import DatasetPCOcc
 from vgn.dataset_voxel_grasp_pc import DatasetVoxelGraspPCOcc
 from vgn.networks import get_network, load_network
 
@@ -65,11 +64,11 @@ def main(args):
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, mode='min')
 
     metrics = {
-        "accuracy": Accuracy(lambda out: (torch.round(out[1][0]), out[2][0])) # out[1][0] => y_pred -> quality
+        "accuracy": Accuracy(lambda out: (torch.round(out[1][0]), out[2][0])), # out[1][0] => y_pred -> quality
                                                                               # out[2][0] => y -> quality
                                                                               # ^ Refer def _update() returns
-        # "precision": Precision(lambda out: (torch.round(out[1][0]), out[2][0])),
-        # "recall": Recall(lambda out: (torch.round(out[1][0]), out[2][0])),
+        "precision": Precision(lambda out: (torch.round(out[1][0]), out[2][0])),
+        "recall": Recall(lambda out: (torch.round(out[1][0]), out[2][0])),
     }
     for k in LOSS_KEYS:
         metrics[k] = Average(lambda out, sk=k: out[3][sk])
@@ -238,7 +237,6 @@ def create_trainer(net, optimizer, scheduler, loss_fn, metrics, device):
         net.train()
         optimizer.zero_grad()
         # forward
-        #x, y, pos, pos_occ = prepare_batch(batch, device)
         x, y, grasp_query, pos_occ = prepare_batch(batch, device) # <- Changed to predict only grasp quality (check inside)
         y_pred = select(net(x, grasp_query, p_tsdf=pos_occ))
         loss, loss_dict = loss_fn(y_pred, y)
