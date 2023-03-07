@@ -37,7 +37,7 @@ def main(args, rank):
 
     for scene_id in range(grasps_per_worker // GRASPS_PER_SCENE): # range determines number of scenes
         # generate heap
-        object_count = np.random.poisson(OBJECT_COUNT_LAMBDA) + 1
+        object_count = 1 # CHANGED for one object #np.random.poisson(OBJECT_COUNT_LAMBDA) + 1
         sim.reset(object_count)
         sim.save_state()
 
@@ -91,11 +91,11 @@ def render_side_images(sim, n=1, random=False):
         camera = {}
         if random:
             r = np.random.uniform(1.6, 2.4) * sim.size
-            theta = np.random.uniform(np.pi / 4.0, 5.0 * np.pi / 12.0)
+            theta = np.random.uniform(0, np.pi / 7.0)
             phi = np.random.uniform(- 5.0 * np.pi / 5, - 3.0 * np.pi / 8.0)
         else:
             r = 2 * sim.size
-            theta = np.pi / 3.0
+            theta = np.pi / 6.0
             phi = - np.pi / 2.0
 
         extrinsic = camera_on_sphere(origin, r, theta, phi)
