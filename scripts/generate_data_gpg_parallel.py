@@ -135,25 +135,27 @@ def generate_from_existing_scene(mesh_pose_list_path, args):
     # pc = pc.crop(bounding_box)
     # o3d.visualization.draw_geometries([pc], point_show_normal=True)
 
-    # sample grasps with GPG:
-    sampler = GpgGraspSamplerPcl(sim.gripper.finger_depth-0.0075) # Franka finger depth is actually a little less than 0.05
-    safety_dist_above_table = sim.gripper.finger_depth # table is spawned at finger_depth
-    grasps, _, _ = sampler.sample_grasps(pc, num_grasps=GRASPS_PER_SCENE_GPG, max_num_samples=180,
-                                        safety_dis_above_table=safety_dist_above_table, show_final_grasps=False)
-    for grasp in grasps:
-        label, width = evaluate_grasp_gpg(sim, grasp) # try grasp and get true width
-        grasp.width = width
-        # store the sample
-        write_grasp(args.root, scene_id, grasp, label)
+    grasps = []
+    if GRASPS_PER_SCENE_GPG > 0:
+        # sample grasps with GPG:
+        sampler = GpgGraspSamplerPcl(sim.gripper.finger_depth-0.0075) # Franka finger depth is actually a little less than 0.05
+        safety_dist_above_table = sim.gripper.finger_depth # table is spawned at finger_depth
+        grasps, _, _ = sampler.sample_grasps(pc, num_grasps=GRASPS_PER_SCENE_GPG, max_num_samples=180,
+                                            safety_dis_above_table=safety_dist_above_table, show_final_grasps=False)
+        for grasp in grasps:
+            label, width = evaluate_grasp_gpg(sim, grasp) # try grasp and get true width
+            grasp.width = width
+            # store the sample
+            write_grasp(args.root, scene_id, grasp, label)
 
     # Optional: sample remaining grasps with regular sampling
-    # for _ in range(GRASPS_PER_SCENE-len(grasps)):
-    #     # sample and evaluate a grasp point
-    #     point, normal = sample_grasp_point(pc, sim.gripper.finger_depth)
-    #     grasp, label = evaluate_grasp_point(sim, point, normal)
+    for _ in range(GRASPS_PER_SCENE-len(grasps)):
+        # sample and evaluate a grasp point
+        point, normal = sample_grasp_point(pc, sim.gripper.finger_depth)
+        grasp, label = evaluate_grasp_point(sim, point, normal)
 
-    #     # store the sample
-    #     write_grasp(args.root, scene_id, grasp, label)
+        # store the sample
+        write_grasp(args.root, scene_id, grasp, label)
 
 
 def render_images(sim, n):
