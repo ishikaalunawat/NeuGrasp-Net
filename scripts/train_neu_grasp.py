@@ -20,19 +20,13 @@ LOSS_KEYS = ['loss_all', 'loss_qual', 'loss_occ']
 
 def main(args):
 
-    filename = 'summary_%s.txt' % (args.dataset_raw.name)
-    with open(filename, 'r') as f:
-        note = (";").join(f.readlines()[1:5]).replace('\n', '')
-
-    if args.log_wandb:
-        wandb.init(config=args, project="6dgrasp", entity="irosa-ias", notes = note)
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
     kwargs = {"num_workers": args.num_workers, "pin_memory": True} if use_cuda else {}
 
     # create log directory
     if args.savedir == '':
-        time_stamp = datetime.now().strftime("%y-%m-%d-%H-%M")
+        time_stamp = datetime.now().strftime("%y-%m-%d-%H-%M-%S")
         description = "{}_dataset={},augment={},net=6d_{},batch_size={},lr={:.0e},{}".format(
             time_stamp,
             args.dataset.name,
@@ -45,9 +39,15 @@ def main(args):
         logdir = args.logdir / description
         meshdir = logdir / "meshes"
         meshdir.mkdir(parents=True, exist_ok=True)
-        
     else:
         logdir = Path(args.savedir)
+    
+    filename = 'summary_%s.txt' % (args.dataset_raw.name)
+    with open(filename, 'r') as f:
+        note = (";").join(f.readlines()[1:5]).replace('\n', '')
+
+    if args.log_wandb:
+        wandb.init(config=args, project="6dgrasp", entity="irosa-ias", id=args.dataset.name+'_'+time_stamp, notes=note)
 
     # create data loaders
     train_loader, val_loader = create_train_val_loaders(
@@ -67,8 +67,8 @@ def main(args):
         "accuracy": Accuracy(lambda out: (torch.round(out[1][0]), out[2][0])), # out[1][0] => y_pred -> quality
                                                                               # out[2][0] => y -> quality
                                                                               # ^ Refer def _update() returns
-        "precision": Precision(lambda out: (torch.round(out[1][0]), out[2][0])),
-        "recall": Recall(lambda out: (torch.round(out[1][0]), out[2][0])),
+        # "precision": Precision(lambda out: (torch.round(out[1][0]), out[2][0])),
+        # "recall": Recall(lambda out: (torch.round(out[1][0]), out[2][0])),
     }
     for k in LOSS_KEYS:
         metrics[k] = Average(lambda out, sk=k: out[3][sk])
@@ -125,7 +125,7 @@ def main(args):
     checkpoint_handler = ModelCheckpoint(
         logdir,
         "neural_grasp",
-        n_saved=None, # Changed from 1. Save everythinggg
+        n_saved=1, # Changed from None. Save latest model
         require_empty=True,
     )
     best_checkpoint_handler = ModelCheckpoint(
@@ -158,10 +158,10 @@ def create_train_val_loaders(root, root_raw, batch_size, val_split, augment, kwa
     train_set, val_set = torch.utils.data.random_split(dataset, [train_size, val_size])
     # create loaders for both datasets
     train_loader = torch.utils.data.DataLoader(
-        train_set, batch_size=batch_size, shuffle=True, drop_last=True, **kwargs
+        train_set, batch_size=train_size, shuffle=True, drop_last=True, **kwargs
     )
     val_loader = torch.utils.data.DataLoader(
-        val_set, batch_size=batch_size, shuffle=False, drop_last=True, **kwargs
+        val_set, batch_size=val_size, shuffle=False, drop_last=True, **kwargs
     )
     return train_loader, val_loader
 
@@ -260,16 +260,11 @@ def create_evaluator(net, loss_fn, metrics, device):
 
         net.eval()
         with torch.no_grad():
-            #x, y, pos, pos_occ = prepare_batch(batch, device)
             x, y, grasp_query, pos_occ = prepare_batch(batch, device) # <- Changed to predict only grasp quality (check inside)
             out = net(x, grasp_query, p_tsdf=pos_occ)
-
-            # Out: qual_out, rot_out, width_out, sdf => (4,) => (32, 40, 40, 40)
             y_pred = select(out)
             sdf = out[-1]
             _, loss_dict = loss_fn(y_pred, y)
-            #print(y_pred[-1].shape)
-
 
         return x, y_pred, y, loss_dict, sdf
 

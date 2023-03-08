@@ -441,6 +441,7 @@ class PickedPointDecoder(nn.Module):
     def forward(self, grasp_query, c_plane):
         if isinstance(grasp_query, tuple):
             pos, rotations, grasps_pc_local, grasps_pc = grasp_query
+            zero_pc_indices = grasps_pc.sum(dim=2) == 0
             f = torch.cat([pos,rotations], dim = 2) # <- Changed to predict only grasp quality
         else:
             raise NotImplementedError
@@ -456,6 +457,8 @@ class PickedPointDecoder(nn.Module):
                 c.append(self.sample_plane_feature(grasps_pc, c_plane['yz'], plane='yz'))
             c = torch.cat(c, dim=1)
             c = c.transpose(1, 2)
+            # zero the features for zero points in the grasp_pc
+            c[zero_pc_indices] *= torch.tensor(0, dtype=c.dtype, device=c.device)
         else:
             raise NotImplementedError
         # concat grasp point cloud in local frame
@@ -464,7 +467,8 @@ class PickedPointDecoder(nn.Module):
         # Linear layer to encode input grasp center and orientation
         g = self.fc_g(f)
         queries = torch.cat([g, c], dim=1)
-
+        
+        queries = queries.transpose(2, 1) # Transpose to get shape B, D, N
         out = self.point_network(queries)
 
         return out
