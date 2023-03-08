@@ -158,10 +158,10 @@ def create_train_val_loaders(root, root_raw, batch_size, val_split, augment, kwa
     train_set, val_set = torch.utils.data.random_split(dataset, [train_size, val_size])
     # create loaders for both datasets
     train_loader = torch.utils.data.DataLoader(
-        train_set, batch_size=train_size, shuffle=True, drop_last=True, **kwargs
+        train_set, batch_size=batch_size, shuffle=True, drop_last=True, **kwargs
     )
     val_loader = torch.utils.data.DataLoader(
-        val_set, batch_size=val_size, shuffle=False, drop_last=True, **kwargs
+        val_set, batch_size=batch_size, shuffle=False, drop_last=True, **kwargs
     )
     return train_loader, val_loader
 
