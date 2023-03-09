@@ -25,8 +25,8 @@ def main(args):
     kwargs = {"num_workers": args.num_workers, "pin_memory": True} if use_cuda else {}
 
     # create log directory
+    time_stamp = datetime.now().strftime("%y-%m-%d-%H-%M-%S")
     if args.savedir == '':
-        time_stamp = datetime.now().strftime("%y-%m-%d-%H-%M-%S")
         description = "{}_dataset={},augment={},net=6d_{},batch_size={},lr={:.0e},{}".format(
             time_stamp,
             args.dataset.name,
@@ -47,7 +47,7 @@ def main(args):
         note = (";").join(f.readlines()[1:5]).replace('\n', '')
 
     if args.log_wandb:
-        wandb.init(config=args, project="6dgrasp", entity="irosa-ias", id=args.dataset.name+'_'+time_stamp, notes=note)
+        wandb.init(config=args, project="6dgrasp", entity="irosa-ias", id=args.net+'_'+args.dataset.name+'_'+time_stamp, notes=note)
 
     # create data loaders
     train_loader, val_loader = create_train_val_loaders(

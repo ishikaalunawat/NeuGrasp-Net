@@ -5,7 +5,7 @@ from .utils.dgcnn_util import get_graph_feature
 
 
 class DGCNN(nn.Module):
-    def __init__(self, input_dim=32, num_class=1, n_knn=20):#, normal_channel=False):
+    def __init__(self, input_dim=99, num_class=1, n_knn=20):#, normal_channel=False):
         super(DGCNN, self).__init__()
         # self.args = args
         self.n_knn = n_knn # args.n_knn

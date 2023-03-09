@@ -16,6 +16,7 @@ def get_network(name):
         "giga_geo": GIGAGeo,
         "giga_detach": GIGADetach,
         "neu_grasp_pn": NeuGraspPN,
+        "neu_grasp_dgcnn": NeuGraspDGCNN,
     }
     return models[name.lower()]()
 
@@ -236,10 +237,10 @@ def NeuGraspDGCNN():
             }
         },
         'decoder': 'picked_points',
-        'point_network': 'dgcnn',
         'decoder_tsdf': 'simple_local',
         'decoder_kwargs': {
             'dim': 7,
+            'point_network': 'dgcnn',
             'sample_mode': 'bilinear',
             'concat_feat': True
         },
