@@ -87,18 +87,19 @@ def write_df(df, root):
     df.to_csv(root / "grasps.csv", index=False)
 
 
-def write_voxel_grid(root, scene_id, voxel_grid):
-    path = root / "scenes" / (scene_id + ".npz")
-    np.savez_compressed(path, grid=voxel_grid)
+def write_voxel_grid(root, voxel_grid):
+    path = root / "grid.npz"
+    np.savez_compressed(path, tsdf_grid=voxel_grid)
 
 
-def write_point_cloud(root, scene_id, point_cloud, name="point_clouds"):
-    path = root / name / (scene_id + ".npz")
-    np.savez_compressed(path, pc=point_cloud)
+def write_point_cloud(root, point_cloud):
+    points, normals = point_cloud.points, point_cloud.normals
+    path = root / "pc.npz"
+    np.savez_compressed(path, points=points, normals = normals)
 
 def read_voxel_grid(root, scene_id):
-    path = root / "scenes" / (scene_id + ".npz")
-    return np.load(path)["grid"]
+    path = root / "unisurf_data_meshes" / (f"scene_{scene_id}" + ".npz")
+    return np.load(path)['voxel_grid']
 
 def read_point_cloud(root, scene_id, name="point_clouds"):
     path = root / name / (scene_id + ".npz")

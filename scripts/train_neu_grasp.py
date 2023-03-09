@@ -10,7 +10,7 @@ from ignite.handlers import ModelCheckpoint
 from ignite.metrics import Average, Accuracy, Precision, Recall
 
 import torch
-from torch.utils import tensorboard
+# from torch.utils import tensorboard
 import torch.nn.functional as F
 
 from vgn.dataset_voxel_grasp_pc import DatasetVoxelGraspPCOcc
@@ -67,8 +67,8 @@ def main(args):
         "accuracy": Accuracy(lambda out: (torch.round(out[1][0]), out[2][0])), # out[1][0] => y_pred -> quality
                                                                               # out[2][0] => y -> quality
                                                                               # ^ Refer def _update() returns
-        # "precision": Precision(lambda out: (torch.round(out[1][0]), out[2][0])),
-        # "recall": Recall(lambda out: (torch.round(out[1][0]), out[2][0])),
+        "precision": Precision(lambda out: (torch.round(out[1][0]), out[2][0])),
+        "recall": Recall(lambda out: (torch.round(out[1][0]), out[2][0])),
     }
     for k in LOSS_KEYS:
         metrics[k] = Average(lambda out, sk=k: out[3][sk])
@@ -144,7 +144,8 @@ def main(args):
     )
 
     # run the training loop
-    trainer.run(train_loader, max_epochs=args.epochs)
+    epoch_length = int(args.epoch_length_frac*len(train_loader))
+    trainer.run(train_loader, max_epochs=args.epochs, epoch_length=epoch_length)
 
 
 def create_train_val_loaders(root, root_raw, batch_size, val_split, augment, kwargs):
@@ -291,18 +292,19 @@ if __name__ == "__main__":
     parser.add_argument("--net", default="neu_grasp_pn")
     parser.add_argument("--dataset", type=Path, required=True)
     parser.add_argument("--dataset_raw", type=Path, required=True)
-    parser.add_argument("--num_workers", type=int, default=16)
+    parser.add_argument("--num_workers", type=int, default=10)
     parser.add_argument("--logdir", type=Path, default="data/runs")
     parser.add_argument("--log_wandb", action="store_true")
     parser.add_argument("--description", type=str, default="")
     parser.add_argument("--savedir", type=str, default="")
     parser.add_argument("--epochs", type=int, default=20)
-    parser.add_argument("--batch_size", type=int, default=32)
+    parser.add_argument("--epoch_length_frac", type=float, default=1.0, help="fraction of training data that constitutes one epoch")
+    parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--lr", type=float, default=2e-4)
-    parser.add_argument("--val_split", type=float, default=0.1)
+    parser.add_argument("--val_split", type=float, default=0.05, help="fraction of data used for validation")
     parser.add_argument("--augment", action="store_true")
     parser.add_argument("--silence", action="store_true")
-    parser.add_argument("--load_path", type=str, default='')
+    parser.add_argument("--load_path", type=str, default='', help="load checkpoint network and continue")
     args, _ = parser.parse_known_args()
     print(args)
     main(args)
