@@ -169,7 +169,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("root", type=Path)
     parser.add_argument("--scene", type=str, choices=["pile", "packed"], default="pile")
-    parser.add_argument("--object-set", type=str, default="blocks")
+    parser.add_argument("--object-set", type=str, default="pile/train")
     parser.add_argument("--num-grasps", type=int, default=10000)
     parser.add_argument("--grasps-per-scene", type=int, default=1)
     parser.add_argument("--num-proc", type=int, default=1)

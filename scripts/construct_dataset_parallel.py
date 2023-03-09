@@ -11,7 +11,8 @@ from vgn.perception import *
 from vgn.utils.misc import apply_noise
 
 
-RESOLUTION = 40
+RESOLUTION = 64 # High Resolution
+# RESOLUTION = 40 # Low Resolution
 
 def process_one_scene(args, f):
     if f.suffix != ".npz":

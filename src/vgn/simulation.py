@@ -1,6 +1,6 @@
 from pathlib import Path
 import time
-
+import os
 import numpy as np
 import pybullet
 
@@ -12,10 +12,12 @@ from vgn.utils.misc import apply_noise, apply_translational_noise
 
 
 class ClutterRemovalSim(object):
-    def __init__(self, scene, object_set, gui=True, seed=None, add_noise=False, sideview=False, save_dir=None, save_freq=8):
+    def __init__(self, scene, object_set, gui=True, seed=None, add_noise=False, sideview=False, save_dir=None, save_freq=8, data_root=None):
         assert scene in ["pile", "packed"]
 
         self.urdf_root = Path("data/urdfs")
+        if data_root:
+            self.urdf_root = Path(data_root) / self.urdf_root
         self.scene = scene
         self.object_set = object_set
         self.discover_objects()
@@ -52,6 +54,36 @@ class ClutterRemovalSim(object):
     def restore_state(self):
         self.world.restore_state(self._snapshot_id)
 
+    def setup_sim_scene_from_mesh_pose_list(self, mesh_pose_list, table=True, data_root=None):
+        self.world.reset()
+        self.world.set_gravity([0.0, 0.0, -9.81])
+        self.draw_workspace()
+
+        if self.gui:
+            self.world.p.resetDebugVisualizerCamera(
+                cameraDistance=1.0,
+                cameraYaw=0.0,
+                cameraPitch=-45,
+                cameraTargetPosition=[0.15, 0.50, -0.3],
+            )
+        if table:
+            table_height = self.gripper.finger_depth
+            self.place_table(table_height)
+
+        for mesh_path, scale, pose in mesh_pose_list:
+            if data_root is not None:
+                mesh_path = os.path.join(data_root, mesh_path)
+            if os.path.splitext(mesh_path)[1] == '.urdf':
+                urdf_path = mesh_path
+            else:
+                # path is to the _visual.obj file. Change to urdf
+                urdf_path = mesh_path[:-11] + '.urdf'
+            body_pose = Transform.from_matrix(pose)
+            body = self.world.load_urdf(urdf_path, body_pose, scale)
+            # assert len(body.links) == 1
+            # assert len(body.links[0].visuals) == 1
+            # assert len(body.links[0].visuals[0].geometry.meshes) == 1
+    
     def reset(self, object_count):
         self.world.reset()
         self.world.set_gravity([0.0, 0.0, -9.81])

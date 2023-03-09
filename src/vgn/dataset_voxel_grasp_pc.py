@@ -8,14 +8,13 @@ from vgn.perception import *
 from vgn.utils.transform import Rotation, Transform
 from vgn.utils.implicit import get_scene_from_mesh_pose_list
 
-class DatasetVoxel(torch.utils.data.Dataset):
-    def __init__(self, root, raw_root, num_point=2048, augment=False):
-        self.root = root
+class DatasetVoxelGraspPC(torch.utils.data.Dataset):
+    def __init__(self, root, raw_root, augment=False):
+        self.root = root# Why don't you just read the pandas df here?????
         self.augment = augment
-        self.num_point = num_point
         self.raw_root = raw_root
-        self.num_th = 32
-        self.df = read_df(raw_root)
+        self.num_th = 32 # Unused?
+        self.df = read_df_with_surface_clouds(raw_root)
         self.size, _, _, _ = read_setup(raw_root)
 
     def __len__(self):
@@ -23,26 +22,34 @@ class DatasetVoxel(torch.utils.data.Dataset):
 
     def __getitem__(self, i):
         scene_id = self.df.loc[i, "scene_id"]
-        ori = Rotation.from_quat(self.df.loc[i, "qx":"qw"].to_numpy(np.single))
-        pos = self.df.loc[i, "x":"z"].to_numpy(np.single)
+        rotation = self.df.loc[i, "qx":"qw"].to_numpy(np.single).reshape(1, 4) # <- Changed to predict only grasp quality
+        pos = self.df.loc[i, "x":"z"].to_numpy(np.single).reshape(1, 3)
         width = self.df.loc[i, "width"].astype(np.single)
         label = self.df.loc[i, "label"].astype(np.long)
-        voxel_grid = read_voxel_grid(self.root, scene_id)
-        
+        voxel_grid = read_voxel_grid(self.root, scene_id) # TODO: Can I load the whole thing into memory?
         if self.augment:
-            voxel_grid, ori, pos = apply_transform(voxel_grid, ori, pos)
+            voxel_grid, ori, pos = apply_aug_transform(voxel_grid, ori, pos)
+        grasp_pc = self.read_grasp_pc(self.df.loc[i, "grasp_id"]) # Load grasp point cloud
         
+        # Normalize
         pos = pos / self.size - 0.5
         width = width / self.size
+        grasp_pc = grasp_pc / self.size - 0.5
 
-        rotations = np.empty((2, 4), dtype=np.single)
-        R = Rotation.from_rotvec(np.pi * np.r_[0.0, 0.0, 1.0])
-        rotations[0] = ori.as_quat()
-        rotations[1] = (ori * R).as_quat()
+        # Transform grasp point cloud to local frame and return this too
+        grasp_pc_local = transform_to_frame(grasp_pc, Rotation.from_quat(rotation[0]), pos[0])
+        
+        tsdf, y, rot = voxel_grid[0], (label, width), rotation # <- Changed to predict only grasp quality
 
-        x, y = voxel_grid[0], (label, rotations, width)
+        grasp_query = (pos, rot, grasp_pc_local, grasp_pc)
+        
+        return tsdf, y, grasp_query
 
-        return x, y, pos
+    def read_grasp_pc(self, grasp_id):
+        grasp_pc_path = self.raw_root / 'grasp_point_clouds' / (str(grasp_id) + '.npz')
+        grasp_pc_data = np.load(grasp_pc_path)
+        grasp_pc = grasp_pc_data['pc']
+        return grasp_pc
 
     def get_mesh(self, idx):
         scene_id = self.df.loc[idx, "scene_id"]
@@ -52,7 +59,7 @@ class DatasetVoxel(torch.utils.data.Dataset):
         return scene
 
 
-class DatasetVoxelOccFile(torch.utils.data.Dataset):
+class DatasetVoxelGraspPCOcc(torch.utils.data.Dataset):
     def __init__(self, root, raw_root, num_point=2048, num_point_occ=8000, augment=False):
         self.root = root# Why don't you just read the pandas df here?????
         self.augment = augment
@@ -60,47 +67,50 @@ class DatasetVoxelOccFile(torch.utils.data.Dataset):
         self.num_point_occ = num_point_occ
         self.raw_root = raw_root
         self.num_th = 32 # Unused?
-        self.df = read_df(raw_root)
+        self.df = read_df_with_surface_clouds(raw_root)
         self.size, _, _, _ = read_setup(raw_root)
+        self.max_points_grasp_pc = read_json(raw_root / "grasp_cloud_setup.json")["max_points"]
 
     def __len__(self):
         return len(self.df.index)
 
     def __getitem__(self, i):
         scene_id = self.df.loc[i, "scene_id"]
-        # ori = Rotation.from_quat(self.df.loc[i, "qx":"qw"].to_numpy(np.single))
-        pos = self.df.loc[i, "x":"z"].to_numpy(np.single)
+        rotation = self.df.loc[i, "qx":"qw"].to_numpy(np.single).reshape(1, 4) # <- Changed to predict only grasp quality
+        pos = self.df.loc[i, "x":"z"].to_numpy(np.single).reshape(1, 3)
         width = self.df.loc[i, "width"].astype(np.single)
         label = self.df.loc[i, "label"].astype(np.long)
         voxel_grid = read_voxel_grid(self.root, scene_id) # TODO: Can I load the whole thing into memory?
-        
         if self.augment:
-            voxel_grid, ori, pos = apply_transform(voxel_grid, ori, pos)
+            voxel_grid, ori, pos = apply_aug_transform(voxel_grid, ori, pos)
+        grasp_pc = self.read_grasp_pc(self.df.loc[i, "grasp_id"]) # Load grasp point cloud
         
+        # Normalize
         pos = pos / self.size - 0.5
         width = width / self.size
+        grasp_pc = grasp_pc / self.size - 0.5
 
-        #rotations = np.empty((2, 4), dtype=np.single)
-        #R = Rotation.from_rotvec(np.pi * np.r_[0.0, 0.0, 1.0])
-        # rotations = ori.as_quat().reshape(1, 4)
-        rotation = self.df.loc[i, "qx":"qw"].to_numpy(np.single).reshape(1, 4) # <- Changed to predict only grasp quality
-        #rotations[1] = (ori * R).as_quat()
-
-        # x, y = voxel_grid[0], (label, rotations, width)
-
-        # occ_points, occ = self.read_occ(scene_id, self.num_point_occ)
-        # occ_points = occ_points / self.size - 0.5
-
-        # return x, y, pos, occ_points, occ
-
+        # Transform grasp point cloud to local frame and return this too
+        grasp_pc_local = transform_to_frame(grasp_pc, Rotation.from_quat(rotation[0]), pos[0])
+        # If the number of points is less than the maximum number of points, pad with zeros
+        if grasp_pc.shape[0] < self.max_points_grasp_pc:
+            grasp_pc = np.vstack((grasp_pc, np.zeros((self.max_points_grasp_pc - grasp_pc.shape[0], 3))))
+            grasp_pc_local = np.vstack((grasp_pc_local, np.zeros((self.max_points_grasp_pc - grasp_pc_local.shape[0], 3))))
+        
         tsdf, y, rot = voxel_grid[0], (label, width), rotation # <- Changed to predict only grasp quality
 
         occ_points, occ = self.read_occ(scene_id, self.num_point_occ) # TODO: Can I load the whole thing into memory?
         occ_points = occ_points / self.size - 0.5
 
-        grasp_query = (pos, rot)
-
+        grasp_query = (pos, rot, grasp_pc_local, grasp_pc)
+        
         return tsdf, y, grasp_query, occ_points, occ
+
+    def read_grasp_pc(self, grasp_id):
+        grasp_pc_path = self.raw_root / 'grasp_point_clouds' / (str(grasp_id) + '.npz')
+        grasp_pc_data = np.load(grasp_pc_path)
+        grasp_pc = grasp_pc_data['pc']
+        return grasp_pc
 
     def read_occ(self, scene_id, num_point):
         occ_paths = list((self.raw_root / 'occ' / scene_id).glob('*.npz'))
@@ -120,8 +130,17 @@ class DatasetVoxelOccFile(torch.utils.data.Dataset):
         scene = get_scene_from_mesh_pose_list(mesh_pose_list, return_list=False)
         return scene
 
+def transform_to_frame(points, orientation, position):
 
-def apply_transform(voxel_grid, orientation, position):
+    # transform point set to T frame
+    T = Transform(orientation, position)
+    T_inv = T.inverse()
+    
+    points_transformed = T_inv.transform_point(points)
+
+    return points_transformed
+
+def apply_aug_transform(voxel_grid, orientation, position):
     angle = np.pi / 2.0 * np.random.choice(4)
     R_augment = Rotation.from_rotvec(np.r_[0.0, 0.0, angle])
 

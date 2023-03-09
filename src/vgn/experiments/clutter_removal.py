@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import tqdm
 import trimesh
+import open3d as o3d
 
 from vgn import io#, vis
 from vgn.grasp import *
@@ -19,7 +20,7 @@ MAX_CONSECUTIVE_FAILURES = 2
 
 
 State = collections.namedtuple("State", ["tsdf", "pc"])
-wandb.init(project="6dgrasp", entity="irosa-ias")
+# wandb.init(project="6dgrasp", entity="irosa-ias")
 
 def run(
     grasp_plan_fn,
@@ -76,13 +77,17 @@ def run(
             timings = {}
 
             # scan the scene
-            tsdf, pc, timings["integration"] = sim.acquire_tsdf(n=n, N=N, resolution=40)
+            tsdf, pc, timings["integration"] = sim.acquire_tsdf(n=n, N=N, resolution=resolution)
             # Also sampling extended scene PC for more grasp queries
-            _, pc_extended, _ = sim.acquire_tsdf(n=16, N=N, resolution=40)
+            while True:
+                _, pc_extended, _ = sim.acquire_tsdf(n=6, N=N, resolution=resolution)
+                if len(pc_extended.points) >= 1000:
+                    break
+
             state = argparse.Namespace(tsdf=tsdf, pc=pc, pc_extended=pc_extended)
-            if resolution != 40:
-                extra_tsdf, _, _ = sim.acquire_tsdf(n=n, N=N, resolution=resolution)
-                state.tsdf_process = extra_tsdf
+            # if resolution != 40:
+            #     extra_tsdf, _, _ = sim.acquire_tsdf(n=n, N=N, resolution=resolution)
+            #     state.tsdf_process = extra_tsdf
 
             if pc.is_empty():
                 break  # empty point cloud, abort this round TODO this should not happen
@@ -93,6 +98,7 @@ def run(
                 scene_mesh = get_scene_from_mesh_pose_list(mesh_pose_list)
                 grasps, scores, timings["planning"], visual_mesh = grasp_plan_fn(state, scene_mesh)
                 assert not visual_mesh.is_empty
+                # o3d.visualization.draw_geometries([visual_mesh.as_open3d])
                 logger.log_mesh(scene_mesh, visual_mesh, f'round_{round_id:03d}_trial_{trial_id:03d}')
                 
             else:
@@ -186,8 +192,8 @@ class Logger(object):
         aff_mesh.export(str(self.mesh_dir / (name + "_aff.stl")), 'stl')
         #trimesh.exchange.export.export_scene(aff_mesh, 'abc1.obj', file_type='obj')
         assert not aff_mesh.is_empty
-        wandb.log({'Grasps (Scene vs Grasp)' : [wandb.Object3D(open(self.mesh_dir / (name + "_scene.obj"))),
-                                               wandb.Object3D(open(self.mesh_dir / (name + "_aff.obj")))]})
+        # wandb.log({'Grasps (Scene vs Grasp)' : [wandb.Object3D(open(self.mesh_dir / (name + "_scene.obj"))),
+        #                                        wandb.Object3D(open(self.mesh_dir / (name + "_aff.obj")))]})
 
     def log_grasp(self, round_id, state, timings, grasp, score, label):
         # log scene

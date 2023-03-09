@@ -5,3 +5,4 @@ data
 wandb
 build
 unisurf_data_pc/
+logs

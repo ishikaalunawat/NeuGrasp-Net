@@ -8,7 +8,8 @@ decoder_dict = {
     'simple_fc': decoder.FCDecoder,
     'simple_local': decoder.LocalDecoder,
     'simple_local_crop': decoder.PatchLocalDecoder,
-    'simple_local_point': decoder.LocalPointDecoder
+    'simple_local_point': decoder.LocalPointDecoder,
+    'picked_points': decoder.PickedPointDecoder,
 }
 
 

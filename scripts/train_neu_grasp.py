@@ -13,26 +13,20 @@ import torch
 from torch.utils import tensorboard
 import torch.nn.functional as F
 
-#from vgn.dataset_pc import DatasetPCOcc
-from vgn.dataset_voxel import DatasetVoxelOccFile
+from vgn.dataset_voxel_grasp_pc import DatasetVoxelGraspPCOcc
 from vgn.networks import get_network, load_network
 
 LOSS_KEYS = ['loss_all', 'loss_qual', 'loss_occ']
 
 def main(args):
 
-    filename = 'summary_%s.txt' % (args.dataset_raw.name)
-    with open(filename, 'r') as f:
-        note = (";").join(f.readlines()[1:5]).replace('\n', '')
-
-    wandb.init(config=args, project="6dgrasp", entity="irosa-ias", notes = note)
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
     kwargs = {"num_workers": args.num_workers, "pin_memory": True} if use_cuda else {}
 
     # create log directory
     if args.savedir == '':
-        time_stamp = datetime.now().strftime("%y-%m-%d-%H-%M")
+        time_stamp = datetime.now().strftime("%y-%m-%d-%H-%M-%S")
         description = "{}_dataset={},augment={},net=6d_{},batch_size={},lr={:.0e},{}".format(
             time_stamp,
             args.dataset.name,
@@ -45,9 +39,15 @@ def main(args):
         logdir = args.logdir / description
         meshdir = logdir / "meshes"
         meshdir.mkdir(parents=True, exist_ok=True)
-        
     else:
         logdir = Path(args.savedir)
+    
+    filename = 'summary_%s.txt' % (args.dataset_raw.name)
+    with open(filename, 'r') as f:
+        note = (";").join(f.readlines()[1:5]).replace('\n', '')
+
+    if args.log_wandb:
+        wandb.init(config=args, project="6dgrasp", entity="irosa-ias", id=args.dataset.name+'_'+time_stamp, notes=note)
 
     # create data loaders
     train_loader, val_loader = create_train_val_loaders(
@@ -64,7 +64,7 @@ def main(args):
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, mode='min')
 
     metrics = {
-        "accuracy": Accuracy(lambda out: (torch.round(out[1][0]), out[2][0])) # out[1][0] => y_pred -> quality
+        "accuracy": Accuracy(lambda out: (torch.round(out[1][0]), out[2][0])), # out[1][0] => y_pred -> quality
                                                                               # out[2][0] => y -> quality
                                                                               # ^ Refer def _update() returns
         # "precision": Precision(lambda out: (torch.round(out[1][0]), out[2][0])),
@@ -73,7 +73,8 @@ def main(args):
     for k in LOSS_KEYS:
         metrics[k] = Average(lambda out, sk=k: out[3][sk])
     
-    wandb.watch(net, log_freq=100)
+    if args.log_wandb:
+        wandb.watch(net, log_freq=100)
 
     # create ignite engines for training and validation
     trainer = create_trainer(net, optimizer, scheduler, loss_fn, metrics, device)
@@ -88,12 +89,11 @@ def main(args):
     @trainer.on(Events.EPOCH_COMPLETED)
     def log_train_results(engine):
         epoch, metrics = trainer.state.epoch, trainer.state.metrics
-        for k, v in metrics.items():
-            wandb.log({'train_'+k:v})
-            continue
 
         msg = 'Train'
         for k, v in metrics.items():
+            if args.log_wandb:
+                wandb.log({'train_'+k:v})                
             msg += f' {k}: {v:.4f}'
         print(msg)
 
@@ -104,12 +104,10 @@ def main(args):
         epoch, metrics = trainer.state.epoch, evaluator.state.metrics
         # out = evaluator.state.output
 
-        for k, v in metrics.items():
-            wandb.log({'val_'+k:v})
-            continue
-
         msg = 'Val'
         for k, v in metrics.items():
+            if args.log_wandb:
+                wandb.log({'val_'+k:v})
             msg += f' {k}: {v:.4f}'
         print(msg)
 
@@ -126,13 +124,13 @@ def main(args):
     # checkpoint model
     checkpoint_handler = ModelCheckpoint(
         logdir,
-        "vgn",
-        n_saved=None, # Changed from 1. Save everythinggg
+        "neural_grasp",
+        n_saved=1, # Changed from None. Save latest model
         require_empty=True,
     )
     best_checkpoint_handler = ModelCheckpoint(
         logdir,
-        "best_vgn",
+        "best_neural_grasp",
         n_saved=1,
         score_name="val_acc",
         score_function=default_score_fn,
@@ -152,7 +150,8 @@ def main(args):
 def create_train_val_loaders(root, root_raw, batch_size, val_split, augment, kwargs):
     # load the dataset
 
-    dataset = DatasetVoxelOccFile(root, root_raw)
+    dataset = DatasetVoxelGraspPCOcc(root, root_raw)
+
     # split into train and validation sets
     val_size = int(val_split * len(dataset))
     train_size = len(dataset) - val_size
@@ -167,20 +166,21 @@ def create_train_val_loaders(root, root_raw, batch_size, val_split, augment, kwa
     return train_loader, val_loader
 
 
-def prepare_batch(batch, device): #pc==tsdf
-    #pc, (label, rotations, width), pos, pos_occ, occ_value = batch
-    pc, (label, width), (pos, rotations), pos_occ, occ_value = batch
+def prepare_batch(batch, device):
+    # pc==tsdf
+    pc, (label, width), (pos, rotations, grasps_pc_local, grasps_pc), pos_occ, occ_value = batch
+
     pc = pc.float().to(device)
     label = label.float().to(device)
-    rotations = rotations.float().to(device)
     width = width.float().to(device)
-    pos.unsqueeze_(1) # B, 1, 3
     pos = pos.float().to(device)
+    rotations = rotations.float().to(device)
+    grasps_pc_local = grasps_pc_local.float().to(device)
+    grasps_pc = grasps_pc.float().to(device)
     pos_occ = pos_occ.float().to(device)
     occ_value = occ_value.float().to(device)
-    #return pc, (label, rotations, width, occ_value), pos, pos_occ
-    return pc, (label, width, occ_value), (pos, rotations), pos_occ
-    #return pc, (label, occ_value), (pos, rotations), pos_occ
+
+    return pc, (label, width, occ_value), (pos, rotations, grasps_pc_local, grasps_pc), pos_occ
 
 
 def select(out):
@@ -237,7 +237,6 @@ def create_trainer(net, optimizer, scheduler, loss_fn, metrics, device):
         net.train()
         optimizer.zero_grad()
         # forward
-        #x, y, pos, pos_occ = prepare_batch(batch, device)
         x, y, grasp_query, pos_occ = prepare_batch(batch, device) # <- Changed to predict only grasp quality (check inside)
         y_pred = select(net(x, grasp_query, p_tsdf=pos_occ))
         loss, loss_dict = loss_fn(y_pred, y)
@@ -261,16 +260,11 @@ def create_evaluator(net, loss_fn, metrics, device):
 
         net.eval()
         with torch.no_grad():
-            #x, y, pos, pos_occ = prepare_batch(batch, device)
             x, y, grasp_query, pos_occ = prepare_batch(batch, device) # <- Changed to predict only grasp quality (check inside)
             out = net(x, grasp_query, p_tsdf=pos_occ)
-
-            # Out: qual_out, rot_out, width_out, sdf => (4,) => (32, 40, 40, 40)
             y_pred = select(out)
             sdf = out[-1]
             _, loss_dict = loss_fn(y_pred, y)
-            #print(y_pred[-1].shape)
-
 
         return x, y_pred, y, loss_dict, sdf
 
@@ -294,11 +288,12 @@ def create_summary_writers(net, device, log_dir):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--net", default="giga")
+    parser.add_argument("--net", default="neu_grasp_pn")
     parser.add_argument("--dataset", type=Path, required=True)
     parser.add_argument("--dataset_raw", type=Path, required=True)
     parser.add_argument("--num_workers", type=int, default=16)
     parser.add_argument("--logdir", type=Path, default="data/runs")
+    parser.add_argument("--log_wandb", action="store_true")
     parser.add_argument("--description", type=str, default="")
     parser.add_argument("--savedir", type=str, default="")
     parser.add_argument("--epochs", type=int, default=20)

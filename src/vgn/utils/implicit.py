@@ -50,11 +50,13 @@ def get_mesh_pose_list_from_world(world, object_set, exclude_plane=True):
         mesh_pose_list.append((mesh_path, scale, pose))
     return mesh_pose_list
 
-def get_scene_from_mesh_pose_list(mesh_pose_list, scene_as_mesh=True, return_list=False):
+def get_scene_from_mesh_pose_list(mesh_pose_list, scene_as_mesh=True, return_list=False, data_root=None):
     # create scene from meshes
     scene = trimesh.Scene()
     mesh_list = []
     for mesh_path, scale, pose in mesh_pose_list:
+        if data_root is not None:
+            mesh_path = os.path.join(data_root, mesh_path)
         if os.path.splitext(mesh_path)[1] == '.urdf':
             obj = URDF.load(mesh_path)
             assert len(obj.links) == 1

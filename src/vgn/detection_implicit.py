@@ -11,6 +11,7 @@ from vgn.utils.transform import Transform, Rotation
 from vgn.networks import load_network
 from vgn.utils import visual
 from vgn.utils.implicit import as_mesh
+from vgn.grasp_sampler import GpgGraspSamplerPcl
 
 LOW_TH = 0.5
 axes_cond = lambda x,z: np.isclose(np.abs(np.dot(x, z)), 1.0, 1e-4)
@@ -76,11 +77,7 @@ class VGNImplicit(object):
                 pos_queries.append(p)
                 rot_queries.append(ori.as_quat())
 
-        # (TODO: Check if needed) Truncate and reshape to 64K samples
-        pos_queries = np.array(pos_queries)[:self.resolution**3]
-        rot_queries = np.array(rot_queries)[:self.resolution**3]
-        
-        return torch.Tensor(pos_queries).view(1, -1, 3), torch.Tensor(rot_queries).view(1, -1, 4)
+        return pos_queries, rot_queries
             
     
     def __call__(self, state, scene_mesh=None, aff_kwargs={}):
@@ -104,14 +101,47 @@ class VGNImplicit(object):
 
         tic = time.time()
 
-        points, normals = self.sample_grasp_points(pc_extended, self.finger_depth)
-        pos, rot = self.get_grasp_queries(points, normals) # Grasp queries :: (pos ;xyz, rot ;as quat)
-        
+        # Use GPG grasp sampling:
+        # Optional: Get GT point cloud from scene mesh:
+        # Get scene point cloud and normals using ground truth meshes
+        # o3d_scene_mesh = scene_mesh.as_open3d
+        # o3d_scene_mesh.compute_vertex_normals()
+        # pc_extended = o3d_scene_mesh.sample_points_uniformly(number_of_points=1000)
+        # Optional: Downsample point cloud if too large
+        pc_extended_down = pc_extended.voxel_down_sample(voxel_size=0.005)
+
+        sampler = GpgGraspSamplerPcl(0.05-0.0075) # Franka finger depth is actually a little less than 0.05
+        safety_dist_above_table = 0.05 # table is spawned at finger_depth
+        grasps, pos_queries, rot_queries = sampler.sample_grasps(pc_extended_down, num_grasps=40, max_num_samples=180,
+                                            safety_dis_above_table=safety_dist_above_table, show_final_grasps=False, verbose=False)
+        self.qual_th = 0.5
+        best_only = False # Show all grasps and not just the best one
+
+        # Use standard GIGA grasp sampling:
+        # points, normals = self.sample_grasp_points(pc_extended, self.finger_depth)
+        # pos_queries, rot_queries = self.get_grasp_queries(points, normals) # Grasp queries :: (pos ;xyz, rot ;as quat)
+        # best_only = True
+
+        if (len(pos_queries) < 2):
+            print("[Warning]: No grasps found by GPG")
+            if self.visualize:
+                return [], [], 0.0, scene_mesh
+            else:
+                return [], [], 0.0
+
+        # Convert to torch tensor
+        pos_queries = torch.Tensor(pos_queries).view(1, -1, 3)
+        rot_queries = torch.Tensor(rot_queries).view(1, -1, 4)
+        # Choose queries upto resolution^3 (TODO: Check if needed)
+        # chosen_indices = np.random.choice(len(pos_queries),size=(self.resolution**3))
+        # pos_queries = pos_queries[chosen_indices].view(1, -1, 3)
+        # rot_queries = rot_queries[chosen_indices].view(1, -1, 4)
         # Normalize 3D pos queries
-        pos = pos/size - 0.5
+        pos_queries = pos_queries/size - 0.5
 
         # Variable rot_vol replaced with ==> rot
-        qual_vol, width_vol = predict(tsdf_vol, (pos, rot), self.net, self.device)
+        assert tsdf_vol.shape == (1, self.resolution, self.resolution, self.resolution)
+        qual_vol, width_vol = predict(tsdf_vol, (pos_queries, rot_queries), self.net, self.device)
         
         # reject voxels with predicted widths that are too small or too large
         # qual_vol, width_vol = process(tsdf_process, qual_vol, rot, width_vol, out_th=self.out_th)
@@ -121,42 +151,59 @@ class VGNImplicit(object):
 
         # qual_vol = bound(qual_vol, voxel_size) # TODO: Check if needed
 
-        # Reshape to 3D grid. TODO: Check if needed
-        qual_vol = qual_vol.reshape((self.resolution, self.resolution, self.resolution))
-        rot = rot.reshape((self.resolution, self.resolution, self.resolution, 4))
-        width_vol = width_vol.reshape((self.resolution, self.resolution, self.resolution))
+        # Reshape to 3D grid. TODO: Check if needed. Update: Not needed
+        # qual_vol = qual_vol.reshape((self.resolution, self.resolution, self.resolution))
+        # rot_queries = rot_queries.reshape((self.resolution, self.resolution, self.resolution, 4))
+        # width_vol = width_vol.reshape((self.resolution, self.resolution, self.resolution))
 
         if self.visualize:
             ### TODO - check affordance - visual (WEIRD)
             colored_scene_mesh = scene_mesh
             # colored_scene_mesh = visual.affordance_visual(qual_vol, rot, scene_mesh, size, self.resolution, **aff_kwargs)
-        # import pdb; pdb.set_trace()
-        grasps, scores = select(qual_vol.copy(), pos.view(self.resolution, self.resolution, self.resolution, 3).cpu(), rot, width_vol, threshold=self.qual_th, force_detection=self.force_detection, max_filter_size=8 if self.visualize else 4)
+        grasps, scores, bad_grasps, bad_scores = select(qual_vol.copy(), pos_queries[0].squeeze(), rot_queries[0].squeeze(), width_vol, best_only=best_only, threshold=self.qual_th, force_detection=self.force_detection, max_filter_size=8 if self.visualize else 4)
         toc = time.time() - tic
 
+        bad_grasps, bad_scores = np.asarray(bad_grasps), np.asarray(bad_scores)
         grasps, scores = np.asarray(grasps), np.asarray(scores)
 
+        new_bad_grasps = []
         new_grasps = []
         if len(grasps) > 0:
             if self.best:
                 p = np.arange(len(grasps))
+                p_bad = np.arange(len(bad_grasps))
             else:
                 p = np.random.permutation(len(grasps))
+                p_bad = np.random.permutation(len(bad_grasps))
+            for bad_g in bad_grasps[p_bad]:
+                pose = bad_g.pose
+                # Un-normalize
+                pose.translation = (pose.translation + 0.5) * size
+                width = bad_g.width * size
+                new_bad_grasps.append(Grasp(pose, width))
             for g in grasps[p]:
                 pose = g.pose
                 # Un-normalize
                 pose.translation = (pose.translation + 0.5) * size
                 width = g.width * size
                 new_grasps.append(Grasp(pose, width))
+            bad_scores = bad_scores[p_bad]
             scores = scores[p]
+        bad_grasps = new_bad_grasps
         grasps = new_grasps
 
         if self.visualize:
-            # Need coloured mesh from affordance_visual()
-            grasp_mesh_list = [visual.grasp2mesh(g, s) for g, s in zip(grasps, scores)]
-            composed_scene = trimesh.Scene(colored_scene_mesh)
-            for i, g_mesh in enumerate(grasp_mesh_list):
-                composed_scene.add_geometry(g_mesh, node_name=f'grasp_{i}')
+            composed_scene = colored_scene_mesh
+            # # Need coloured mesh from affordance_visual()
+            # grasp_mesh_list = [visual.grasp2mesh(g, s) for g, s in zip(grasps, scores)]
+            # composed_scene = trimesh.Scene(colored_scene_mesh)
+            # for i, g_mesh in enumerate(grasp_mesh_list):
+            #     composed_scene.add_geometry(g_mesh, node_name=f'grasp_{i}')
+            # bad_grasp_mesh_list = [visual.grasp2mesh(g, s, color='red') for g, s in zip(bad_grasps, bad_scores)]
+            # for i, g_mesh in enumerate(bad_grasp_mesh_list):
+            #     composed_scene.add_geometry(g_mesh, node_name=f'bad_grasp_{i}')
+            # # Optional: Show grasps (for debugging)
+            # composed_scene.show()
             return grasps, scores, toc, composed_scene
         else:
             return grasps, scores, toc
@@ -175,7 +222,6 @@ def bound(qual_vol, voxel_size, limit=[0.02, 0.02, 0.055]):
     return qual_vol
 
 def predict(tsdf_vol, pos, net, device):
-    assert tsdf_vol.shape == (1, 40, 40, 40)
     #_, rot = pos
     # move input to the GPU
     tsdf_vol = torch.from_numpy(tsdf_vol).to(device)
@@ -222,11 +268,14 @@ def process(
     return qual_vol, width_vol
 
 
-def select(qual_vol, center_vol, rot_vol, width_vol, threshold=0.90, max_filter_size=4, force_detection=False):
-    best_only = True # TODO: Test this
+def select(qual_vol, center_vol, rot_vol, width_vol, threshold=0.90, max_filter_size=4, force_detection=False, best_only=False):
+    
+    bad_mask = np.where(qual_vol<LOW_TH, 1.0, 0.0)
+
     qual_vol[qual_vol < LOW_TH] = 0.0
     if force_detection and (qual_vol >= threshold).sum() == 0:
-        best_only = True
+        pass
+        # best_only = True
     else:
         # threshold on grasp quality
         qual_vol[qual_vol < threshold] = 0.0
@@ -237,22 +286,46 @@ def select(qual_vol, center_vol, rot_vol, width_vol, threshold=0.90, max_filter_
     mask = np.where(qual_vol, 1.0, 0.0)
 
     # construct grasps
+    bad_grasps, bad_scores = [], []
+    for index in np.argwhere(bad_mask):
+        index = index.squeeze()
+        ori = Rotation.from_quat(rot_vol[index])
+        pos = center_vol[index].numpy()
+        bad_grasp, bad_score = Grasp(Transform(ori, pos), width_vol[index]), qual_vol[index]
+        # bad_grasp, bad_score = select_index(qual_vol, center_vol, rot_vol, width_vol, index)
+        bad_grasps.append(bad_grasp)
+        bad_scores.append(bad_score)
+    
     grasps, scores = [], []
     for index in np.argwhere(mask):
-        grasp, score = select_index(qual_vol, center_vol, rot_vol, width_vol, index)
+        index = index.squeeze()
+        ori = Rotation.from_quat(rot_vol[index])
+        pos = center_vol[index].numpy()
+        grasp, score = Grasp(Transform(ori, pos), width_vol[index]), qual_vol[index]
+        # grasp, score = select_index(qual_vol, center_vol, rot_vol, width_vol, index)
         grasps.append(grasp)
         scores.append(score)
-
+    
+    sorted_bad_grasps = [bad_grasps[i] for i in np.argsort(bad_scores)]
+    sorted_bad_scores = [bad_scores[i] for i in np.argsort(bad_scores)]
     sorted_grasps = [grasps[i] for i in reversed(np.argsort(scores))]
     sorted_scores = [scores[i] for i in reversed(np.argsort(scores))]
 
-    if best_only and len(sorted_grasps) > 0:
-        # Take only top 10
-        sorted_grasps = [sorted_grasps[i] for i in range(10)]
-        sorted_scores = [sorted_scores[i] for i in range(10)]
-        
-    return sorted_grasps, sorted_scores
+    if best_only:
+        # Take only best grasp(s)
+        if len(sorted_grasps) >= 100:
+            max_grasps = 10
+        else:
+            max_grasps = 1
 
+        sorted_grasps = [sorted_grasps[i] for i in range(max_grasps)]
+        sorted_scores = [sorted_scores[i] for i in range(max_grasps)]
+
+        sorted_bad_grasps = [sorted_bad_grasps[i] for i in range(max_grasps)]
+        sorted_bad_scores = [sorted_bad_scores[i] for i in range(max_grasps)]
+
+        
+    return sorted_grasps, sorted_scores, sorted_bad_grasps, sorted_bad_scores
 
 
 def select_index(qual_vol, center_vol, rot_vol, width_vol, index):
