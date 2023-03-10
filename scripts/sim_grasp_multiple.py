@@ -11,7 +11,7 @@ from vgn.utils.misc import set_random_seed
 
 def main(args):
 
-    if args.type in ['giga', 'giga_hr', 'giga_aff']:
+    if args.type in ['giga', 'giga_hr', 'giga_aff', 'neu_grasp_pn', 'neu_grasp_dgcnn']:
         grasp_planner = VGNImplicit(args.model,
                                     args.type,
                                     best=args.best,

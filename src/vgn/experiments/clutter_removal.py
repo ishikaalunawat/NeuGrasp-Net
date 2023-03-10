@@ -96,13 +96,13 @@ def run(
             if visualize:
                 mesh_pose_list = get_mesh_pose_list_from_world(sim.world, object_set)
                 scene_mesh = get_scene_from_mesh_pose_list(mesh_pose_list)
-                grasps, scores, timings["planning"], visual_mesh = grasp_plan_fn(state, scene_mesh)
+                grasps, scores, timings["planning"], visual_mesh = grasp_plan_fn(state, scene_mesh, sim=sim)
                 assert not visual_mesh.is_empty
                 # o3d.visualization.draw_geometries([visual_mesh.as_open3d])
                 logger.log_mesh(scene_mesh, visual_mesh, f'round_{round_id:03d}_trial_{trial_id:03d}')
                 
             else:
-                grasps, scores, timings["planning"] = grasp_plan_fn(state)
+                grasps, scores, timings["planning"] = grasp_plan_fn(state, sim=sim)
             planning_times.append(timings["planning"])
             total_times.append(timings["planning"] + timings["integration"])
 
