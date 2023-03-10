@@ -91,6 +91,12 @@ def write_voxel_grid(root, voxel_grid):
 
 
 def write_point_cloud(root, point_cloud):
+    # crop surface and borders from point cloud
+    lower = np.array([0.02 , 0.02 , 0.055])
+    upper = np.array([0.28, 0.28, 0.3])
+    bounding_box = o3d.geometry.AxisAlignedBoundingBox(lower, upper)
+    
+    point_cloud = point_cloud.crop(bounding_box)
     points, normals = point_cloud.points, point_cloud.normals
     path = root / "pc.npz"
     np.savez_compressed(path, points=points, normals = normals)

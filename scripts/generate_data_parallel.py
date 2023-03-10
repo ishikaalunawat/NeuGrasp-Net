@@ -37,7 +37,7 @@ def main(args, rank):
 
     for scene_id in range(grasps_per_worker // GRASPS_PER_SCENE): # range determines number of scenes
         # generate heap
-        object_count = 1 # CHANGED for one object #np.random.poisson(OBJECT_COUNT_LAMBDA) + 1
+        object_count = np.random.poisson(OBJECT_COUNT_LAMBDA) + 1
         sim.reset(object_count)
         sim.save_state()
 
