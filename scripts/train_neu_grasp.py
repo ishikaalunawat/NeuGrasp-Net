@@ -125,7 +125,7 @@ def main(args):
     checkpoint_handler = ModelCheckpoint(
         logdir,
         "neural_grasp",
-        n_saved=1, # Changed from None. Save latest model
+        n_saved=None, # Changed from 1. Save everything
         require_empty=True,
     )
     best_checkpoint_handler = ModelCheckpoint(
