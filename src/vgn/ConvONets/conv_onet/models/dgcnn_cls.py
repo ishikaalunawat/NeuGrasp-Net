@@ -5,16 +5,23 @@ from .utils.dgcnn_util import get_graph_feature
 
 
 class DGCNN(nn.Module):
-    def __init__(self, input_dim=99, num_class=1, n_knn=20):#, normal_channel=False):
+    def __init__(self, input_dim=99, num_class=1, n_knn=20, use_bnorm=False):#, normal_channel=False):
         super(DGCNN, self).__init__()
         # self.args = args
         self.n_knn = n_knn # args.n_knn
         
-        self.bn1 = nn.BatchNorm2d(64)
-        self.bn2 = nn.BatchNorm2d(64)
-        self.bn3 = nn.BatchNorm2d(128)
-        self.bn4 = nn.BatchNorm2d(256)
-        self.bn5 = nn.BatchNorm1d(1024)
+        if use_bnorm:
+            self.bn1 = nn.BatchNorm2d(64)
+            self.bn2 = nn.BatchNorm2d(64)
+            self.bn3 = nn.BatchNorm2d(128)
+            self.bn4 = nn.BatchNorm2d(256)
+            self.bn5 = nn.BatchNorm1d(1024)
+        else:
+            self.bn1 = nn.Identity()
+            self.bn2 = nn.Identity()
+            self.bn3 = nn.Identity()
+            self.bn4 = nn.Identity()
+            self.bn5 = nn.Identity()
 
         self.conv1 = nn.Sequential(nn.Conv2d(input_dim*2, 64, kernel_size=1, bias=False),
                                    self.bn1,

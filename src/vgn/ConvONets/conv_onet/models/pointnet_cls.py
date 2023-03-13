@@ -7,16 +7,20 @@ import numpy as np
 import torch.nn.functional as F
 
 class PointNet(nn.Module):
-    def __init__(self, input_dim=99, num_class=1):
+    def __init__(self, input_dim=99, num_class=1, use_bnorm=False):
         super(PointNet, self).__init__()
 
-        self.feat = PointNetEncoder(global_feat=True, feature_transform=False, input_dim=input_dim)
+        self.feat = PointNetEncoder(global_feat=True, feature_transform=False, input_dim=input_dim, use_bnorm=use_bnorm)
         self.fc1 = nn.Linear(1024, 512)
         self.fc2 = nn.Linear(512, 256)
         self.fc3 = nn.Linear(256, num_class)
         self.dropout = nn.Dropout(p=0.4)
-        self.bn1 = nn.BatchNorm1d(512)
-        self.bn2 = nn.BatchNorm1d(256)
+        if use_bnorm:
+            self.bn1 = nn.BatchNorm1d(512)
+            self.bn2 = nn.BatchNorm1d(256)
+        else:
+            self.bn1 = nn.Identity()
+            self.bn2 = nn.Identity()
         self.relu = nn.ReLU()
 
     def forward(self, x):
@@ -63,7 +67,7 @@ class get_loss(torch.nn.Module):
 
 
 class STN3d(nn.Module):
-    def __init__(self, channel):
+    def __init__(self, channel, use_bnorm=False):
         super(STN3d, self).__init__()
         self.conv1 = torch.nn.Conv1d(channel, 64, 1)
         self.conv2 = torch.nn.Conv1d(64, 128, 1)
@@ -73,11 +77,18 @@ class STN3d(nn.Module):
         self.fc3 = nn.Linear(256, 9)
         self.relu = nn.ReLU()
 
-        self.bn1 = nn.BatchNorm1d(64)
-        self.bn2 = nn.BatchNorm1d(128)
-        self.bn3 = nn.BatchNorm1d(1024)
-        self.bn4 = nn.BatchNorm1d(512)
-        self.bn5 = nn.BatchNorm1d(256)
+        if use_bnorm:
+            self.bn1 = nn.BatchNorm1d(64)
+            self.bn2 = nn.BatchNorm1d(128)
+            self.bn3 = nn.BatchNorm1d(1024)
+            self.bn4 = nn.BatchNorm1d(512)
+            self.bn5 = nn.BatchNorm1d(256)
+        else:
+            self.bn1 = nn.Identity()
+            self.bn2 = nn.Identity()
+            self.bn3 = nn.Identity()
+            self.bn4 = nn.Identity()
+            self.bn5 = nn.Identity()
 
     def forward(self, x):
         batchsize = x.size()[0]
@@ -105,7 +116,7 @@ class STN3d(nn.Module):
 
 
 class STNkd(nn.Module):
-    def __init__(self, k=64):
+    def __init__(self, k=64, use_bnorm=False):
         super(STNkd, self).__init__()
         self.conv1 = torch.nn.Conv1d(k, 64, 1)
         self.conv2 = torch.nn.Conv1d(64, 128, 1)
@@ -115,11 +126,18 @@ class STNkd(nn.Module):
         self.fc3 = nn.Linear(256, k * k)
         self.relu = nn.ReLU()
 
-        self.bn1 = nn.BatchNorm1d(64)
-        self.bn2 = nn.BatchNorm1d(128)
-        self.bn3 = nn.BatchNorm1d(1024)
-        self.bn4 = nn.BatchNorm1d(512)
-        self.bn5 = nn.BatchNorm1d(256)
+        if use_bnorm:
+            self.bn1 = nn.BatchNorm1d(64)
+            self.bn2 = nn.BatchNorm1d(128)
+            self.bn3 = nn.BatchNorm1d(1024)
+            self.bn4 = nn.BatchNorm1d(512)
+            self.bn5 = nn.BatchNorm1d(256)
+        else:
+            self.bn1 = nn.Identity()
+            self.bn2 = nn.Identity()
+            self.bn3 = nn.Identity()
+            self.bn4 = nn.Identity()
+            self.bn5 = nn.Identity()
 
         self.k = k
 
@@ -145,15 +163,20 @@ class STNkd(nn.Module):
 
 
 class PointNetEncoder(nn.Module):
-    def __init__(self, global_feat=True, feature_transform=False, input_dim=99):
+    def __init__(self, global_feat=True, feature_transform=False, input_dim=99, use_bnorm=False):
         super(PointNetEncoder, self).__init__()
         # self.stn = STN3d(channel) # Not required
         self.conv1 = torch.nn.Conv1d(input_dim, 64, 1)
         self.conv2 = torch.nn.Conv1d(64, 128, 1)
         self.conv3 = torch.nn.Conv1d(128, 1024, 1)
-        self.bn1 = nn.BatchNorm1d(64)
-        self.bn2 = nn.BatchNorm1d(128)
-        self.bn3 = nn.BatchNorm1d(1024)
+        if use_bnorm:            
+            self.bn1 = nn.BatchNorm1d(64)
+            self.bn2 = nn.BatchNorm1d(128)
+            self.bn3 = nn.BatchNorm1d(1024)
+        else:
+            self.bn1 = nn.Identity()
+            self.bn2 = nn.Identity()
+            self.bn3 = nn.Identity()
         self.global_feat = global_feat
         self.feature_transform = feature_transform
         if self.feature_transform:
