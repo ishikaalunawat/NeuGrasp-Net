@@ -3,6 +3,7 @@ import argparse
 from datetime import datetime
 import uuid
 import wandb
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -62,8 +63,27 @@ def run(
     planning_times = []
     total_times = []
 
+    debug_validation = False
+    if debug_validation:
+        # import pdb; pdb.set_trace()
+        raw_root = Path('/home/sjauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/pile/data_pile_train_random_raw_4M_radomized_views')
+        root = Path('/home/sjauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/pile/data_pile_train_constructed_4M_HighRes_radomized_views_GPG_only')
+        df = io.read_df_with_surface_clouds(raw_root)
     for _ in tqdm.tqdm(range(num_rounds), disable=silence):
-        sim.reset(num_objects)
+        data_for_scene = None
+        if debug_validation:
+            # pick a random entry from the dataset
+            idx = np.random.randint(len(df))
+            # import pdb; pdb.set_trace()
+            data_entry = df.iloc[idx]
+            scene_id = data_entry['scene_id']
+            data_for_scene = df[df['scene_id'] == data_entry['scene_id']]
+            # setup scene
+            mesh_pose_filename = scene_id + ".npz"
+            mesh_pose_list = np.load(raw_root / "mesh_pose_list" / mesh_pose_filename, allow_pickle=True)['pc']
+            sim.setup_sim_scene_from_mesh_pose_list(mesh_pose_list)
+        else:
+            sim.reset(num_objects)
 
         round_id = logger.last_round_id() + 1
         logger.log_round(round_id, sim.num_objects)
@@ -79,11 +99,15 @@ def run(
             # scan the scene
             tsdf, pc, timings["integration"] = sim.acquire_tsdf(n=n, N=N, resolution=resolution)
             # Also sampling extended scene PC for more grasp queries
-            while True:
-                _, pc_extended, _ = sim.acquire_tsdf(n=6, N=N, resolution=resolution)
-                if len(pc_extended.points) >= 1000:
-                    break
-
+            # while True:
+            _, pc_extended, _ = sim.acquire_tsdf(n=6, N=N, resolution=resolution)
+                # if len(pc_extended.points) >= 1000:
+                #     break
+            
+            if debug_validation:
+                # Use tsdf from the dataset
+                tsdf = io.read_voxel_grid(root, scene_id)
+            
             state = argparse.Namespace(tsdf=tsdf, pc=pc, pc_extended=pc_extended)
             # if resolution != 40:
             #     extra_tsdf, _, _ = sim.acquire_tsdf(n=n, N=N, resolution=resolution)
@@ -96,13 +120,13 @@ def run(
             if visualize:
                 mesh_pose_list = get_mesh_pose_list_from_world(sim.world, object_set)
                 scene_mesh = get_scene_from_mesh_pose_list(mesh_pose_list)
-                grasps, scores, timings["planning"], visual_mesh = grasp_plan_fn(state, scene_mesh, sim=sim)
+                grasps, scores, timings["planning"], visual_mesh = grasp_plan_fn(state, scene_mesh, sim=sim, debug_data=data_for_scene, seed=seed)
                 assert not visual_mesh.is_empty
                 # o3d.visualization.draw_geometries([visual_mesh.as_open3d])
                 logger.log_mesh(scene_mesh, visual_mesh, f'round_{round_id:03d}_trial_{trial_id:03d}')
                 
             else:
-                grasps, scores, timings["planning"] = grasp_plan_fn(state, sim=sim)
+                grasps, scores, timings["planning"] = grasp_plan_fn(state, sim=sim, debug_data=data_for_scene, seed=seed)
             planning_times.append(timings["planning"])
             total_times.append(timings["planning"] + timings["integration"])
 
@@ -117,8 +141,9 @@ def run(
             if label != Label.FAILURE:
                 success += 1
 
-            # log the grasp
-            logger.log_grasp(round_id, state, timings, grasp, score, label)
+            if not debug_validation:
+                # log the grasp
+                logger.log_grasp(round_id, state, timings, grasp, score, label)
 
             if last_label == Label.FAILURE and label == Label.FAILURE:
                 consecutive_failures += 1
@@ -127,6 +152,9 @@ def run(
             if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
                 cons_fail += 1
             last_label = label
+
+            if debug_validation:
+                break
         left_objs += sim.num_objects
     success_rate = 100.0 * success / cnt
     declutter_rate = 100.0 * success / total_objs

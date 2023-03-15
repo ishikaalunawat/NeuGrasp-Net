@@ -87,7 +87,7 @@ class VGNImplicit(object):
         return pos_queries, rot_queries
             
     
-    def __call__(self, state, scene_mesh=None, sim=None, aff_kwargs={}):
+    def __call__(self, state, scene_mesh=None, sim=None, debug_data=None, seed=None, aff_kwargs={}):
         if hasattr(state, 'tsdf_process'):
             tsdf_process = state.tsdf_process
         else:
@@ -108,33 +108,51 @@ class VGNImplicit(object):
 
         tic = time.time()
 
-        # Use GPG grasp sampling:
-        # Optional: Get GT point cloud from scene mesh:
-        # Get scene point cloud and normals using ground truth meshes
-        # o3d_scene_mesh = scene_mesh.as_open3d
-        # o3d_scene_mesh.compute_vertex_normals()
-        # pc_extended = o3d_scene_mesh.sample_points_uniformly(number_of_points=1000)
-        # Optional: Downsample point cloud if too large
-        pc_extended_down = pc_extended.voxel_down_sample(voxel_size=0.005)
+        if debug_data is not None:
+            # debug validation
+            # get grasps from dataset
+            grasps, pos_queries, rot_queries, debug_labels = [], [], [], []
+            # Optional: Use only successful grasps for debug
+            # debug_data = debug_data[debug_data["label"] == 1]
+            for i in debug_data.index:
+                rota = debug_data.loc[i, "qx":"qw"].to_numpy(np.single)
+                posi = debug_data.loc[i, "x":"z"].to_numpy(np.single)
+                grasps.append(Grasp(Transform(Rotation.from_quat(rota), posi), sim.gripper.max_opening_width))
+                pos_queries.append(posi)
+                rot_queries.append(rota)
+                debug_labels.append(debug_data.loc[i, "label"])
+                # if len(grasps) >= 16:
+                #     break
+            best_only = False # Show all grasps and not just the best one
+        else:
+            # Use GPG grasp sampling:
+            # Optional: Get GT point cloud from scene mesh:
+            # Get scene point cloud and normals using ground truth meshes
+            # o3d_scene_mesh = scene_mesh.as_open3d
+            # o3d_scene_mesh.compute_vertex_normals()
+            # pc_extended = o3d_scene_mesh.sample_points_uniformly(number_of_points=1000)
+            # Optional: Downsample point cloud if too large
+            pc_extended_down = pc_extended.voxel_down_sample(voxel_size=0.005)
 
-        sampler = GpgGraspSamplerPcl(0.05-0.0075) # Franka finger depth is actually a little less than 0.05
-        safety_dist_above_table = 0.05 # table is spawned at finger_depth
-        grasps, pos_queries, rot_queries = sampler.sample_grasps(pc_extended_down, num_grasps=40, max_num_samples=180,
-                                            safety_dis_above_table=safety_dist_above_table, show_final_grasps=False, verbose=False)
-        self.qual_th = 0.5
-        best_only = False # Show all grasps and not just the best one
+            sampler = GpgGraspSamplerPcl(0.05-0.0075) # Franka finger depth is actually a little less than 0.05
+            safety_dist_above_table = 0.05 # table is spawned at finger_depth
+            grasps, pos_queries, rot_queries = sampler.sample_grasps(pc_extended_down, num_grasps=40, max_num_samples=180,
+                                                safety_dis_above_table=safety_dist_above_table, show_final_grasps=False, verbose=False)
+            self.qual_th = 0.5
+            best_only = False # Show all grasps and not just the best one
 
-        # Use standard GIGA grasp sampling:
-        # points, normals = self.sample_grasp_points(pc_extended, self.finger_depth)
-        # pos_queries, rot_queries = self.get_grasp_queries(points, normals) # Grasp queries :: (pos ;xyz, rot ;as quat)
-        # best_only = True
+            # Use standard GIGA grasp sampling:
+            # points, normals = self.sample_grasp_points(pc_extended, self.finger_depth)
+            # pos_queries, rot_queries = self.get_grasp_queries(points, normals) # Grasp queries :: (pos ;xyz, rot ;as quat)
+            # best_only = True
 
-        if (len(pos_queries) < 2):
-            print("[Warning]: No grasps found by GPG")
-            if self.visualize:
-                return [], [], 0.0, scene_mesh
-            else:
-                return [], [], 0.0
+            if (len(pos_queries) < 2):
+                print("[Warning]: No grasps found by GPG")
+                # import pdb; pdb.set_trace()
+                if self.visualize:
+                    return [], [], 0.0, scene_mesh
+                else:
+                    return [], [], 0.0
 
         # Convert to torch tensor
         pos_queries = torch.Tensor(pos_queries).view(1, -1, 3)
@@ -155,7 +173,7 @@ class VGNImplicit(object):
             render_settings = read_json(Path("data/pile/data_pile_train_random_raw_4M_radomized_views/grasp_cloud_setup.json"))
             # remove table because we dont want to render it
             sim.world.remove_body(sim.world.bodies[0]) # normally table is the first body
-            grasps_pc_local = torch.zeros((len(grasps),1023,3))
+            grasps_pc_local = torch.zeros((len(grasps),render_settings['max_points'],3))
             grasps_pc = grasps_pc_local.clone()
             bad_indices = []
             for ind, grasp in enumerate(grasps):
@@ -176,20 +194,21 @@ class VGNImplicit(object):
             rot_queries = rot_queries.transpose(0,1)
             tsdf_vol = np.repeat(tsdf_vol,len(grasps), axis=0)
 
-            qual_vol, width_vol = predict(tsdf_vol, (pos_queries, rot_queries, grasps_pc_local, grasps_pc), self.net, self.device)
+            qual_vol, width_vol = predict(tsdf_vol, (pos_queries, rot_queries, grasps_pc_local, grasps_pc), self.net, self.device, seed=seed)
+            # import pdb; pdb.set_trace()
             qual_vol[bad_indices] = 0.0 # set bad grasp scores to zero
             
             # put back into original shape so that we can use the same code as before
             pos_queries = pos_queries.transpose(0,1)
             rot_queries = rot_queries.transpose(0,1)
         else:
-            qual_vol, width_vol = predict(tsdf_vol, (pos_queries, rot_queries), self.net, self.device)
+            qual_vol, width_vol = predict(tsdf_vol, (pos_queries, rot_queries), self.net, self.device, seed=seed)
         
         # reject voxels with predicted widths that are too small or too large
         # qual_vol, width_vol = process(tsdf_process, qual_vol, rot, width_vol, out_th=self.out_th)
         min_width=0.033
         max_width=0.233
-        qual_vol[np.logical_or(width_vol < min_width, width_vol > max_width)] = 0.0
+        # qual_vol[np.logical_or(width_vol < min_width, width_vol > max_width)] = 0.0
 
         # qual_vol = bound(qual_vol, voxel_size) # TODO: Check if needed
 
@@ -422,6 +441,7 @@ def generate_grasp_cloud(sim, render_settings, grasp, scene_mesh=None, debug=Fal
     if len(down_surface_pc.points) < render_settings['min_points']:
         # Points are too few! skip this grasp
         print("[Warning]: Points are too few! Skipping this grasp...")
+        # import pdb; pdb.set_trace()
         return False, 0, 0
     if debug:
         # viz original pc and gripper
@@ -446,12 +466,14 @@ def bound(qual_vol, voxel_size, limit=[0.02, 0.02, 0.055]):
     qual_vol[:, :, :z_lim] = 0.0
     return qual_vol
 
-def predict(tsdf_vol, pos, net, device):
+def predict(tsdf_vol, pos, net, device, seed=0):
     #_, rot = pos
     # move input to the GPU
     tsdf_vol = torch.from_numpy(tsdf_vol).to(device)
 
     # forward pass
+    # if seed != 100:
+    net.eval()
     with torch.no_grad():
         qual_vol, width_vol = net(tsdf_vol, pos)
 
