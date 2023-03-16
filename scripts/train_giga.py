@@ -1,30 +1,34 @@
 import argparse
 from pathlib import Path
 from datetime import datetime
+import wandb
+import numpy as np
 
 from ignite.contrib.handlers.tqdm_logger import ProgressBar
 from ignite.engine import Engine, Events
 from ignite.handlers import ModelCheckpoint
 from ignite.metrics import Average, Accuracy, Precision, Recall
+
 import torch
-from torch.utils import tensorboard
+# from torch.utils import tensorboard
 import torch.nn.functional as F
 
 #from vgn.dataset_pc import DatasetPCOcc
 from vgn.dataset_voxel import DatasetVoxelOccFile
 from vgn.networks import get_network, load_network
 
-LOSS_KEYS = ['loss_all', 'loss_qual', 'loss_rot', 'loss_width', 'loss_occ']
+LOSS_KEYS = ['loss_all', 'loss_qual', 'loss_occ']
 
 def main(args):
+
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
-    kwargs = {"num_workers": 16, "pin_memory": True} if use_cuda else {}
+    kwargs = {"num_workers": args.num_workers, "pin_memory": True} if use_cuda else {}
 
     # create log directory
+    time_stamp = datetime.now().strftime("%y-%m-%d-%H-%M-%S")
     if args.savedir == '':
-        time_stamp = datetime.now().strftime("%y-%m-%d-%H-%M")
-        description = "{}_dataset={},augment={},net={},batch_size={},lr={:.0e},{}".format(
+        description = "{}_dataset={},augment={},net=6d_{},batch_size={},lr={:.0e},{}".format(
             time_stamp,
             args.dataset.name,
             args.augment,
@@ -34,8 +38,17 @@ def main(args):
             args.description,
         ).strip(",")
         logdir = args.logdir / description
+        meshdir = logdir / "meshes"
+        meshdir.mkdir(parents=True, exist_ok=True)
     else:
         logdir = Path(args.savedir)
+    
+    filename = 'summary_%s.txt' % (args.dataset_raw.name)
+    with open(filename, 'r') as f:
+        note = (";").join(f.readlines()[1:5]).replace('\n', '')
+
+    if args.log_wandb:
+        wandb.init(config=args, project="6dgrasp", entity="irosa-ias", id=args.net+'_'+args.dataset.name+'_'+time_stamp, notes=note)
 
     # create data loaders
     train_loader, val_loader = create_train_val_loaders(
@@ -43,52 +56,67 @@ def main(args):
 
     # build the network or load
     if args.load_path == '':
-        net = get_network(args.net).to(device)
+        net = get_network(args.net).to(device) # <- Changed to predict only grasp quality (check inside)
     else:
         net = load_network(args.load_path, device, args.net)
-
+    
     # define optimizer and metrics
     optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, mode='min')
 
     metrics = {
-        "accuracy": Accuracy(lambda out: (torch.round(out[1][0]), out[2][0])),
+        "accuracy": Accuracy(lambda out: (torch.round(out[1][0]), out[2][0])), # out[1][0] => y_pred -> quality
+                                                                              # out[2][0] => y -> quality
+                                                                              # ^ Refer def _update() returns
         "precision": Precision(lambda out: (torch.round(out[1][0]), out[2][0])),
         "recall": Recall(lambda out: (torch.round(out[1][0]), out[2][0])),
     }
     for k in LOSS_KEYS:
         metrics[k] = Average(lambda out, sk=k: out[3][sk])
+    
+    if args.log_wandb:
+        wandb.watch(net, log_freq=100)
 
     # create ignite engines for training and validation
-    trainer = create_trainer(net, optimizer, loss_fn, metrics, device)
+    trainer = create_trainer(net, optimizer, scheduler, loss_fn, metrics, device)
     evaluator = create_evaluator(net, loss_fn, metrics, device)
 
     # log training progress to the terminal and tensorboard
     ProgressBar(persist=True, ascii=True, dynamic_ncols=True, disable=args.silence).attach(trainer)
 
-    train_writer, val_writer = create_summary_writers(net, device, logdir)
+    #train_writer, val_writer = create_summary_writers(net, device, logdir)
+    
 
     @trainer.on(Events.EPOCH_COMPLETED)
     def log_train_results(engine):
         epoch, metrics = trainer.state.epoch, trainer.state.metrics
-        for k, v in metrics.items():
-            train_writer.add_scalar(k, v, epoch)
 
         msg = 'Train'
         for k, v in metrics.items():
+            if args.log_wandb:
+                wandb.log({'train_'+k:v})                
             msg += f' {k}: {v:.4f}'
         print(msg)
 
     @trainer.on(Events.EPOCH_COMPLETED)
     def log_validation_results(engine):
+        
         evaluator.run(val_loader)
         epoch, metrics = trainer.state.epoch, evaluator.state.metrics
-        for k, v in metrics.items():
-            val_writer.add_scalar(k, v, epoch)
-            
+        # out = evaluator.state.output
+
         msg = 'Val'
         for k, v in metrics.items():
+            if args.log_wandb:
+                wandb.log({'val_'+k:v})
             msg += f' {k}: {v:.4f}'
         print(msg)
+
+    @evaluator.on(Events.COMPLETED)
+    def reduct_step(engine):
+    # engine is evaluator
+    # engine.metrics is a dict with metrics, e.g. {"loss": val_loss_value, "acc": val_acc_value}
+        scheduler.step(evaluator.state.metrics['loss_all'])
 
     def default_score_fn(engine):
         score = engine.state.metrics['accuracy']
@@ -98,7 +126,7 @@ def main(args):
     checkpoint_handler = ModelCheckpoint(
         logdir,
         "vgn",
-        n_saved=1,
+        n_saved=None, # Changed from 1. Save everythinggg
         require_empty=True,
     )
     best_checkpoint_handler = ModelCheckpoint(
@@ -117,7 +145,8 @@ def main(args):
     )
 
     # run the training loop
-    trainer.run(train_loader, max_epochs=args.epochs)
+    epoch_length = int(args.epoch_length_frac*len(train_loader))
+    trainer.run(train_loader, max_epochs=args.epochs, epoch_length=epoch_length)
 
 
 def create_train_val_loaders(root, root_raw, batch_size, val_split, augment, kwargs):
@@ -195,7 +224,7 @@ def _occ_loss_fn(pred, target):
     return F.binary_cross_entropy(pred, target, reduction="none").mean(-1)
 
 
-def create_trainer(net, optimizer, loss_fn, metrics, device):
+def create_trainer(net, optimizer, scheduler, loss_fn, metrics, device):
     def _update(_, batch):
         net.train()
         optimizer.zero_grad()
@@ -247,19 +276,22 @@ def create_summary_writers(net, device, log_dir):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--net", default="giga")
+    parser.add_argument("--net", default="giga_classic_hr")
     parser.add_argument("--dataset", type=Path, required=True)
     parser.add_argument("--dataset_raw", type=Path, required=True)
+    parser.add_argument("--num_workers", type=int, default=10)
     parser.add_argument("--logdir", type=Path, default="data/runs")
+    parser.add_argument("--log_wandb", type=bool, default=True)
     parser.add_argument("--description", type=str, default="")
     parser.add_argument("--savedir", type=str, default="")
-    parser.add_argument("--epochs", type=int, default=10)
-    parser.add_argument("--batch-size", type=int, default=32)
+    parser.add_argument("--epochs", type=int, default=20)
+    parser.add_argument("--epoch_length_frac", type=float, default=1.0, help="fraction of training data that constitutes one epoch")
+    parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--lr", type=float, default=2e-4)
-    parser.add_argument("--val-split", type=float, default=0.1)
+    parser.add_argument("--val_split", type=float, default=0.05, help="fraction of data used for validation")
     parser.add_argument("--augment", action="store_true")
     parser.add_argument("--silence", action="store_true")
-    parser.add_argument("--load-path", type=str, default='')
-    args = parser.parse_args()
+    parser.add_argument("--load_path", type=str, default='', help="load checkpoint network and continue")
+    args, _ = parser.parse_known_args()
     print(args)
     main(args)

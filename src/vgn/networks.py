@@ -11,7 +11,8 @@ def get_network(name):
     models = {
         "vgn": ConvNet,
         "giga_aff": GIGAAff,
-        "giga": GIGA,
+        "giga_classic": GIGA,
+        "giga_classic_hr": GIGAHighRes,
         "giga_geo": GIGAGeo,
         "giga_detach": GIGADetach,
     }
@@ -94,6 +95,32 @@ def GIGA():
         'encoder_kwargs': {
             'plane_type': ['xz', 'xy', 'yz'],
             'plane_resolution': 40,
+            'unet': True,
+            'unet_kwargs': {
+                'depth': 3,
+                'merge_mode': 'concat',
+                'start_filts': 32
+            }
+        },
+        'decoder': 'simple_local',
+        'decoder_tsdf': True,
+        'decoder_kwargs': {
+            'dim': 3,
+            'sample_mode': 'bilinear',
+            'hidden_size': 32,
+            'concat_feat': True
+        },
+        'padding': 0,
+        'c_dim': 32
+    }
+    return get_model(config)
+
+def GIGAHighRes():
+    config = {
+        'encoder': 'voxel_simple_local',
+        'encoder_kwargs': {
+            'plane_type': ['xz', 'xy', 'yz'],
+            'plane_resolution': 64,
             'unet': True,
             'unet_kwargs': {
                 'depth': 3,
