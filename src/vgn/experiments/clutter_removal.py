@@ -96,8 +96,8 @@ def run(
             trial_id += 1
             timings = {}
 
-            # scan the scene
-            tsdf, pc, timings["integration"] = sim.acquire_tsdf(n=n, N=N, resolution=resolution)
+            # scan the scene: with RANDOMIZED view
+            tsdf, pc, timings["integration"] = sim.acquire_tsdf(n=n, N=N, resolution=resolution, randomize_view=False)
             # Also sampling extended scene PC for more grasp queries
             # while True:
             _, pc_extended, _ = sim.acquire_tsdf(n=6, N=N, resolution=resolution)

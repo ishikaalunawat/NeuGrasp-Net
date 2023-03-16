@@ -178,7 +178,8 @@ class VGNImplicit(object):
             bad_indices = []
             for ind, grasp in enumerate(grasps):
                 result, grasp_pc_local, grasp_pc = generate_grasp_cloud(sim, render_settings, grasp, scene_mesh, debug=False)
-                grasp_pc_local = grasp_pc_local / size - 0.5
+                # import pdb; pdb.set_trace()
+                grasp_pc_local = grasp_pc_local / size # - 0.5 DONT SUBTRACT HERE!
                 grasp_pc = grasp_pc / size - 0.5
                 if result:
                     grasps_pc_local[ind, :grasp_pc_local.shape[0],:] = torch.tensor(grasp_pc_local)
@@ -451,6 +452,16 @@ def generate_grasp_cloud(sim, render_settings, grasp, scene_mesh=None, debug=Fal
     grasp_pc = np.asarray(down_surface_pc.points)
     T_inv = Transform(rotation, pos).inverse()
     grasp_pc_local = T_inv.transform_point(grasp_pc)
+    if debug:
+        # viz local and global and original pc and gripper
+        gripper_pc_local = T_inv.transform_point(np.asarray(gripper_pc.points))
+        gripper_pc_local_o3d = o3d.geometry.PointCloud()
+        gripper_pc_local_o3d.points = o3d.utility.Vector3dVector(gripper_pc_local)
+        gripper_pc_local_o3d.colors = o3d.utility.Vector3dVector(np.tile(np.array([1, 1, 0.]), (np.asarray(gripper_pc_local_o3d.points).shape[0], 1)))
+        grasp_pc_local_o3d = o3d.geometry.PointCloud()
+        grasp_pc_local_o3d.points = o3d.utility.Vector3dVector(grasp_pc_local)
+        grasp_pc_local_o3d.colors = o3d.utility.Vector3dVector(np.tile(np.array([1.0, 0.45, 0.]), (np.asarray(grasp_pc_local_o3d.points).shape[0], 1)))
+        o3d.visualization.draw_geometries([grasp_pc_local_o3d, gripper_pc_local_o3d, down_surface_pc, gripper_pc, pc])
 
     return True, grasp_pc_local, grasp_pc
 
