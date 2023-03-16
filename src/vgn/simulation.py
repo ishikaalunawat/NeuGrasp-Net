@@ -174,7 +174,7 @@ class ClutterRemovalSim(object):
                 self.remove_and_wait()
             attempts += 1
 
-    def acquire_tsdf(self, n, N=None, resolution=40):
+    def acquire_tsdf(self, n, N=None, resolution=40, randomize_view=False):
         """Render synthetic depth images from n viewpoints and integrate into a TSDF.
 
         If N is None, the n viewpoints are equally distributed on circular trajectory.
@@ -189,7 +189,10 @@ class ClutterRemovalSim(object):
             theta = np.pi / 3.0
         else:
             origin = Transform(Rotation.identity(), np.r_[self.size / 2, self.size / 2, 0])
-            theta = np.pi / 6.0
+            if randomize_view:
+                theta = np.random.uniform(0.0, 5* np.pi / 12.0) # elevation: 0 to 75 degrees
+            else:
+                theta = np.pi / 6.0
         r = 2.0 * self.size
 
         N = N if N else n
