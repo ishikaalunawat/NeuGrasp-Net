@@ -50,13 +50,7 @@ def affordance_visual(qual_vol,
                           axis=-1)
         grid += z_axis * finger_depth * finger_offset
 
-    if len(qual_vol)<40:
-        diff = 40 - len(qual_vol)
-        q_vol = np.pad(qual_vol, (0, diff), 'constant')
-    else:
-        q_vol = qual_vol[:len(qual_vol)-40]
-
-    grid = grid[q_vol > th]
+    grid = grid[qual_vol > th]
     if grid.shape[0] <= 0:
         return scene_mesh
     qual_vol = qual_vol[qual_vol > th]
@@ -104,13 +98,10 @@ def affordance_visual(qual_vol,
     return mesh
 
 
-def grasp2mesh(grasp, score=0.0, color='green', finger_depth=0.05):
+def grasp2mesh(grasp, score, finger_depth=0.05):
     # color = cmap(float(score))
     # color = (np.array(color) * 255).astype(np.uint8)
-    if color=='red':
-        color = np.array([250, 0, 0, 180]).astype(np.uint8)
-    else: # green
-        color = np.array([0, 250, 0, 180]).astype(np.uint8)
+    color = np.array([0, 250, 0, 180]).astype(np.uint8)
     radius = 0.1 * finger_depth
     w, d = grasp.width, finger_depth
     scene = trimesh.Scene()

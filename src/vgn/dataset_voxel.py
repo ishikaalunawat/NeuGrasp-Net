@@ -53,13 +53,13 @@ class DatasetVoxel(torch.utils.data.Dataset):
 
 
 class DatasetVoxelOccFile(torch.utils.data.Dataset):
-    def __init__(self, root, raw_root, num_point=2048, num_point_occ=8000, augment=False):
-        self.root = root# Why don't you just read the pandas df here?????
+    def __init__(self, root, raw_root, num_point=2048, num_point_occ=2048, augment=False):
+        self.root = root
         self.augment = augment
         self.num_point = num_point
         self.num_point_occ = num_point_occ
         self.raw_root = raw_root
-        self.num_th = 32 # Unused?
+        self.num_th = 32
         self.df = read_df(raw_root)
         self.size, _, _, _ = read_setup(raw_root)
 
@@ -68,11 +68,11 @@ class DatasetVoxelOccFile(torch.utils.data.Dataset):
 
     def __getitem__(self, i):
         scene_id = self.df.loc[i, "scene_id"]
-        # ori = Rotation.from_quat(self.df.loc[i, "qx":"qw"].to_numpy(np.single))
+        ori = Rotation.from_quat(self.df.loc[i, "qx":"qw"].to_numpy(np.single))
         pos = self.df.loc[i, "x":"z"].to_numpy(np.single)
         width = self.df.loc[i, "width"].astype(np.single)
         label = self.df.loc[i, "label"].astype(np.long)
-        voxel_grid = read_voxel_grid(self.root, scene_id) # TODO: Can I load the whole thing into memory?
+        voxel_grid = read_voxel_grid(self.root, scene_id)
         
         if self.augment:
             voxel_grid, ori, pos = apply_transform(voxel_grid, ori, pos)
@@ -80,27 +80,17 @@ class DatasetVoxelOccFile(torch.utils.data.Dataset):
         pos = pos / self.size - 0.5
         width = width / self.size
 
-        #rotations = np.empty((2, 4), dtype=np.single)
-        #R = Rotation.from_rotvec(np.pi * np.r_[0.0, 0.0, 1.0])
-        # rotations = ori.as_quat().reshape(1, 4)
-        rotation = self.df.loc[i, "qx":"qw"].to_numpy(np.single).reshape(1, 4) # <- Changed to predict only grasp quality
-        #rotations[1] = (ori * R).as_quat()
+        rotations = np.empty((2, 4), dtype=np.single)
+        R = Rotation.from_rotvec(np.pi * np.r_[0.0, 0.0, 1.0])
+        rotations[0] = ori.as_quat()
+        rotations[1] = (ori * R).as_quat()
 
-        # x, y = voxel_grid[0], (label, rotations, width)
+        x, y = voxel_grid[0], (label, rotations, width)
 
-        # occ_points, occ = self.read_occ(scene_id, self.num_point_occ)
-        # occ_points = occ_points / self.size - 0.5
-
-        # return x, y, pos, occ_points, occ
-
-        tsdf, y, rot = voxel_grid[0], (label, width), rotation # <- Changed to predict only grasp quality
-
-        occ_points, occ = self.read_occ(scene_id, self.num_point_occ) # TODO: Can I load the whole thing into memory?
+        occ_points, occ = self.read_occ(scene_id, self.num_point_occ)
         occ_points = occ_points / self.size - 0.5
 
-        grasp_query = (pos, rot)
-
-        return tsdf, y, grasp_query, occ_points, occ
+        return x, y, pos, occ_points, occ
 
     def read_occ(self, scene_id, num_point):
         occ_paths = list((self.raw_root / 'occ' / scene_id).glob('*.npz'))

@@ -8,8 +8,7 @@ decoder_dict = {
     'simple_fc': decoder.FCDecoder,
     'simple_local': decoder.LocalDecoder,
     'simple_local_crop': decoder.PatchLocalDecoder,
-    'simple_local_point': decoder.LocalPointDecoder,
-    'picked_points': decoder.PickedPointDecoder,
+    'simple_local_point': decoder.LocalPointDecoder
 }
 
 
@@ -26,10 +25,10 @@ class ConvolutionalOccupancyNetwork(nn.Module):
         super().__init__()
         
         self.decoder_qual = decoders[0].to(device)
-        # self.decoder_rot = decoders[1].to(device)
-        self.decoder_width = decoders[1].to(device)
-        if len(decoders) == 3:
-            self.decoder_tsdf = decoders[2].to(device)
+        self.decoder_rot = decoders[1].to(device)
+        self.decoder_width = decoders[2].to(device)
+        if len(decoders) == 4:
+            self.decoder_tsdf = decoders[3].to(device)
 
         if encoder is not None:
             self.encoder = encoder.to(device)
@@ -40,7 +39,7 @@ class ConvolutionalOccupancyNetwork(nn.Module):
 
         self.detach_tsdf = detach_tsdf
 
-    def forward(self, inputs, grasp_query, p_tsdf=None, sample=True, **kwargs): # <- Changed to predict only grasp quality
+    def forward(self, inputs, p, p_tsdf=None, sample=True, **kwargs):
         ''' Performs a forward pass through the network.
 
         Args:
@@ -50,29 +49,22 @@ class ConvolutionalOccupancyNetwork(nn.Module):
             p_tsdf (tensor): tsdf query points, B*N_P*3
         '''
         #############
-        #p, _ = grasp_query # <- Changed to predict only grasp quality
-        # if isinstance(grasp_query, tuple):
-        #     query, _ = grasp_query
-        # else:
-        #     query = grasp_query
-
-        # if isinstance(p, dict):
-        #     batch_size = p['p'].size(0)
-        # else:
-        #     batch_size = p.size(0)
-
+        if isinstance(p, dict):
+            batch_size = p['p'].size(0)
+        else:
+            batch_size = p.size(0)
         c = self.encode_inputs(inputs)
         # feature = self.query_feature(p, c)
         # qual, rot, width = self.decode_feature(p, feature)
-        qual, width = self.decode(grasp_query, c) # <- Changed to predict only grasp quality
+        qual, rot, width = self.decode(p, c)
         if p_tsdf is not None:
             if self.detach_tsdf:
                 for k, v in c.items():
                     c[k] = v.detach()
             tsdf = self.decoder_tsdf(p_tsdf, c, **kwargs)
-            return qual, width, tsdf # <- Changed to predict only grasp quality
+            return qual, rot, width, tsdf
         else:
-            return qual, width # <- Changed to predict only grasp quality
+            return qual, rot, width
             
     def infer_geo(self, inputs, p_tsdf, **kwargs):
         c = self.encode_inputs(inputs)
@@ -126,10 +118,10 @@ class ConvolutionalOccupancyNetwork(nn.Module):
 
         qual = self.decoder_qual(p, c, **kwargs)
         qual = torch.sigmoid(qual)
-        #rot = self.decoder_rot(p, c, **kwargs)
-        #rot = nn.functional.normalize(rot, dim=2)
+        rot = self.decoder_rot(p, c, **kwargs)
+        rot = nn.functional.normalize(rot, dim=2)
         width = self.decoder_width(p, c, **kwargs)
-        return qual, width
+        return qual, rot, width
 
     def to(self, device):
         ''' Puts the model to the device.

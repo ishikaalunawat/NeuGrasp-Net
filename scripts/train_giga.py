@@ -1,34 +1,30 @@
 import argparse
 from pathlib import Path
 from datetime import datetime
-import wandb
-import numpy as np
 
 from ignite.contrib.handlers.tqdm_logger import ProgressBar
 from ignite.engine import Engine, Events
 from ignite.handlers import ModelCheckpoint
 from ignite.metrics import Average, Accuracy, Precision, Recall
-
 import torch
-# from torch.utils import tensorboard
+from torch.utils import tensorboard
 import torch.nn.functional as F
 
 #from vgn.dataset_pc import DatasetPCOcc
 from vgn.dataset_voxel import DatasetVoxelOccFile
 from vgn.networks import get_network, load_network
 
-LOSS_KEYS = ['loss_all', 'loss_qual', 'loss_occ']
+LOSS_KEYS = ['loss_all', 'loss_qual', 'loss_rot', 'loss_width', 'loss_occ']
 
 def main(args):
-
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
-    kwargs = {"num_workers": args.num_workers, "pin_memory": True} if use_cuda else {}
+    kwargs = {"num_workers": 16, "pin_memory": True} if use_cuda else {}
 
     # create log directory
-    time_stamp = datetime.now().strftime("%y-%m-%d-%H-%M-%S")
     if args.savedir == '':
-        description = "{}_dataset={},augment={},net=6d_{},batch_size={},lr={:.0e},{}".format(
+        time_stamp = datetime.now().strftime("%y-%m-%d-%H-%M")
+        description = "{}_dataset={},augment={},net={},batch_size={},lr={:.0e},{}".format(
             time_stamp,
             args.dataset.name,
             args.augment,
@@ -38,17 +34,8 @@ def main(args):
             args.description,
         ).strip(",")
         logdir = args.logdir / description
-        meshdir = logdir / "meshes"
-        meshdir.mkdir(parents=True, exist_ok=True)
     else:
         logdir = Path(args.savedir)
-    
-    filename = 'summary_%s.txt' % (args.dataset_raw.name)
-    with open(filename, 'r') as f:
-        note = (";").join(f.readlines()[1:5]).replace('\n', '')
-
-    if args.log_wandb:
-        wandb.init(config=args, project="6dgrasp", entity="irosa-ias", id=args.net+'_'+args.dataset.name+'_'+time_stamp, notes=note)
 
     # create data loaders
     train_loader, val_loader = create_train_val_loaders(
@@ -56,67 +43,52 @@ def main(args):
 
     # build the network or load
     if args.load_path == '':
-        net = get_network(args.net).to(device) # <- Changed to predict only grasp quality (check inside)
+        net = get_network(args.net).to(device)
     else:
         net = load_network(args.load_path, device, args.net)
-    
+
     # define optimizer and metrics
     optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, mode='min')
 
     metrics = {
-        "accuracy": Accuracy(lambda out: (torch.round(out[1][0]), out[2][0])), # out[1][0] => y_pred -> quality
-                                                                              # out[2][0] => y -> quality
-                                                                              # ^ Refer def _update() returns
+        "accuracy": Accuracy(lambda out: (torch.round(out[1][0]), out[2][0])),
         "precision": Precision(lambda out: (torch.round(out[1][0]), out[2][0])),
         "recall": Recall(lambda out: (torch.round(out[1][0]), out[2][0])),
     }
     for k in LOSS_KEYS:
         metrics[k] = Average(lambda out, sk=k: out[3][sk])
-    
-    if args.log_wandb:
-        wandb.watch(net, log_freq=100)
 
     # create ignite engines for training and validation
-    trainer = create_trainer(net, optimizer, scheduler, loss_fn, metrics, device)
+    trainer = create_trainer(net, optimizer, loss_fn, metrics, device)
     evaluator = create_evaluator(net, loss_fn, metrics, device)
 
     # log training progress to the terminal and tensorboard
     ProgressBar(persist=True, ascii=True, dynamic_ncols=True, disable=args.silence).attach(trainer)
 
-    #train_writer, val_writer = create_summary_writers(net, device, logdir)
-    
+    train_writer, val_writer = create_summary_writers(net, device, logdir)
 
     @trainer.on(Events.EPOCH_COMPLETED)
     def log_train_results(engine):
         epoch, metrics = trainer.state.epoch, trainer.state.metrics
+        for k, v in metrics.items():
+            train_writer.add_scalar(k, v, epoch)
 
         msg = 'Train'
         for k, v in metrics.items():
-            if args.log_wandb:
-                wandb.log({'train_'+k:v})                
             msg += f' {k}: {v:.4f}'
         print(msg)
 
     @trainer.on(Events.EPOCH_COMPLETED)
     def log_validation_results(engine):
-        
         evaluator.run(val_loader)
         epoch, metrics = trainer.state.epoch, evaluator.state.metrics
-        # out = evaluator.state.output
-
+        for k, v in metrics.items():
+            val_writer.add_scalar(k, v, epoch)
+            
         msg = 'Val'
         for k, v in metrics.items():
-            if args.log_wandb:
-                wandb.log({'val_'+k:v})
             msg += f' {k}: {v:.4f}'
         print(msg)
-
-    @evaluator.on(Events.COMPLETED)
-    def reduct_step(engine):
-    # engine is evaluator
-    # engine.metrics is a dict with metrics, e.g. {"loss": val_loss_value, "acc": val_acc_value}
-        scheduler.step(evaluator.state.metrics['loss_all'])
 
     def default_score_fn(engine):
         score = engine.state.metrics['accuracy']
@@ -126,7 +98,7 @@ def main(args):
     checkpoint_handler = ModelCheckpoint(
         logdir,
         "vgn",
-        n_saved=None, # Changed from 1. Save everythinggg
+        n_saved=1,
         require_empty=True,
     )
     best_checkpoint_handler = ModelCheckpoint(
@@ -145,8 +117,7 @@ def main(args):
     )
 
     # run the training loop
-    epoch_length = int(args.epoch_length_frac*len(train_loader))
-    trainer.run(train_loader, max_epochs=args.epochs, epoch_length=epoch_length)
+    trainer.run(train_loader, max_epochs=args.epochs)
 
 
 def create_train_val_loaders(root, root_raw, batch_size, val_split, augment, kwargs):
@@ -167,9 +138,8 @@ def create_train_val_loaders(root, root_raw, batch_size, val_split, augment, kwa
     return train_loader, val_loader
 
 
-def prepare_batch(batch, device): #pc==tsdf
-    #pc, (label, rotations, width), pos, pos_occ, occ_value = batch
-    pc, (label, width), (pos, rotations), pos_occ, occ_value = batch
+def prepare_batch(batch, device):
+    pc, (label, rotations, width), pos, pos_occ, occ_value = batch
     pc = pc.float().to(device)
     label = label.float().to(device)
     rotations = rotations.float().to(device)
@@ -178,34 +148,29 @@ def prepare_batch(batch, device): #pc==tsdf
     pos = pos.float().to(device)
     pos_occ = pos_occ.float().to(device)
     occ_value = occ_value.float().to(device)
-    #return pc, (label, rotations, width, occ_value), pos, pos_occ
-    return pc, (label, width, occ_value), (pos, rotations), pos_occ
-    #return pc, (label, occ_value), (pos, rotations), pos_occ
+    return pc, (label, rotations, width, occ_value), pos, pos_occ
 
 
 def select(out):
-    #qual_out, rot_out, width_out, sdf = out
-    qual_out, width_out, sdf = out     # <- Changed to predict only grasp quality (check inside)
-    # rot_out = rot_out.squeeze(1)
-    occ = torch.sigmoid(sdf) # to probability
-    #return qual_out.squeeze(-1), rot_out, width_out.squeeze(-1), occ
-    return qual_out.squeeze(-1), width_out.squeeze(-1), occ
+    qual_out, rot_out, width_out, occ = out
+    rot_out = rot_out.squeeze(1)
+    occ = torch.sigmoid(occ) # to probability
+    return qual_out.squeeze(-1), rot_out, width_out.squeeze(-1), occ
 
 
 def loss_fn(y_pred, y):
-    label_pred, width_pred, occ_pred = y_pred
-    label, width, occ = y
+    label_pred, rotation_pred, width_pred, occ_pred = y_pred
+    label, rotations, width, occ = y
     loss_qual = _qual_loss_fn(label_pred, label)
-    # loss_rot = _rot_loss_fn(rotation_pred, rotations)
+    loss_rot = _rot_loss_fn(rotation_pred, rotations)
     loss_width = _width_loss_fn(width_pred, width)
     loss_occ = _occ_loss_fn(occ_pred, occ)
-    loss = loss_qual + label * (0.01 * loss_width) + loss_occ # <-label * (loss_rot + 0.01 * loss_width): new one, Changed
+    loss = loss_qual + label * (loss_rot + 0.01 * loss_width) + loss_occ
     loss_dict = {'loss_qual': loss_qual.mean(),
-                #  'loss_rot': loss_rot.mean(),
-                'loss_width': loss_width.mean(),
-                'loss_occ': loss_occ.mean(),
-                'loss_all': loss.mean()
-                }
+                 'loss_rot': loss_rot.mean(),
+                 'loss_width': loss_width.mean(),
+                 'loss_occ': loss_occ.mean(),
+                 'loss_all': loss.mean()}
     return loss.mean(), loss_dict
 
 
@@ -213,14 +178,14 @@ def _qual_loss_fn(pred, target):
     return F.binary_cross_entropy(pred, target, reduction="none")
 
 
-# def _rot_loss_fn(pred, target):
-#     loss0 = _quat_loss_fn(pred, target[:, 0])
-#     loss1 = _quat_loss_fn(pred, target[:, 1])
-#     return torch.min(loss0, loss1)
+def _rot_loss_fn(pred, target):
+    loss0 = _quat_loss_fn(pred, target[:, 0])
+    loss1 = _quat_loss_fn(pred, target[:, 1])
+    return torch.min(loss0, loss1)
 
 
-# def _quat_loss_fn(pred, target):
-#     return 1.0 - torch.abs(torch.sum(pred * target, dim=1))
+def _quat_loss_fn(pred, target):
+    return 1.0 - torch.abs(torch.sum(pred * target, dim=1))
 
 
 def _width_loss_fn(pred, target):
@@ -229,24 +194,21 @@ def _width_loss_fn(pred, target):
 def _occ_loss_fn(pred, target):
     return F.binary_cross_entropy(pred, target, reduction="none").mean(-1)
 
-# def get_mesh(voxels):
-#     return mcubes.marching_cubes(voxels, 0)
 
-def create_trainer(net, optimizer, scheduler, loss_fn, metrics, device):
+def create_trainer(net, optimizer, loss_fn, metrics, device):
     def _update(_, batch):
         net.train()
         optimizer.zero_grad()
         # forward
-        #x, y, pos, pos_occ = prepare_batch(batch, device)
-        x, y, grasp_query, pos_occ = prepare_batch(batch, device) # <- Changed to predict only grasp quality (check inside)
-        y_pred = select(net(x, grasp_query, p_tsdf=pos_occ))
+        x, y, pos, pos_occ = prepare_batch(batch, device)
+        y_pred = select(net(x, pos, p_tsdf=pos_occ))
         loss, loss_dict = loss_fn(y_pred, y)
 
         # backward
         loss.backward()
         optimizer.step()
 
-        return x, y_pred, y, loss_dict # (32,40,40); pred [(label, width, occ)], true [(label, width, occ)], loss_dict (already defined above)
+        return x, y_pred, y, loss_dict
 
     trainer = Engine(_update)
 
@@ -258,21 +220,12 @@ def create_trainer(net, optimizer, scheduler, loss_fn, metrics, device):
 
 def create_evaluator(net, loss_fn, metrics, device):
     def _inference(_, batch):
-
         net.eval()
         with torch.no_grad():
-            #x, y, pos, pos_occ = prepare_batch(batch, device)
-            x, y, grasp_query, pos_occ = prepare_batch(batch, device) # <- Changed to predict only grasp quality (check inside)
-            out = net(x, grasp_query, p_tsdf=pos_occ)
-
-            # Out: qual_out, rot_out, width_out, sdf => (4,) => (32, 40, 40, 40)
-            y_pred = select(out)
-            sdf = out[-1]
-            _, loss_dict = loss_fn(y_pred, y)
-            #print(y_pred[-1].shape)
-
-
-        return x, y_pred, y, loss_dict, sdf
+            x, y, pos, pos_occ = prepare_batch(batch, device)
+            y_pred = select(net(x, pos, p_tsdf=pos_occ))
+            loss, loss_dict = loss_fn(y_pred, y)
+        return x, y_pred, y, loss_dict
 
     evaluator = Engine(_inference)
 
@@ -294,22 +247,19 @@ def create_summary_writers(net, device, log_dir):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--net", default="giga_hr")
+    parser.add_argument("--net", default="giga")
     parser.add_argument("--dataset", type=Path, required=True)
     parser.add_argument("--dataset_raw", type=Path, required=True)
-    parser.add_argument("--num_workers", type=int, default=10)
     parser.add_argument("--logdir", type=Path, default="data/runs")
-    parser.add_argument("--log_wandb", type=bool, default=True)
     parser.add_argument("--description", type=str, default="")
     parser.add_argument("--savedir", type=str, default="")
-    parser.add_argument("--epochs", type=int, default=20)
-    parser.add_argument("--epoch_length_frac", type=float, default=1.0, help="fraction of training data that constitutes one epoch")
-    parser.add_argument("--batch_size", type=int, default=16)
+    parser.add_argument("--epochs", type=int, default=10)
+    parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--lr", type=float, default=2e-4)
-    parser.add_argument("--val_split", type=float, default=0.05, help="fraction of data used for validation")
+    parser.add_argument("--val-split", type=float, default=0.1)
     parser.add_argument("--augment", action="store_true")
     parser.add_argument("--silence", action="store_true")
-    parser.add_argument("--load_path", type=str, default='', help="load checkpoint network and continue")
-    args, _ = parser.parse_known_args()
+    parser.add_argument("--load-path", type=str, default='')
+    args = parser.parse_args()
     print(args)
     main(args)

@@ -4,7 +4,6 @@ from pathlib import Path
 from datetime import datetime
 import json
 import numpy as np
-import wandb
 
 import torch
 import tqdm
@@ -17,6 +16,7 @@ from vgn.ConvONets.conv_onet.generation import Generator3D
 from vgn.utils.implicit import get_mesh_pose_list_from_world, get_scene_from_mesh_pose_list
 from vgn.ConvONets.eval import MeshEvaluator
 from vgn.ConvONets.utils.libmesh import check_mesh_contains
+from vgn.dataset_pc import sample_point_cloud
 from vgn.utils.misc import set_random_seed
 from vgn.ConvONets.common import compute_iou
 
@@ -24,7 +24,7 @@ def main(args):
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
     kwargs = {"num_workers": 8, "pin_memory": True} if use_cuda else {}
-    wandb.init(config=args, project="6dgrasp", entity="irosa-ias")
+
     # create log directory
     time_stamp = datetime.now().strftime("%y-%m-%d-%H-%M")
     description = "{}_eval_geo_dataset={},net={},th={},{}".format(
@@ -35,7 +35,7 @@ def main(args):
         args.description,
     ).strip(",")
     logdir = args.logdir / description
-    logdir.mkdir(parents=True, exist_ok=True)
+    logdir.mkdir()
 
     # create data loaders
     test_set, test_loader = create_test_loader(
@@ -64,7 +64,6 @@ def main(args):
         input_type='pointcloud',
         padding=0,
     )
-    wandb.watch(net)
 
     with torch.no_grad():
         for idx, (data, gt_mesh) in tqdm.tqdm(enumerate(test_loader), total=len(test_loader),  dynamic_ncols=True):
@@ -96,11 +95,6 @@ def main(args):
                             mean_dict[k].append(out_dict[k])
                 gt_mesh.export(save_dir / 'gt_mesh.glb')
                 pred_mesh.export(save_dir / 'pred_mesh.glb')
-            
-                wandb.log({'TSDFs (IvsR)' : [wandb.Object3D(open(save_dir/'gt_mesh.glb')),
-                                            wandb.Object3D(open(save_dir/'pred_mesh.glb'))]})
-                
-
             else:
                 print(f'{idx} empty mesh!')
             with open(save_dir / 'results.json', 'w') as f:

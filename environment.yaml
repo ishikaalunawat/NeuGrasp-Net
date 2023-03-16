@@ -1,4 +1,4 @@
-name: GIGA-6DoF
+name: GIGA
 channels:
   - pytorch
   - conda-forge
@@ -34,13 +34,13 @@ dependencies:
   - pip=21.0.1=py38h06a4308_0
   - python=3.8.8=hdb3f193_4
   - python_abi=3.8=1_cp38
-  # - pytorch=1.7.1=py3.8_cuda11.0.221_cudnn8.0.5_0
+  - pytorch=1.7.1=py3.8_cuda11.0.221_cudnn8.0.5_0
   - readline=8.1=h27cfd23_0
   - setuptools=52.0.0=py38h06a4308_0
   - six=1.15.0=pyh9f0ad1d_0
   - sqlite=3.35.3=hdfb4753_0
   - tk=8.6.10=hbc83047_0
-  # - torchvision=0.8.2=py38_cu110
+  - torchvision=0.8.2=py38_cu110
   - typing_extensions=3.7.4.3=py_0
   - wheel=0.36.2=pyhd3eb1b0_0
   - xz=5.2.5=h7b6447c_0
@@ -122,7 +122,7 @@ dependencies:
     - pyrender==0.1.45
     - pyrsistent==0.17.3
     - python-dateutil==2.8.1
-    # - pytorch-ignite==0.4.4
+    - pytorch-ignite==0.4.4
     - pytz==2021.1
     - pywavelets==1.1.1
     - pyyaml==5.4.1
@@ -141,9 +141,8 @@ dependencies:
     - testpath==0.4.4
     - threadpoolctl==2.1.0
     - tifffile==2021.3.31
-    # - torch==1.7.1
-    - wandb
-    # - torch-scatter==2.0.6
+    - torch==1.7.0
+    - torch-scatter==2.0.6
     - tornado==6.1
     - tqdm==4.59.0
     - traitlets==5.0.5
@@ -154,3 +153,4 @@ dependencies:
     - webencodings==0.5.1
     - werkzeug==1.0.1
     - widgetsnbextension==3.5.1
+prefix: /mnt/data2/zhenyu/anaconda3/envs/GIGA

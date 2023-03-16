@@ -47,19 +47,12 @@ def main(args):
     g_starting_time = time.time()
 
     if args.num_proc > 1:
+        pool = mp.Pool(processes=args.num_proc) 
         print('Total jobs: %d, CPU num: %d' % (g_num_total_jobs, args.num_proc))
-        # Using fix from: https://github.com/UT-Austin-RPL/GIGA/issues/1
-        from joblib import Parallel, delayed
-        results = Parallel(n_jobs=args.num_proc)(delayed(save_occ)(f, args) for f in mesh_list_files)
-        
-        for result in results:
-            log_result(result)
-        # pool = mp.Pool(processes=args.num_proc) 
-        # print('Total jobs: %d, CPU num: %d' % (g_num_total_jobs, args.num_proc))
-        # for f in mesh_list_files:
-        #     pool.apply_async(func=save_occ, args=(f,args), callback=log_result)
-        # pool.close()
-        # pool.join()
+        for f in mesh_list_files:
+            pool.apply_async(func=save_occ, args=(f,args), callback=log_result)
+        pool.close()
+        pool.join()
     else:
         for f in mesh_list_files:
             save_occ(f, args)

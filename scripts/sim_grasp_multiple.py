@@ -11,7 +11,7 @@ from vgn.utils.misc import set_random_seed
 
 def main(args):
 
-    if args.type in ['giga', 'giga_hr', 'giga_aff', 'neu_grasp_pn', 'neu_grasp_dgcnn']:
+    if args.type in ['giga', 'giga_aff']:
         grasp_planner = VGNImplicit(args.model,
                                     args.type,
                                     best=args.best,
@@ -19,7 +19,6 @@ def main(args):
                                     force_detection=args.force,
                                     out_th=0.1,
                                     select_top=False,
-                                    resolution=args.resolution,
                                     visualize=args.vis)
     elif args.type == 'vgn':
         grasp_planner = VGN(args.model,
@@ -39,7 +38,6 @@ def main(args):
         success_rate, declutter_rate = clutter_removal.run(
             grasp_plan_fn=grasp_planner,
             logdir=args.logdir,
-            resolution=args.resolution,
             description=args.description,
             scene=args.scene,
             object_set=args.object_set,
@@ -86,9 +84,8 @@ if __name__ == "__main__":
                         default="pile")
     parser.add_argument("--object-set", type=str, default="blocks")
     parser.add_argument("--num-objects", type=int, default=5)
-    parser.add_argument("--num-view", type=int, default=1) # No need to change
+    parser.add_argument("--num-view", type=int, default=1)
     parser.add_argument("--num-rounds", type=int, default=100)
-    parser.add_argument("--resolution", type=int, default=40)
     parser.add_argument("--seeds", type=int, nargs='+', default=[0, 1, 2, 3, 4])
     parser.add_argument("--sim-gui", action="store_true")
     # parser.add_argument("--grad-refine", action="store_true")

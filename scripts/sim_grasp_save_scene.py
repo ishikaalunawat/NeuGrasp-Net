@@ -2,16 +2,16 @@ import json
 import argparse
 import numpy as np
 from pathlib import Path
-import wandb
 
 from vgn.detection import VGN
 from vgn.detection_implicit import VGNImplicit
+from vgn.detection_implicit_top import VGNImplicitTop
+from vgn.detection_implicit_pc import VGNImplicitPC
 from vgn.experiments import clutter_removal_single
 from vgn.utils.misc import set_random_seed
 
 
 def main(args):
-    #wandb.init(config=args, project="6dgrasp", entity="irosa-ias")
 
     if 'giga' in args.type:
         grasp_planner = VGNImplicit(args.model,
@@ -40,7 +40,7 @@ def main(args):
     for n in range(args.num_rounds):
         args.seed = np.random.randint(3000)
         save_dir = args.save_dir / f'round_{n:03d}'
-        results[n], visual_mesh = clutter_removal_single.run(grasp_plan_fn=grasp_planner,
+        results[n] = clutter_removal_single.run(grasp_plan_fn=grasp_planner,
                                                 save_dir=save_dir,
                                                 scene=args.scene,
                                                 object_set=args.object_set,
@@ -51,12 +51,9 @@ def main(args):
                                                 add_noise=args.add_noise,
                                                 sideview=args.sideview)
         print(f'Round {n} finished, result: {results[n]}')
-        visual_mesh.export(args.save_dir / 'scene_'.format(n), 'obj')
-        #wandb.log({'Grasps' : wandb.Object3D(open(args.save_dir + '/scene_{}.obj' % n))})
-
     with open(args.save_dir / 'results.json', 'w') as f:
         json.dump(results, f, indent=2)
-    
+
 
 
 if __name__ == "__main__":

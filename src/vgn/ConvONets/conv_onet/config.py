@@ -53,22 +53,19 @@ def get_model(cfg, device=None, dataset=None, **kwargs):
             c_dim=c_dim, padding=padding, out_dim=1,
             **decoder_kwargs
         )
-        # decoder_rot = models.decoder_dict[decoder](
-        #     c_dim=c_dim, padding=padding, out_dim=4,
-        #     **decoder_kwargs
-        # )
+        decoder_rot = models.decoder_dict[decoder](
+            c_dim=c_dim, padding=padding, out_dim=4,
+            **decoder_kwargs
+        )
         decoder_width = models.decoder_dict[decoder](
             c_dim=c_dim, padding=padding, out_dim=1,
             **decoder_kwargs
-        
         )
-        decoders = [decoder_qual, decoder_width] # <- Changed to predict only grasp quality 
+        decoders = [decoder_qual, decoder_rot, decoder_width]
     if cfg['decoder_tsdf'] or tsdf_only:
-        decoder_tsdf = models.decoder_dict[cfg['decoder_tsdf']](dim=3,
+        decoder_tsdf = models.decoder_dict[decoder](
             c_dim=c_dim, padding=padding, out_dim=1,
-            sample_mode= 'bilinear',
-            hidden_size= 32,
-            concat_feat= True
+            **decoder_kwargs
         )
         decoders.append(decoder_tsdf)
 

@@ -11,8 +11,7 @@ from vgn.perception import *
 from vgn.utils.misc import apply_noise
 
 
-RESOLUTION = 64 # High Resolution
-# RESOLUTION = 40 # Low Resolution
+RESOLUTION = 40
 
 def process_one_scene(args, f):
     if f.suffix != ".npz":
@@ -82,20 +81,13 @@ def main(args):
     # create tsdfs and pcs
 
     if args.num_proc > 1:
-        print('Total jobs: %d, CPU num: %d' % (g_num_total_jobs, args.num_proc))
-        # Using fix from: https://github.com/UT-Austin-RPL/GIGA/issues/1
-        from joblib import Parallel, delayed
-        results = Parallel(n_jobs=args.num_proc)(delayed(process_one_scene)(args, f,) for f in file_list)
-        
-        for result in results:
-            log_result(result)
-        # pool = mp.Pool(processes=args.num_proc)
+        pool = mp.Pool(processes=args.num_proc)
 
-        # print('Total jobs: %d, CPU num: %d' % (g_num_total_jobs, args.num_proc))
-        # for f in file_list:
-        #     pool.apply_async(func=process_one_scene, args=(args, f,), callback=log_result)
-        # pool.close()
-        # pool.join()
+        print('Total jobs: %d, CPU num: %d' % (g_num_total_jobs, args.num_proc))
+        for f in file_list:
+            pool.apply_async(func=process_one_scene, args=(args, f,), callback=log_result)
+        pool.close()
+        pool.join()
     else:
         for f in tqdm(file_list, total=len(file_list)):
             process_one_scene(args, f)
