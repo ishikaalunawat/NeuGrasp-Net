@@ -73,7 +73,23 @@ class ConvolutionalOccupancyNetwork(nn.Module):
             return qual, width, tsdf # <- Changed to predict only grasp quality
         else:
             return qual, width # <- Changed to predict only grasp quality
-            
+    
+    def gradient(self, tsdf, p):
+        # Gradient can be used for calculation of surface normals
+        with torch.enable_grad():
+            p.requires_grad_(True)
+            c = self.encode_inputs(tsdf)
+            y = self.decode_occ(p, c).logits
+            d_output = torch.ones_like(y, requires_grad=False, device=y.device)
+            gradients = torch.autograd.grad(
+                outputs=y,
+                inputs=p,
+                grad_outputs=d_output,
+                create_graph=True,
+                retain_graph=True,
+                only_inputs=True, allow_unused=True)[0]
+            return gradients
+        
     def infer_geo(self, inputs, p_tsdf, **kwargs):
         c = self.encode_inputs(inputs)
         tsdf = self.decoder_tsdf(p_tsdf, c, **kwargs)

@@ -7,7 +7,7 @@ import numpy as np
 import torch.nn.functional as F
 
 class PointNet(nn.Module):
-    def __init__(self, input_dim=99, num_class=1, use_bnorm=False):
+    def __init__(self, input_dim=99, num_class=1, use_bnorm=True):
         super(PointNet, self).__init__()
 
         self.feat = PointNetEncoder(global_feat=True, feature_transform=False, input_dim=input_dim, use_bnorm=use_bnorm)
@@ -67,7 +67,7 @@ class get_loss(torch.nn.Module):
 
 
 class STN3d(nn.Module):
-    def __init__(self, channel, use_bnorm=False):
+    def __init__(self, channel, use_bnorm=True):
         super(STN3d, self).__init__()
         self.conv1 = torch.nn.Conv1d(channel, 64, 1)
         self.conv2 = torch.nn.Conv1d(64, 128, 1)
@@ -116,7 +116,7 @@ class STN3d(nn.Module):
 
 
 class STNkd(nn.Module):
-    def __init__(self, k=64, use_bnorm=False):
+    def __init__(self, k=64, use_bnorm=True):
         super(STNkd, self).__init__()
         self.conv1 = torch.nn.Conv1d(k, 64, 1)
         self.conv2 = torch.nn.Conv1d(64, 128, 1)
@@ -163,7 +163,7 @@ class STNkd(nn.Module):
 
 
 class PointNetEncoder(nn.Module):
-    def __init__(self, global_feat=True, feature_transform=False, input_dim=99, use_bnorm=False):
+    def __init__(self, global_feat=True, feature_transform=False, input_dim=99, use_bnorm=True):
         super(PointNetEncoder, self).__init__()
         # self.stn = STN3d(channel) # Not required
         self.conv1 = torch.nn.Conv1d(input_dim, 64, 1)
