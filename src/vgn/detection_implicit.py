@@ -15,7 +15,7 @@ from vgn.utils.implicit import as_mesh
 LOW_TH = 0.5
 
 class VGNImplicit(object):
-    def __init__(self, model_path, model_type, best=False, force_detection=False, qual_th=0.9, out_th=0.5, visualize=False, resolution=40, **kwargs):
+    def __init__(self, model_path, model_type, best=False, force_detection=False, qual_th=0.9, out_th=0.5, visualize=False, resolution=64, **kwargs):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.net = load_network(model_path, self.device, model_type=model_type)
         self.qual_th = qual_th
@@ -97,7 +97,7 @@ def bound(qual_vol, voxel_size, limit=[0.02, 0.02, 0.055]):
     return qual_vol
 
 def predict(tsdf_vol, pos, net, device):
-    assert tsdf_vol.shape == (1, 40, 40, 40)
+    # assert tsdf_vol.shape == (1, 40, 40, 40)
 
     # move input to the GPU
     tsdf_vol = torch.from_numpy(tsdf_vol).to(device)

@@ -34,7 +34,7 @@ def run(
     result_path=None,
     add_noise=False,
     sideview=False,
-    resolution=40,
+    resolution=64,
     silence=False,
     visualize=False
 ):
