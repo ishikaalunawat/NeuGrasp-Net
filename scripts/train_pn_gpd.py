@@ -238,8 +238,10 @@ def create_trainer(net, optimizer, scheduler, loss_fn, metrics, device):
         net.train()
         optimizer.zero_grad()
         # forward
-        x, y, grasp_query, pos_occ = prepare_batch(batch, device) # <- Changed to predict only grasp quality (check inside)
-        y_pred = select(net(x, grasp_query, p_tsdf=pos_occ))
+        x, y, grasp_query, _ = prepare_batch(batch, device)
+
+        # forward() [PointNetGPD()] takes only grasp_query: (pos, rot, grasp_local_pc, <grasp_pc>s)
+        y_pred = select(net(grasp_query)) 
         loss, loss_dict = loss_fn(y_pred, y)
 
         # backward
@@ -289,7 +291,7 @@ def create_summary_writers(net, device, log_dir):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--net", default="neu_grasp_pn")
+    parser.add_argument("--net", default="pointnetgpd")
     parser.add_argument("--dataset", type=Path, required=True)
     parser.add_argument("--dataset_raw", type=Path, required=True)
     parser.add_argument("--num_workers", type=int, default=10)
