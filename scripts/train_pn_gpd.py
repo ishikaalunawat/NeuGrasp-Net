@@ -186,31 +186,33 @@ def prepare_batch(batch, device):
 
 def select(out):
     #qual_out, rot_out, width_out, sdf = out
-    qual_out, width_out, sdf = out     # <- Changed to predict only grasp quality (check inside)
+    qual_out = out     # <- Changed to predict only grasp quality (check inside)
     # rot_out = rot_out.squeeze(1)
-    occ = torch.sigmoid(sdf) # to probability
+    # occ = torch.sigmoid(sdf) # to probability
     #return qual_out.squeeze(-1), rot_out, width_out.squeeze(-1), occ
-    return qual_out.squeeze(-1), width_out.squeeze(-1), occ
+    return qual_out.squeeze()
 
 
 def loss_fn(y_pred, y):
-    label_pred, width_pred, occ_pred = y_pred
-    label, width, occ = y
+    label_pred = y_pred # PointNetGPD output
+    print(label_pred.shape, y[0].shape)
+    label, width, occ_value = y
     loss_qual = _qual_loss_fn(label_pred, label)
     # loss_rot = _rot_loss_fn(rotation_pred, rotations)
-    loss_width = _width_loss_fn(width_pred, width)
-    loss_occ = _occ_loss_fn(occ_pred, occ)
-    loss = loss_qual + label * (0.01 * loss_width) + loss_occ # <-label * (loss_rot + 0.01 * loss_width): new one, Changed
+    # loss_width = _width_loss_fn(width_pred, width)
+    # loss_occ = _occ_loss_fn(occ_pred, occ)
+    loss = loss_qual #+ label * (0.01 * loss_width) + loss_occ # <-label * (loss_rot + 0.01 * loss_width): new one, Changed
     loss_dict = {'loss_qual': loss_qual.mean(),
                 #  'loss_rot': loss_rot.mean(),
-                'loss_width': loss_width.mean(),
-                'loss_occ': loss_occ.mean(),
-                'loss_all': loss.mean()
+                # 'loss_width': loss_width.mean(),
+                # 'loss_occ': loss_occ.mean(),
+                # 'loss_all': loss.mean()
                 }
     return loss.mean(), loss_dict
 
 
 def _qual_loss_fn(pred, target):
+    # print(pred.size(), target.size())
     return F.binary_cross_entropy(pred, target, reduction="none")
 
 
@@ -266,10 +268,10 @@ def create_evaluator(net, loss_fn, metrics, device):
             x, y, grasp_query, pos_occ = prepare_batch(batch, device) # <- Changed to predict only grasp quality (check inside)
             out = net(x, grasp_query, p_tsdf=pos_occ)
             y_pred = select(out)
-            sdf = out[-1]
+            # sdf = out[-1]
             _, loss_dict = loss_fn(y_pred, y)
 
-        return x, y_pred, y, loss_dict, sdf
+        return x, y_pred, y, loss_dict
 
     evaluator = Engine(_inference)
 

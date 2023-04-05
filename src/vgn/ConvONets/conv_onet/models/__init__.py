@@ -234,12 +234,12 @@ class ConvolutionalOccupancyNetworkGeometry(nn.Module):
         return p_r
 
 class PointNetGPD(nn.Module):
-    def __init__(self, dim=7, c_dim=32,
+    def __init__(self, dim=7, c_dim=3, # PointNetGPD
                  out_dim=1,
                  point_network='pointnet',
                  sample_mode='bilinear', 
                  padding=0.1,
-                 concat_feat=True):
+                 concat_feat=False):
         super().__init__()
         
         self.dim = dim # input
@@ -287,10 +287,8 @@ class PointNetGPD(nn.Module):
         
         # Linear layer to encode input grasp center and orientation
         g = self.fc_g(f)
-        print(g.size(), c.size())
         queries = torch.cat([g, c], dim=1)
         
         queries = queries.transpose(2, 1) # Transpose to get shape B, D, N
         out = self.point_network(queries)
-
         return out
