@@ -94,6 +94,12 @@ class ConvolutionalOccupancyNetwork(nn.Module):
         c = self.encode_inputs(inputs)
         tsdf = self.decoder_tsdf(p_tsdf, c, **kwargs)
         return tsdf
+    
+    def infer_occ(self, p, inputs):
+        c = self.encode_inputs(inputs)
+
+        occ = self.decode_occ(p, c)
+        return torch.sigmoid(occ.logits)
 
     def encode_inputs(self, inputs):
         ''' Encodes the input.
@@ -101,7 +107,6 @@ class ConvolutionalOccupancyNetwork(nn.Module):
         Args:
             input (tensor): the input
         '''
-
         if self.encoder is not None:
             c = self.encoder(inputs)
         else:
