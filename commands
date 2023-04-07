@@ -24,3 +24,7 @@ python scripts/sim_grasp_multiple.py --num-view 1 --object-set pile/test --scene
 # UNISURF: 
 ## DIFFERENT VIEWS - 5 scenes (to change number of scenes to 'x':: --num_grasps x)
 python scripts/generate_data_parallel.py --scene pile --object-set pile/train --num-grasps 5 --save-scene ./data/unisurf --random
+
+
+# PointNetGPD
+nohup python scripts/train_pn_gpd.py --dataset data/pile/data_pile_train_constructed_4M_HighRes_radomized_views_GPG_only --dataset_raw data/pile/data_pile_train_random_raw_4M_radomized_views --epoch_length_frac 0.5 > nohup_logs/train_pointnetgpd_4M.out &

@@ -1,0 +1,44 @@
+wandb: Currently logged in as: ishikaa25 (irosa-ias). Use `wandb login --relogin` to force relogin
+wandb: wandb version 0.14.0 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Tracking run with wandb version 0.13.1
+wandb: Run data is saved locally in /home/hypatia/6D-DAAD/GIGA/wandb/run-20230404_161401-pointnetgpd_data_pile_train_constructed_4M_random_views_2_23-04-04-16-14-00
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run pointnetgpd_data_pile_train_constructed_4M_random_views_2_23-04-04-16-14-00
+wandb: ⭐️ View project at https://wandb.ai/irosa-ias/6dgrasp
+wandb: 🚀 View run at https://wandb.ai/irosa-ias/6dgrasp/runs/pointnetgpd_data_pile_train_constructed_4M_random_views_2_23-04-04-16-14-00
+INFO - 2023-04-04 16:14:09,560 - engine - Engine run starting with max_epochs=20.
+Namespace(augment=False, batch_size=16, dataset=PosixPath('data/pile/data_pile_train_constructed_4M_random_views_2'), dataset_raw=PosixPath('data/pile/data_pile_train_random_raw_4M_radomized_views'), description='', epoch_length_frac=0.5, epochs=20, load_path='', log_wandb=True, logdir=PosixPath('data/runs'), lr=0.0002, net='pointnetgpd', num_workers=10, savedir='', silence=False, val_split=0.05)
+ERROR - 2023-04-04 16:14:10,511 - engine - Current run is terminating due to exception: Sizes of tensors must match except in dimension 1. Expected size 99 but got size 3 for tensor number 1 in the list.
+ERROR - 2023-04-04 16:14:10,597 - engine - Engine run is terminating due to exception: Sizes of tensors must match except in dimension 1. Expected size 99 but got size 3 for tensor number 1 in the list.
+wandb: Waiting for W&B process to finish... (failed 1). Press Control-C to abort syncing.
+wandb: - 0.001 MB of 0.001 MB uploaded (0.000 MB deduped)wandb: \ 0.001 MB of 0.001 MB uploaded (0.000 MB deduped)wandb: | 0.001 MB of 0.001 MB uploaded (0.000 MB deduped)wandb: / 0.001 MB of 0.016 MB uploaded (0.000 MB deduped)wandb: - 0.001 MB of 0.016 MB uploaded (0.000 MB deduped)wandb: \ 0.016 MB of 0.016 MB uploaded (0.000 MB deduped)wandb: | 0.016 MB of 0.016 MB uploaded (0.000 MB deduped)wandb: / 0.016 MB of 0.016 MB uploaded (0.000 MB deduped)wandb: - 0.016 MB of 0.016 MB uploaded (0.000 MB deduped)wandb: \ 0.016 MB of 0.016 MB uploaded (0.000 MB deduped)wandb: | 0.016 MB of 0.016 MB uploaded (0.000 MB deduped)wandb: / 0.016 MB of 0.016 MB uploaded (0.000 MB deduped)wandb:                                                                                
+wandb: Synced pointnetgpd_data_pile_train_constructed_4M_random_views_2_23-04-04-16-14-00: https://wandb.ai/irosa-ias/6dgrasp/runs/pointnetgpd_data_pile_train_constructed_4M_random_views_2_23-04-04-16-14-00
+wandb: Synced 6 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ./wandb/run-20230404_161401-pointnetgpd_data_pile_train_constructed_4M_random_views_2_23-04-04-16-14-00/logs
+Traceback (most recent call last):
+  File "scripts/train_pn_gpd.py", line 312, in <module>
+    main(args)
+  File "scripts/train_pn_gpd.py", line 148, in main
+    trainer.run(train_loader, max_epochs=args.epochs, epoch_length=epoch_length)
+  File "/home/hypatia/anaconda3/envs/giga/lib/python3.8/site-packages/ignite/engine/engine.py", line 704, in run
+    return self._internal_run()
+  File "/home/hypatia/anaconda3/envs/giga/lib/python3.8/site-packages/ignite/engine/engine.py", line 783, in _internal_run
+    self._handle_exception(e)
+  File "/home/hypatia/anaconda3/envs/giga/lib/python3.8/site-packages/ignite/engine/engine.py", line 466, in _handle_exception
+    raise e
+  File "/home/hypatia/anaconda3/envs/giga/lib/python3.8/site-packages/ignite/engine/engine.py", line 753, in _internal_run
+    time_taken = self._run_once_on_dataset()
+  File "/home/hypatia/anaconda3/envs/giga/lib/python3.8/site-packages/ignite/engine/engine.py", line 854, in _run_once_on_dataset
+    self._handle_exception(e)
+  File "/home/hypatia/anaconda3/envs/giga/lib/python3.8/site-packages/ignite/engine/engine.py", line 466, in _handle_exception
+    raise e
+  File "/home/hypatia/anaconda3/envs/giga/lib/python3.8/site-packages/ignite/engine/engine.py", line 840, in _run_once_on_dataset
+    self.state.output = self._process_function(self, self.state.batch)
+  File "scripts/train_pn_gpd.py", line 244, in _update
+    y_pred = select(net(grasp_query))
+  File "/home/hypatia/anaconda3/envs/giga/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1102, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/hypatia/6D-DAAD/GIGA/src/vgn/ConvONets/conv_onet/models/__init__.py", line 290, in forward
+    queries = torch.cat([g, c], dim=1)
+RuntimeError: Sizes of tensors must match except in dimension 1. Expected size 99 but got size 3 for tensor number 1 in the list.

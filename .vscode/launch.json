@@ -25,8 +25,10 @@
             //           "dex", "--force", "--best", "--model",
             //           "data/runs/23-01-19-13-12_dataset=data_pile_train_constructed_4M,augment=False,net=6d_giga,batch_size=32,lr=2e-04/best_vgn_giga_val_acc=0.9986.pt", 
             //           "--type", "giga", "--result-path", "data/grasps", "--vis"],
-            "args" : ["--scene", "pile", "--object-set", "pile/train",
-            "--num-grasps", "5", "--save-scene", "./data/giga/scene001", "--random"],
+            // "args" : ["--scene", "pile", "--object-set", "pile/train",
+            // "--num-grasps", "5", "--save-scene", "./data/giga/scene001", "--random"],
+            "args" : ["--dataset", "data/pile/data_pile_train_constructed_4M_HighRes_radomized_views_GPG_only", 
+                      "--dataset_raw", "data/pile/data_pile_train_random_raw_4M_radomized_views", "--epoch_length_frac", "0.5"],
             "justMyCode": false
         }
     ]

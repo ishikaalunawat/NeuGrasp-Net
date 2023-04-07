@@ -96,9 +96,8 @@ class DatasetVoxelGraspPCOcc(torch.utils.data.Dataset):
         if grasp_pc.shape[0] < self.max_points_grasp_pc:
             grasp_pc = np.vstack((grasp_pc, np.zeros((self.max_points_grasp_pc - grasp_pc.shape[0], 3))))
             grasp_pc_local = np.vstack((grasp_pc_local, np.zeros((self.max_points_grasp_pc - grasp_pc_local.shape[0], 3))))
-        
+        # assert label==None, f"{i}"
         tsdf, y, rot = voxel_grid[0], (label, width), rotation # <- Changed to predict only grasp quality
-
         occ_points, occ = self.read_occ(scene_id, self.num_point_occ) # TODO: Can I load the whole thing into memory?
         occ_points = occ_points / self.size - 0.5
 

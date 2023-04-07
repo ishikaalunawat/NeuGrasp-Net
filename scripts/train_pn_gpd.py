@@ -16,12 +16,13 @@ import torch.nn.functional as F
 from vgn.dataset_voxel_grasp_pc import DatasetVoxelGraspPCOcc
 from vgn.networks import get_network, load_network
 
-LOSS_KEYS = ['loss_all', 'loss_qual', 'loss_occ']
+LOSS_KEYS = ['loss_all', 'loss_qual'] # Removed OCC
 
 def main(args):
 
     use_cuda = torch.cuda.is_available()
-    device = torch.device("cuda" if use_cuda else "cpu")
+    # device = torch.device("cuda" if use_cuda else "cpu")
+    device = "cpu"
     kwargs = {"num_workers": args.num_workers, "pin_memory": True} if use_cuda else {}
 
     # create log directory
@@ -64,11 +65,11 @@ def main(args):
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, mode='min')
 
     metrics = {
-        "accuracy": Accuracy(lambda out: (torch.round(out[1][0]), out[2][0])), # out[1][0] => y_pred -> quality
-                                                                              # out[2][0] => y -> quality
+        "accuracy": Accuracy(lambda out: (torch.round(out[1]), out[2][0])), # out[1] => y_pred -> quality PNGPD
+                                                                              # out[2][0] => y -> quality PNGPD
                                                                               # ^ Refer def _update() returns
-        "precision": Precision(lambda out: (torch.round(out[1][0]), out[2][0])),
-        "recall": Recall(lambda out: (torch.round(out[1][0]), out[2][0])),
+        "precision": Precision(lambda out: (torch.round(out[1]), out[2][0])),
+        "recall": Recall(lambda out: (torch.round(out[1]), out[2][0])),
     }
     for k in LOSS_KEYS:
         metrics[k] = Average(lambda out, sk=k: out[3][sk])
@@ -186,32 +187,32 @@ def prepare_batch(batch, device):
 
 def select(out):
     #qual_out, rot_out, width_out, sdf = out
-    qual_out, width_out, sdf = out     # <- Changed to predict only grasp quality (check inside)
+    qual_out = out     # <- Changed to predict only grasp quality (check inside)
     # rot_out = rot_out.squeeze(1)
-    occ = torch.sigmoid(sdf) # to probability
+    # occ = torch.sigmoid(sdf) # to probability
     #return qual_out.squeeze(-1), rot_out, width_out.squeeze(-1), occ
-    return qual_out.squeeze(-1), width_out.squeeze(-1), occ
+    return qual_out.squeeze()
 
 
 def loss_fn(y_pred, y):
-    label_pred, width_pred, occ_pred = y_pred
-    label, width, occ = y
+    label_pred = y_pred # PointNetGPD output
+    label, width, occ_value = y
     loss_qual = _qual_loss_fn(label_pred, label)
     # loss_rot = _rot_loss_fn(rotation_pred, rotations)
-    loss_width = _width_loss_fn(width_pred, width)
-    loss_occ = _occ_loss_fn(occ_pred, occ)
-    loss = loss_qual + label * (0.01 * loss_width) + loss_occ # <-label * (loss_rot + 0.01 * loss_width): new one, Changed
-    loss_dict = {'loss_qual': loss_qual.mean(),
+    # loss_width = _width_loss_fn(width_pred, width)
+    # loss_occ = _occ_loss_fn(occ_pred, occ)
+    loss = loss_qual #+ label * (0.01 * loss_width) + loss_occ # <-label * (loss_rot + 0.01 * loss_width): new one, Changed
+    loss_dict = {'loss_qual': loss_qual,
                 #  'loss_rot': loss_rot.mean(),
-                'loss_width': loss_width.mean(),
-                'loss_occ': loss_occ.mean(),
+                # 'loss_width': loss_width.mean(),
+                # 'loss_occ': loss_occ.mean(),
                 'loss_all': loss.mean()
                 }
-    return loss.mean(), loss_dict
+    return loss, loss_dict
 
 
 def _qual_loss_fn(pred, target):
-    return F.binary_cross_entropy(pred, target, reduction="none")
+    return F.binary_cross_entropy(pred, target, reduction="mean")
 
 
 # def _rot_loss_fn(pred, target):
@@ -238,8 +239,12 @@ def create_trainer(net, optimizer, scheduler, loss_fn, metrics, device):
         net.train()
         optimizer.zero_grad()
         # forward
-        x, y, grasp_query, pos_occ = prepare_batch(batch, device) # <- Changed to predict only grasp quality (check inside)
-        y_pred = select(net(x, grasp_query, p_tsdf=pos_occ))
+        x, y, grasp_query, _ = prepare_batch(batch, device)
+
+        # forward() [PointNetGPD()] takes only grasp_query: (pos, rot, grasp_local_pc, <grasp_pc>s)
+        y_pred = select(net(grasp_query)) 
+        if y_pred.nelement ==0:
+            print(y_pred)
         loss, loss_dict = loss_fn(y_pred, y)
 
         # backward
@@ -264,10 +269,10 @@ def create_evaluator(net, loss_fn, metrics, device):
             x, y, grasp_query, pos_occ = prepare_batch(batch, device) # <- Changed to predict only grasp quality (check inside)
             out = net(x, grasp_query, p_tsdf=pos_occ)
             y_pred = select(out)
-            sdf = out[-1]
+            # sdf = out[-1]
             _, loss_dict = loss_fn(y_pred, y)
 
-        return x, y_pred, y, loss_dict, sdf
+        return x, y_pred, y, loss_dict
 
     evaluator = Engine(_inference)
 
@@ -289,7 +294,7 @@ def create_summary_writers(net, device, log_dir):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--net", default="neu_grasp_pn")
+    parser.add_argument("--net", default="pointnetgpd")
     parser.add_argument("--dataset", type=Path, required=True)
     parser.add_argument("--dataset_raw", type=Path, required=True)
     parser.add_argument("--num_workers", type=int, default=10)
