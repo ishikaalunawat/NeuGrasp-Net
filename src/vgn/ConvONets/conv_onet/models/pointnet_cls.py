@@ -10,7 +10,7 @@ class PointNet(nn.Module):
     def __init__(self, input_dim=99, num_class=1, use_bnorm=True):
         super(PointNet, self).__init__()
 
-        self.feat = PointNetEncoder(global_feat=True, feature_transform=False, input_dim=input_dim, use_bnorm=use_bnorm)
+        self.feat = PointNetEncoder(global_feat=True, feature_transform=True, input_dim=input_dim, use_bnorm=use_bnorm)
         self.fc1 = nn.Linear(1024, 512)
         self.fc2 = nn.Linear(512, 256)
         self.fc3 = nn.Linear(256, num_class)
@@ -165,7 +165,7 @@ class STNkd(nn.Module):
 class PointNetEncoder(nn.Module):
     def __init__(self, global_feat=True, feature_transform=False, input_dim=99, use_bnorm=True):
         super(PointNetEncoder, self).__init__()
-        # self.stn = STN3d(channel) # Not required
+        self.stn = STN3d(input_dim)
         self.conv1 = torch.nn.Conv1d(input_dim, 64, 1)
         self.conv2 = torch.nn.Conv1d(64, 128, 1)
         self.conv3 = torch.nn.Conv1d(128, 1024, 1)
@@ -184,14 +184,14 @@ class PointNetEncoder(nn.Module):
 
     def forward(self, x):
         B, D, N = x.size()
-        # trans = self.stn(x)
-        # x = x.transpose(2, 1)
-        # if D >3 :
-        #     x, feature = x.split(3,dim=2)
-        # x = torch.bmm(x, trans)
-        # if D > 3:
-        #     x = torch.cat([x,feature],dim=2)
-        # x = x.transpose(2, 1)
+        trans = self.stn(x)
+        x = x.transpose(2, 1)
+        if D >3 :
+            x, feature = x.split(3,dim=2)
+        x = torch.bmm(x, trans)
+        if D > 3:
+            x = torch.cat([x,feature],dim=2)
+        x = x.transpose(2, 1)
         x = F.relu(self.bn1(self.conv1(x)))
 
         if self.feature_transform:
