@@ -291,4 +291,5 @@ class PointNetGPD(nn.Module):
         
         queries = queries.transpose(2, 1) # Transpose to get shape B, D, N
         out = self.point_network(queries)
+        out = torch.sigmoid(out)
         return out
