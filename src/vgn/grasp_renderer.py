@@ -61,7 +61,7 @@ def generate_neur_grasp_clouds(sim, render_settings, grasps, size, tsdf, net, sc
     width = height = render_settings['camera_image_res']
 
     batch_size = len(grasps)
-    n_steps = 5
+    n_steps = render_settings['n_proposal_steps']
     n_pts = width*height*3
     n_secant_steps = 8 # For surface refinement (crucial)
     if tsdf.shape[0] == 1:
@@ -76,8 +76,7 @@ def generate_neur_grasp_clouds(sim, render_settings, grasps, size, tsdf, net, sc
     intrinsic = CameraIntrinsic(width, height, f_x, f_y, width/2, height/2)
     # To capture 5cms on both sides of the gripper, using a 120 deg FOV, we need to be atleast 0.05/tan(60) = 2.8 cms away
     height_max_dist = sim.gripper.max_opening_width/2.5
-    width_max_dist  = sim.gripper.max_opening_width/2.0 + 0.005 # 0.5 cm extra
-    # width_max_dist += 0.02 # 2 cms extra?
+    width_max_dist  = sim.gripper.max_opening_width/2.0 + 0.015 # 1.5 cm extra
     dist_from_gripper = width_max_dist/np.tan(width_fov/2.0)
     min_measured_dist = 0.001
     max_measured_dist = dist_from_gripper + sim.gripper.finger_depth + 0.005 # 0.5 cm extra
@@ -98,6 +97,7 @@ def generate_neur_grasp_clouds(sim, render_settings, grasps, size, tsdf, net, sc
 
     # get grasp tf and extrinsic matrices
     grasp_inv_tfs = torch.ones((batch_size, 4, 4), dtype=torch.float32)
+    grasp_vgn_inv_tfs = torch.ones((batch_size, 4, 4), dtype=torch.float32)
     grasp_cam_inv_extrinsics = torch.ones((batch_size, 4, 4), dtype=torch.float32)
     left_grasp_cam_inv_extrinsics = torch.ones((batch_size, 4, 4), dtype=torch.float32)
     right_grasp_cam_inv_extrinsics = torch.ones((batch_size, 4, 4), dtype=torch.float32)
@@ -115,7 +115,8 @@ def generate_neur_grasp_clouds(sim, render_settings, grasps, size, tsdf, net, sc
         grasp_up_axis = grasp_tf.T[2,:3] # np.array([0.0, 0.0, 1.0]) # grasp_tf z-axis
         inv_extrinsic_bullet = Transform.look_at(eye=offset_pos, center=grasp_center, up=grasp_up_axis).inverse()
         # Store
-        grasp_inv_tfs[idx] = torch.from_numpy(np.linalg.inv(grasp_tf))
+        grasp_inv_tfs[idx] = torch.from_numpy(np.linalg.inv(grasp_tf)) # This still needs to be in the original grasp frame
+        grasp_vgn_inv_tfs[idx] = torch.from_numpy(grasp.pose.inverse().as_matrix()) # This still needs to be in the original grasp frame
         grasp_cam_inv_extrinsics[idx] = torch.from_numpy(inv_extrinsic_bullet.as_matrix()).float()
         camera_world[idx, :] = torch.from_numpy(inv_extrinsic_bullet.translation).float()
         ## Do the same for the other cameras
@@ -249,10 +250,10 @@ def generate_neur_grasp_clouds(sim, render_settings, grasps, size, tsdf, net, sc
                 down_surf_pc = down_surf_pc.select_by_index(indices)
         
             grasp_pc = torch.tensor(down_surf_pc.points, dtype=torch.float32)
-            grasp_pc_local = grasp_inv_tfs[ind] @ torch.hstack((grasp_pc, torch.ones(grasp_pc.shape[0],1))).T
+            grasp_pc_local = grasp_vgn_inv_tfs[ind] @ torch.hstack((grasp_pc, torch.ones(grasp_pc.shape[0],1))).T
             grasp_pc_local = grasp_pc_local[:3,:].T
             grasp_pc_local = grasp_pc_local / size # - 0.5 DONT SUBTRACT HERE!
-            grasp_pc = grasp_pc / size - 0.5
+            grasp_pc = grasp_pc/size - 0.5
 
             grasps_pc_local[ind, :grasp_pc_local.shape[0],:] = grasp_pc_local
             grasps_pc[ind, :grasp_pc.shape[0], :] = grasp_pc
@@ -270,9 +271,12 @@ def generate_neur_grasp_clouds(sim, render_settings, grasps, size, tsdf, net, sc
             gripper_pc = o3d_gripper_mesh.sample_points_uniformly(number_of_points=3000)
             gripper_pc.colors = o3d.utility.Vector3dVector(np.tile(np.array([1, 1, 0]), (np.asarray(gripper_pc.points).shape[0], 1)))
             o3d.visualization.draw_geometries([down_surf_pc, pc, gripper_pc])
+            # origin_pc = o3d.geometry.PointCloud()
+            # origin_pc.points = o3d.utility.Vector3dVector(np.array([[0,0,0]]))
+            # origin_pc.colors = o3d.utility.Vector3dVector(np.tile(np.array([1, 0, 0]), (np.asarray(origin_pc.points).shape[0], 1)))
             # down_surf_pc_local = o3d.geometry.PointCloud()
             # down_surf_pc_local.points = o3d.utility.Vector3dVector(grasp_pc_local*size)
-            # o3d.visualization.draw_geometries([down_surf_pc_local, pc, gripper_pc])
+            # o3d.visualization.draw_geometries([down_surf_pc_local, down_surf_pc, origin_pc, pc, gripper_pc])
         
     return bad_indices, grasps_pc_local, grasps_pc
 
@@ -295,8 +299,7 @@ def generate_gt_grasp_cloud(sim, render_settings, grasp, scene_mesh=None, debug=
     intrinsic = CameraIntrinsic(width, height, f_x, f_y, width/2, height/2)
     # To capture 5cms on both sides of the gripper, using a 120 deg FOV, we need to be atleast 0.05/tan(60) = 2.8 cms away
     height_max_dist = sim.gripper.max_opening_width/2.5
-    width_max_dist  = sim.gripper.max_opening_width/2.0 + 0.005 # 0.5 cm extra
-    # width_max_dist += 0.02 # 2 cms extra?
+    width_max_dist  = sim.gripper.max_opening_width/2.0 + 0.015 # 1.5 cm extra
     dist_from_gripper = width_max_dist/np.tan(width_fov/2.0)
     min_measured_dist = 0.001
     max_measured_dist = dist_from_gripper + sim.gripper.finger_depth + 0.005 # 0.5 cm extra
