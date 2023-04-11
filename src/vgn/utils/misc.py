@@ -15,9 +15,11 @@ def set_random_seed(seed=0):
         torch.backends.cudnn.benchmark = False
         torch.backends.cudnn.deterministic = True
 
-def apply_noise(img, noise_type):
-    if noise_type == 'dex':
-        return apply_dex_noise(img)
+def apply_noise(img, noise_type, gp_rate=0.5):
+    if noise_type == 'mod_dex':
+        return apply_mod_dex_noise(img, gp_rate=gp_rate)
+    elif noise_type == 'dex':
+        return apply_dex_noise(img, gp_rate=gp_rate)
     elif noise_type =='trans':
         return apply_translational_noise(img)
     elif noise_type == 'norm':
@@ -25,6 +27,28 @@ def apply_noise(img, noise_type):
     else:
         return img
 
+def apply_mod_dex_noise(img,
+                gamma_shape=1000,
+                gamma_scale=0.001,
+                gp_sigma=0.005,
+                gp_scale=4.0,
+                gp_rate=0.5):
+    gamma_noise = 2 - np.random.gamma(gamma_shape, gamma_scale)
+    img = img * gamma_noise
+    if np.random.rand() < gp_rate:
+        h, w = img.shape[:2]
+        gp_sample_height = int(h / gp_scale)
+        gp_sample_width = int(w / gp_scale)
+        gp_num_pix = gp_sample_height * gp_sample_width
+        gp_noise = np.random.randn(gp_sample_height, gp_sample_width) * gp_sigma
+        gp_noise = skimage.transform.resize(gp_noise,
+                                            img.shape[:2],
+                                            order=1,
+                                            anti_aliasing=False,
+                                            mode="constant")
+        
+        img += gp_noise
+    return img
 
 def apply_dex_noise(img,
                 gamma_shape=1000,

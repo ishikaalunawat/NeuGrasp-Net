@@ -306,7 +306,7 @@ def generate_gt_grasp_cloud(sim, render_settings, grasp, scene_mesh=None, debug=
     camera = sim.world.add_camera(intrinsic, min_measured_dist, max_measured_dist+0.05) # adding 5cm extra for now but will filter it below
     if render_settings['three_cameras']:
         # Use one camera for wrist and two cameras for the fingers
-        finger_height_max_dist = sim.gripper.max_opening_width/2.5
+        # finger_height_max_dist = sim.gripper.max_opening_width/2.5 # Not required if filtering combined cloud
         finger_width_max_dist = sim.gripper.finger_depth/2.0 + 0.005 # 0.5 cm extra
         dist_from_finger = finger_width_max_dist/np.tan(width_fov/2.0)
         finger_max_measured_dist = dist_from_finger + 0.95*sim.gripper.max_opening_width
@@ -340,7 +340,7 @@ def generate_gt_grasp_cloud(sim, render_settings, grasp, scene_mesh=None, debug=
     depth_img = camera.render(extrinsic_bullet)[1]
     # Optional: Add some dex noise like GIGA
     if render_settings['add_noise']:
-        depth_img = apply_noise(depth_img, noise_type='dex')
+        depth_img = apply_noise(depth_img, noise_type='mod_dex')
     if debug:
         # DEBUG: Viz
         plt.imshow(depth_img)
@@ -362,8 +362,8 @@ def generate_gt_grasp_cloud(sim, render_settings, grasp, scene_mesh=None, debug=
         right_finger_depth_img = finger_camera.render(right_finger_extrinsic_bullet)[1]
         # Optional: Add some dex noise like GIGA
         if render_settings['add_noise']:
-            left_finger_depth_img = apply_noise(left_finger_depth_img, noise_type='dex')
-            right_finger_depth_img = apply_noise(right_finger_depth_img, noise_type='dex')
+            left_finger_depth_img = apply_noise(left_finger_depth_img, noise_type='mod_dex')
+            right_finger_depth_img = apply_noise(right_finger_depth_img, noise_type='mod_dex')
     
     ## Convert to point cloud
     pixel_grid = np.meshgrid(np.arange(width), np.arange(height))
@@ -379,9 +379,9 @@ def generate_gt_grasp_cloud(sim, render_settings, grasp, scene_mesh=None, debug=
     intrinsic_hom = np.eye(4)
     intrinsic_hom[:3,:3] = intrinsic.K
     p_local = np.linalg.inv(intrinsic_hom) @ filt_pixels.T
-    # Also filter out points that are more than max dist height
-    p_local = p_local[:, p_local[1,:] <  height_max_dist]
-    p_local = p_local[:, p_local[1,:] > -height_max_dist]
+    # Also filter out points that are more than max dist height # Not required if filtering combined cloud
+    # p_local = p_local[:, p_local[1,:] <  height_max_dist]
+    # p_local = p_local[:, p_local[1,:] > -height_max_dist]
     p_world = np.linalg.inv(extrinsic_bullet.as_matrix()) @ p_local
     surface_pc = o3d.geometry.PointCloud()
     surface_pc.points = o3d.utility.Vector3dVector(p_world[:3,:].T)
@@ -406,11 +406,11 @@ def generate_gt_grasp_cloud(sim, render_settings, grasp, scene_mesh=None, debug=
         # Project pixels into camera space
         left_filt_pixels[:,:3] *= left_finger_depth_array[left_relevant_mask].reshape(-1, 1) # Multiply by depth
         left_p_local = np.linalg.inv(intrinsic_hom) @ left_filt_pixels.T
-        # Also filter out points that are more than max dist height and width
-        left_p_local = left_p_local[:, left_p_local[0,:] <  finger_width_max_dist]
-        left_p_local = left_p_local[:, left_p_local[0,:] > -finger_width_max_dist]
-        left_p_local = left_p_local[:, left_p_local[1,:] <  finger_height_max_dist]
-        left_p_local = left_p_local[:, left_p_local[1,:] > -finger_height_max_dist]
+        # Also filter out points that are more than max dist height and width # Not required if filtering combined cloud
+        # left_p_local = left_p_local[:, left_p_local[0,:] <  finger_width_max_dist]
+        # left_p_local = left_p_local[:, left_p_local[0,:] > -finger_width_max_dist]
+        # left_p_local = left_p_local[:, left_p_local[1,:] <  finger_height_max_dist]
+        # left_p_local = left_p_local[:, left_p_local[1,:] > -finger_height_max_dist]
         left_p_world = np.linalg.inv(left_finger_extrinsic_bullet.as_matrix()) @ left_p_local
 
         right_finger_depth_array = right_finger_depth_img.reshape(-1)
@@ -421,11 +421,11 @@ def generate_gt_grasp_cloud(sim, render_settings, grasp, scene_mesh=None, debug=
         # Project pixels into camera space
         right_filt_pixels[:,:3] *= right_finger_depth_array[right_relevant_mask].reshape(-1, 1) # Multiply by depth
         right_p_local = np.linalg.inv(intrinsic_hom) @ right_filt_pixels.T
-        # Also filter out points that are more than max dist height and width
-        right_p_local = right_p_local[:, right_p_local[0,:] <  finger_width_max_dist]
-        right_p_local = right_p_local[:, right_p_local[0,:] > -finger_width_max_dist]
-        right_p_local = right_p_local[:, right_p_local[1,:] <  finger_height_max_dist]
-        right_p_local = right_p_local[:, right_p_local[1,:] > -finger_height_max_dist]
+        # Also filter out points that are more than max dist height and width # Not required if filtering combined cloud
+        # right_p_local = right_p_local[:, right_p_local[0,:] <  finger_width_max_dist]
+        # right_p_local = right_p_local[:, right_p_local[0,:] > -finger_width_max_dist]
+        # right_p_local = right_p_local[:, right_p_local[1,:] <  finger_height_max_dist]
+        # right_p_local = right_p_local[:, right_p_local[1,:] > -finger_height_max_dist]
         right_p_world = np.linalg.inv(right_finger_extrinsic_bullet.as_matrix()) @ right_p_local    
 
         if debug:
@@ -441,7 +441,15 @@ def generate_gt_grasp_cloud(sim, render_settings, grasp, scene_mesh=None, debug=
 
         # Combine surface point cloud
         combined_world_points = np.hstack((p_world, left_p_world, right_p_world))
-        surface_pc.points = o3d.utility.Vector3dVector(combined_world_points[:3,:].T)
+        # filter points that are too far away
+        combined_world_points_local = np.linalg.inv(grasp_tf) @ combined_world_points
+        inval_mask = combined_world_points_local[0,:] > (max_measured_dist - dist_from_gripper) # too far X
+        inval_mask = inval_mask | (combined_world_points_local[0,:] < -dist_from_gripper)       # too close X
+        inval_mask = inval_mask | (combined_world_points_local[2,:] >  height_max_dist)         # too far Z
+        inval_mask = inval_mask | (combined_world_points_local[2,:] < -height_max_dist)         # too close Z
+        combined_world_points_filt = combined_world_points[:, ~inval_mask]
+
+        surface_pc.points = o3d.utility.Vector3dVector(combined_world_points_filt[:3,:].T)
 
     down_surface_pc = surface_pc.voxel_down_sample(voxel_size=render_settings['voxel_downsample_size'])
     # If more than max points, uniformly sample
