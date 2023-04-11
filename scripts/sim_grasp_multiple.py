@@ -89,10 +89,10 @@ if __name__ == "__main__":
     parser.add_argument("--num-view", type=int, default=1) # No need to change
     parser.add_argument("--num-rounds", type=int, default=100)
     parser.add_argument("--resolution", type=int, default=40)
-    parser.add_argument("--seeds", type=int, nargs='+', default=[0, 1, 2, 3, 4])
+    parser.add_argument("--seeds", type=int, nargs='+', default=[100, 0, 1, 2, 3, 4])
     parser.add_argument("--sim-gui", action="store_true")
     # parser.add_argument("--grad-refine", action="store_true")
-    parser.add_argument("--qual-th", type=float, default=0.9)
+    parser.add_argument("--qual-th", type=float, default=0.5)
     parser.add_argument("--eval-geo",
                         action="store_true",
                         help='whether evaluate geometry prediction')
@@ -121,6 +121,9 @@ if __name__ == "__main__":
     parser.add_argument("--vis",
                         action="store_true",
                         help="visualize and save affordance")
-
+    parser.add_argument("--save-fails",
+                        action="store_true",
+                        help="Save grasp failure visualizations")
+    
     args = parser.parse_args()
     main(args)

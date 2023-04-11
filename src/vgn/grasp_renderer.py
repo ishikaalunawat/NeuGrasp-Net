@@ -55,7 +55,7 @@ def secant(net, tsdf, f_low, f_high, d_low, d_high, n_secant_steps,
     return d_pred
 
 
-def generate_neur_grasp_clouds(sim, render_settings, grasps, size, tsdf, net, scene_mesh=None, debug=False, device='cuda'):
+def generate_neur_grasp_clouds(sim, render_settings, grasps, size, tsdf, net, device=torch.device("cuda"), scene_mesh=None, debug=False, o3d_vis=None):
     max_points = render_settings['max_points']
     voxel_downsample_size = render_settings['voxel_downsample_size']
     width = height = render_settings['camera_image_res']
@@ -104,6 +104,7 @@ def generate_neur_grasp_clouds(sim, render_settings, grasps, size, tsdf, net, sc
     camera_world = torch.zeros((batch_size, width*height, 3))
     left_camera_world = torch.zeros((batch_size, width*height, 3))
     right_camera_world = torch.zeros((batch_size, width*height, 3))
+    grasps_viz_list = []
     for idx, grasp in enumerate(grasps):
         ## Move camera to grasp offset frame
         grasp_center = grasp.pose.translation
@@ -133,6 +134,17 @@ def generate_neur_grasp_clouds(sim, render_settings, grasps, size, tsdf, net, sc
         right_grasp_cam_inv_extrinsics[idx] = torch.from_numpy(right_finger_inv_extrinsic_bullet.as_matrix()).float()
         left_camera_world[idx, :]  = torch.from_numpy(left_finger_inv_extrinsic_bullet.translation).float().unsqueeze(0)
         right_camera_world[idx, :] = torch.from_numpy(right_finger_inv_extrinsic_bullet.translation).float().unsqueeze(0)
+
+        if o3d_vis is not None:
+            grasps_scene = trimesh.Scene()
+            from vgn.utils import visual
+            grasps_scene.add_geometry(visual.grasp2mesh(grasp), node_name=f'grasp_{idx}')
+            o3d_gripper_mesh = as_mesh(grasps_scene).as_open3d
+            o3d_gripper_mesh.paint_uniform_color([1.0, 0.85, 0.0]) # yellow
+            o3d_vis.add_geometry(o3d_gripper_mesh, reset_bounding_box=False)
+            o3d_vis.poll_events()
+            # o3d_vis.update_renderer()
+            grasps_viz_list.append(o3d_gripper_mesh)
     
     ## Make proposal points for rendering
     # Make pixel points
@@ -207,10 +219,13 @@ def generate_neur_grasp_clouds(sim, render_settings, grasps, size, tsdf, net, sc
     ray_direction_masked = torch.cat((ray_vector_world, left_ray_vector_world, right_ray_vector_world), dim=1)[mask]
 
     # Apply surface depth refinement step (e.g. Secant method)
-    with torch.no_grad():
-        d_pred = secant(net, tsdf_t[0].unsqueeze(0), # we don't care about batch size here
-            f_low, f_high, d_low, d_high, n_secant_steps, ray0_masked,
-            ray_direction_masked, tau=0.5, scale_size=size)
+    if mask.sum() > 0:
+        with torch.no_grad():
+            d_pred = secant(net, tsdf_t[0].unsqueeze(0), # we don't care about batch size here
+                f_low, f_high, d_low, d_high, n_secant_steps, ray0_masked,
+                ray_direction_masked, tau=0.5, scale_size=size)
+    else:
+        d_pred = torch.zeros(0, dtype=torch.float32)
 
     ## Project depth to 3d points
     # t_nan = torch.tensor(float('nan'))
@@ -277,8 +292,14 @@ def generate_neur_grasp_clouds(sim, render_settings, grasps, size, tsdf, net, sc
             # down_surf_pc_local = o3d.geometry.PointCloud()
             # down_surf_pc_local.points = o3d.utility.Vector3dVector(grasp_pc_local*size)
             # o3d.visualization.draw_geometries([down_surf_pc_local, down_surf_pc, origin_pc, pc, gripper_pc])
-        
-    return bad_indices, grasps_pc_local, grasps_pc
+
+        if o3d_vis is not None:
+            down_surf_pc.colors = o3d.utility.Vector3dVector(np.tile(np.array([0.6, 0.0, 1]), (np.asarray(down_surf_pc.points).shape[0], 1)))
+            o3d_vis.add_geometry(down_surf_pc, reset_bounding_box=False)
+            o3d_vis.poll_events()
+            # o3d_vis.update_renderer()
+
+    return bad_indices, grasps_pc_local, grasps_pc, grasps_viz_list
 
 
 def generate_gt_grasp_cloud(sim, render_settings, grasp, scene_mesh=None, debug=False):

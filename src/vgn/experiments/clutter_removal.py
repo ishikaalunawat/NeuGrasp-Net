@@ -13,6 +13,7 @@ import open3d as o3d
 
 from vgn import io#, vis
 from vgn.grasp import *
+# from vgn.perception import camera_on_sphere
 from vgn.simulation import ClutterRemovalSim
 from vgn.utils.transform import Rotation, Transform
 from vgn.utils.implicit import get_mesh_pose_list_from_world, get_scene_from_mesh_pose_list
@@ -52,7 +53,22 @@ def run(
     #n = 6
     sim = ClutterRemovalSim(scene, object_set, gui=sim_gui, seed=seed, add_noise=add_noise, sideview=sideview)
     logger = Logger(logdir, description)
-    
+    if visualize:
+        # Running viz of the scene point clouds and meshes
+        o3d_vis = o3d.visualization.Visualizer()
+        o3d_vis.create_window()
+        first_call = True
+        # import pdb; pdb.set_trace()
+        # vc = o3d_vis.get_view_control()
+        # cam_params = vc.convert_to_pinhole_camera_parameters()
+        # cam_params.intrinsic.intrinsic_matrix
+        # cam_params.extrinsic = np.array([[0.0, 0.0, 1.0, -0.155], [0.0, 1.0, 0.0, 0.148], [-1.0, 0.0, 0.0, 0.411], [0.0, 0.0, 0.0, 1.0]])
+        # # origin = Transform(Rotation.identity(), np.r_[0.15, 0.50, -0.3])
+        # origin = Transform(Rotation.identity(), np.r_[0.0, 0.0, 0.0])
+        # from vgn.perception import camera_on_sphere
+        # old_ext = np.array(cam_params.extrinsic)
+        # cam_params.extrinsic = camera_on_sphere(origin, radius=1.0, theta=np.pi/4, phi=0.0).as_matrix()
+        # vc.convert_from_pinhole_camera_parameters(cam_params, allow_arbitrary=True)
 
     cnt = 0
     success = 0
@@ -83,6 +99,9 @@ def run(
             mesh_pose_list = np.load(raw_root / "mesh_pose_list" / mesh_pose_filename, allow_pickle=True)['pc']
             sim.setup_sim_scene_from_mesh_pose_list(mesh_pose_list)
         else:
+            if visualize and o3d_vis is not None:
+                o3d_vis.clear_geometries()
+                o3d_vis.poll_events()
             sim.reset(num_objects)
 
         round_id = logger.last_round_id() + 1
@@ -118,12 +137,16 @@ def run(
 
             # plan grasps
             if visualize:
+                # Running viz of the scene point clouds and meshes
+                o3d_vis.clear_geometries()
+                # Also return the scene mesh with or without grasps
                 mesh_pose_list = get_mesh_pose_list_from_world(sim.world, object_set)
                 scene_mesh = get_scene_from_mesh_pose_list(mesh_pose_list)
-                grasps, scores, timings["planning"], visual_mesh = grasp_plan_fn(state, scene_mesh, sim=sim, debug_data=data_for_scene, seed=seed)
-                assert not visual_mesh.is_empty
+                grasps, scores, timings["planning"], visual_mesh = grasp_plan_fn(state, scene_mesh, sim=sim, debug_data=data_for_scene, seed=seed, o3d_vis=o3d_vis, first_call=first_call)
+                first_call = False
+                # assert not visual_mesh.is_empty
                 # o3d.visualization.draw_geometries([visual_mesh.as_open3d])
-                logger.log_mesh(scene_mesh, visual_mesh, f'round_{round_id:03d}_trial_{trial_id:03d}')
+                # logger.log_mesh(scene_mesh, visual_mesh, f'round_{round_id:03d}_trial_{trial_id:03d}')
                 
             else:
                 grasps, scores, timings["planning"] = grasp_plan_fn(state, sim=sim, debug_data=data_for_scene, seed=seed)
