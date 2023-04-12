@@ -25,7 +25,7 @@ def main(args):
     with open(filename, 'r') as f:
         note = (";").join(f.readlines()[1:5]).replace('\n', '')
 
-    wandb.init(config=args, project="6dgrasp", entity="irosa-ias", notes = note)
+    wandb.init(config=args, project="6dgrasp", resume=True, entity="irosa-ias", notes = note)
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
     kwargs = {"num_workers": 16, "pin_memory": True} if use_cuda else {}
