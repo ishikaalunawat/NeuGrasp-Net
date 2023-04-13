@@ -48,7 +48,7 @@ def main(args):
         note = (";").join(f.readlines()[1:5]).replace('\n', '')
 
     if args.log_wandb:
-        wandb.init(config=args, project="6dgrasp", resume=True, dir="/work/scratch/sj93qicy/potato-net", entity="irosa-ias", id=args.net+'_'+args.dataset.name+'_'+time_stamp, notes=note)
+        wandb.init(config=args, project="6dgrasp", resume=True, entity="irosa-ias", id=args.net+'_'+args.dataset.name+'_'+time_stamp, notes=note)
 
     # create data loaders
     train_loader, val_loader = create_train_val_loaders(
