@@ -303,7 +303,7 @@ if __name__ == "__main__":
     parser.add_argument("--epoch_length_frac", type=float, default=1.0, help="fraction of training data that constitutes one epoch")
     parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--lr", type=float, default=2e-4)
-    parser.add_argument("--lr_scheduler_patience", type=int, default=4) # How many epochs to wait before reducing lr
+    parser.add_argument("--lr_scheduler_patience", type=int, default=5) # How many epochs to wait before reducing lr
     parser.add_argument("--lr_scheduler_factor", type=float, default=0.1) # Reduce by this factor
     parser.add_argument("--lr_scheduler_threshold", type=float, default=0.05) # Consider reducing when improved by this much percentage
     parser.add_argument("--val_split", type=float, default=0.05, help="fraction of data used for validation")
