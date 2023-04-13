@@ -61,7 +61,9 @@ def main(args):
     
     # define optimizer and metrics
     optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, mode='min')
+    # if 'metric' does not reduce by 'threshold' percentage for 'patience' epochs, reduce lr by 'factor'
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer,
+                mode='min', factor=args.lr_scheduler_factor, patience=args.lr_scheduler_patience, threshold=args.lr_scheduler_threshold, verbose=True)
 
     metrics = {
         "accuracy": Accuracy(lambda out: (torch.round(out[1][0]), out[2][0])), # out[1][0] => y_pred -> quality
@@ -301,6 +303,9 @@ if __name__ == "__main__":
     parser.add_argument("--epoch_length_frac", type=float, default=1.0, help="fraction of training data that constitutes one epoch")
     parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--lr", type=float, default=2e-4)
+    parser.add_argument("--lr_scheduler_patience", type=int, default=4) # How many epochs to wait before reducing lr
+    parser.add_argument("--lr_scheduler_factor", type=float, default=0.1) # Reduce by this factor
+    parser.add_argument("--lr_scheduler_threshold", type=float, default=0.05) # Consider reducing when improved by this much percentage
     parser.add_argument("--val_split", type=float, default=0.05, help="fraction of data used for validation")
     parser.add_argument("--augment", action="store_true")
     parser.add_argument("--silence", action="store_true")
