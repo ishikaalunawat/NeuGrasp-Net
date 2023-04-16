@@ -266,13 +266,14 @@ def create_evaluator(net, loss_fn, metrics, device):
 
         net.eval()
         with torch.no_grad():
-            x, y, grasp_query, pos_occ = prepare_batch(batch, device) # <- Changed to predict only grasp quality (check inside)
-            out = net(x, grasp_query, p_tsdf=pos_occ)
-            y_pred = select(out)
-            # sdf = out[-1]
-            _, loss_dict = loss_fn(y_pred, y)
+            # prepare batch
+            x, y, grasp_query, _ = prepare_batch(batch, device)
+            # forward() [PointNetGPD()] takes only grasp_query: (pos, rot, grasp_local_pc, <grasp_pc>s)
+            y_pred = select(net(grasp_query)) 
+            # compute loss
+            loss, loss_dict = loss_fn(y_pred, y)
 
-        return x, y_pred, y, loss_dict
+        return x, y_pred, y, loss_dict 
 
     evaluator = Engine(_inference)
 
