@@ -452,6 +452,18 @@ def generate_grasp_cloud(sim, render_settings, grasp, scene_mesh=None, debug=Fal
     grasp_pc = np.asarray(down_surface_pc.points)
     T_inv = Transform(rotation, pos).inverse()
     grasp_pc_local = T_inv.transform_point(grasp_pc)
+
+    # pc_trimesh = trimesh.points.PointCloud(down_surface_pc.points)
+    # pc_colors = np.array([[255, 255, 0] for i in down_surface_pc.points])
+    # # increase sphere size of trimesh points
+    # pc_trimesh.colors = np.array([255, 125, 0])
+    # box = trimesh.creation.box(extents=[0.5, 0.5, 0.1])
+    # box.visual.face_colors = [0.9, 0.9, 0.9, 1.0]
+    # translation = [0.15, 0.15, -0.05+0.05]
+    # box.apply_translation(translation)
+    # trimesh.Scene([composed_scene, pc_trimesh, box]).show(line_settings= {'point_size': 20})
+    # import pdb; pdb.set_trace()
+
     if debug:
         # viz local and global and original pc and gripper
         gripper_pc_local = T_inv.transform_point(np.asarray(gripper_pc.points))

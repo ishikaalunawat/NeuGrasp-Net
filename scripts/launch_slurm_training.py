@@ -22,15 +22,15 @@ GRES = 'gpu' # if USE_CUDA else None  # gpu:rtx2080:1, gpu:rtx3080:1
 CONDA_ENV = 'GIGA-6DoF'
 
 launcher = Launcher(
-    exp_name='train_HiRes64_6Dw_giga_GPG_balanced',
-    exp_file='train_giga', # local path without .py
+    exp_name='train_neural_grasp_dgcnn_gpg_balanced',
+    exp_file='train_neu_grasp', # local path without .py
     # exp_file='/work/home/sj93qicy/IAS_WS/potato-net/GIGA-6DoF/scripts/generate_data_gpg_parallel', # without .py
     project_name='project01907',  # for hrz cluster
     n_seeds=N_SEEDS,
     # n_exps_in_parallel=N_EXPS_IN_PARALLEL,
     n_cores=N_CORES,
     memory_per_core=MEMORY_PER_CORE,
-    days=1,
+    days=2,
     hours=23,
     minutes=59,
     seconds=0,
@@ -44,13 +44,15 @@ launcher = Launcher(
 
 # Experiment configs (In this case, they are all argparse arguments for the main python file)
 launcher.add_experiment(
-    net="giga_hr",
+    net="neu_grasp_dgcnn",
     dataset="/work/scratch/sj93qicy/potato-net/data/pile/data_pile_train_constructed_4M_HighRes_radomized_views",
     dataset_raw="/work/scratch/sj93qicy/potato-net/data/pile/data_pile_train_random_raw_4M_GPG_60",
     epochs=35,
     batch_size=16,
     num_workers=10,
+    lr=5e-5,
     epoch_length_frac=0.5,
+    description="DGCNN_with_k_10",
     )
 
 launcher.run(LOCAL, TEST)

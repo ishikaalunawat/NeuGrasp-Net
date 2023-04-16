@@ -17,6 +17,7 @@ def get_network(name):
         "giga_geo": GIGAGeo,
         "giga_detach": GIGADetach,
         "neu_grasp_pn": NeuGraspPN,
+        "neu_grasp_pn_detach": NeuGraspPNDetach,
         "neu_grasp_dgcnn": NeuGraspDGCNN,
         "pointnetgpd" : PointNetGPD
     }
@@ -214,6 +215,33 @@ def NeuGraspPN():
         },
         'decoder': 'picked_points',
         'decoder_tsdf': 'simple_local',
+        'decoder_kwargs': {
+            'dim': 7,
+            'point_network': 'pointnet',
+            'sample_mode': 'bilinear',
+            'concat_feat': True
+        },
+        'padding': 0,
+        'c_dim': 32 
+    }
+    return get_model(config)
+
+def NeuGraspPNDetach():
+    config = {
+        'encoder': 'voxel_simple_local',
+        'encoder_kwargs': {
+            'plane_type': ['xz', 'xy', 'yz'],
+            'plane_resolution': 64,
+            'unet': True,
+            'unet_kwargs': {
+                'depth': 3,
+                'merge_mode': 'concat',
+                'start_filts': 32
+            }
+        },
+        'decoder': 'picked_points',
+        'decoder_tsdf': 'simple_local',
+        'detach_tsdf': True,
         'decoder_kwargs': {
             'dim': 7,
             'point_network': 'pointnet',
