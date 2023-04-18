@@ -1,9 +1,0 @@
-usage: train_giga.py [-h] [--net NET] --dataset DATASET --dataset_raw
-                     DATASET_RAW [--num_workers NUM_WORKERS] [--logdir LOGDIR]
-                     [--log_wandb LOG_WANDB] [--description DESCRIPTION]
-                     [--savedir SAVEDIR] [--epochs EPOCHS]
-                     [--epoch_length_frac EPOCH_LENGTH_FRAC]
-                     [--batch_size BATCH_SIZE] [--lr LR]
-                     [--val_split VAL_SPLIT] [--augment] [--silence]
-                     [--load_path LOAD_PATH]
-train_giga.py: error: argument --log_wandb: expected one argument
