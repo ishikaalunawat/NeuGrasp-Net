@@ -16,8 +16,10 @@ from vgn.utils.misc import apply_noise
 
 from joblib import Parallel, delayed
 
-def generate_from_existing_grasps(grasp_data_entry, args):
+def transform_to_frame(points, T):
+    return T.inverse().transform_point(points)
 
+def generate_from_existing_grasps(grasp_data_entry, args):
     # Get mesh pose list
     scene_id = grasp_data_entry['scene_id']
     file_name = scene_id + ".npz"
@@ -31,7 +33,7 @@ def generate_from_existing_grasps(grasp_data_entry, args):
         scene_mesh = get_scene_from_mesh_pose_list(mesh_pose_list)
         o3d_scene_mesh = scene_mesh.as_open3d
         o3d_scene_mesh.compute_vertex_normals()
-        pc = o3d_scene_mesh.sample_points_uniformly(number_of_points=10000)
+        pc = o3d_scene_mesh.sample_points_uniformly(number_of_points=args.n_sample_points)
         pc.colors = o3d.utility.Vector3dVector(np.tile(np.array([0, 0, 0]), (np.asarray(pc.points).shape[0], 1)))
         o3d.visualization.draw_geometries([pc])
 
@@ -78,117 +80,7 @@ def generate_from_existing_grasps(grasp_data_entry, args):
     # Unfortunately VGN/GIGA grasps are not in the grasp frame we want (frame similar to PointNetGPD), so we need to transform them
     grasp_frame_rot =  grasp.pose.rotation * Rotation.from_euler('Y', np.pi/2) * Rotation.from_euler('Z', np.pi)
     grasp_tf = Transform(grasp_frame_rot, grasp_center).as_matrix()
-    offset_pos =  (grasp_tf @ np.array([[-dist_from_gripper],[0],[0],[1.]]))[:3].squeeze() # Move to offset frame
-    # Unfortunately the bullet renderer uses the OpenGL format so we have to use yet another extrinsic
-    grasp_up_axis = grasp_tf.T[2,:3] # np.array([0.0, 0.0, 1.0]) # grasp_tf z-axis
-    extrinsic_bullet = Transform.look_at(eye=offset_pos, center=grasp_center, up=grasp_up_axis)
-    ## render image
-    depth_img = camera.render(extrinsic_bullet)[1]
-    # Optional: Add some dex noise like GIGA
-    if args.add_noise:
-        depth_img = apply_noise(depth_img, noise_type='dex')
-    if args.debug:
-        # DEBUG: Viz
-        plt.imshow(depth_img)
-        plt.show()
-    
-    # ## Do the same for the other cameras
-    # if args.three_cameras:
-    #     ## Move camera to finger offset frame
-    #     fingers_center =  (grasp_tf @ np.array([[sim.gripper.finger_depth/2.0],[0],[0],[1.]]))[:3].squeeze()
-    #     left_finger_offset_pos  =  (grasp_tf @ np.array([[sim.gripper.finger_depth/2.0],[ (dist_from_finger + sim.gripper.max_opening_width/2.0)],[0],[1.]]))[:3].squeeze()
-    #     right_finger_offset_pos =  (grasp_tf @ np.array([[sim.gripper.finger_depth/2.0],[-(dist_from_finger + sim.gripper.max_opening_width/2.0)],[0],[1.]]))[:3].squeeze()
-        
-    #     # Unfortunately the bullet renderer uses the OpenGL format so we have to use yet another extrinsic
-    #     left_finger_extrinsic_bullet  = Transform.look_at(eye=left_finger_offset_pos,  center=fingers_center, up=grasp_up_axis)
-    #     right_finger_extrinsic_bullet = Transform.look_at(eye=right_finger_offset_pos, center=fingers_center, up=grasp_up_axis)
 
-    #     ## render image
-    #     left_finger_depth_img  = finger_camera.render(left_finger_extrinsic_bullet )[1]
-    #     right_finger_depth_img = finger_camera.render(right_finger_extrinsic_bullet)[1]
-    #     # Optional: Add some dex noise like GIGA
-    #     if args.add_noise:
-    #         left_finger_depth_img = apply_noise(left_finger_depth_img, noise_type='dex')
-    #         right_finger_depth_img = apply_noise(right_finger_depth_img, noise_type='dex')
-    #     # if args.debug:
-    #         # DEBUG: Viz
-    #         # plt.imshow(left_finger_depth_img)
-    #         # plt.imshow(right_finger_depth_img)
-    #         # plt.show()
-    
-    # ## Convert to point cloud
-    # pixel_grid = np.meshgrid(np.arange(width), np.arange(height))
-    # pixels = np.dstack((pixel_grid[0],pixel_grid[1])).reshape(-1, 2)
-
-    # # depth_eps = 0.0001
-    # depth_array = depth_img.reshape(-1)
-    # relevant_mask = depth_array < (max_measured_dist) #- depth_eps) # only depth values in range
-    # filt_pixels = np.array(pixels[relevant_mask]) # only consider pixels with depth values in range
-    # filt_pixels = np.hstack((filt_pixels, np.ones((filt_pixels.shape[0], 2)))) # Homogenous co-ordinates
-    # # Project pixels into camera space
-    # filt_pixels[:,:3] *= depth_array[relevant_mask].reshape(-1, 1) # Multiply by depth
-    # intrinsic_hom = np.eye(4)
-    # intrinsic_hom[:3,:3] = intrinsic.K
-    # p_local = np.linalg.inv(intrinsic_hom) @ filt_pixels.T
-    # # Also filter out points that are more than max dist height
-    # p_local = p_local[:, p_local[1,:] <  height_max_dist]
-    # p_local = p_local[:, p_local[1,:] > -height_max_dist]
-    # p_world = np.linalg.inv(extrinsic_bullet.as_matrix()) @ p_local
-    # surface_pc = o3d.geometry.PointCloud()
-    # surface_pc.points = o3d.utility.Vector3dVector(p_world[:3,:].T)
-
-    # if args.debug:
-    #     ## DEBUG: Viz point cloud and grasp
-    #     grasp_cam_world_depth_pc = o3d.geometry.PointCloud()
-    #     grasp_cam_world_depth_pc.points = o3d.utility.Vector3dVector(p_world[:3,:].T)
-    #     grasp_cam_world_depth_pc.colors = o3d.utility.Vector3dVector(np.tile(np.array([0, 0, 1]), (np.asarray(grasp_cam_world_depth_pc.points).shape[0], 1)))
-    #     # viz original pc and gripper
-    #     o3d_gripper_mesh = as_mesh(grasps_scene).as_open3d
-    #     gripper_pc = o3d_gripper_mesh.sample_points_uniformly(number_of_points=3000)
-    #     gripper_pc.colors = o3d.utility.Vector3dVector(np.tile(np.array([1, 1, 0]), (np.asarray(gripper_pc.points).shape[0], 1)))
-    #     o3d.visualization.draw_geometries([gripper_pc, grasp_cam_world_depth_pc, pc])
-
-    # if args.three_cameras:
-    #     left_finger_depth_array = left_finger_depth_img.reshape(-1)
-    #     left_relevant_mask = left_finger_depth_array < (finger_max_measured_dist)# - depth_eps) # only depth values in range
-    #     left_filt_pixels = np.array(pixels[left_relevant_mask]) # only consider pixels with depth values in range
-        
-    #     left_filt_pixels = np.hstack((left_filt_pixels, np.ones((left_filt_pixels.shape[0], 2)))) # Homogenous co-ordinates
-    #     # Project pixels into camera space
-    #     left_filt_pixels[:,:3] *= left_finger_depth_array[left_relevant_mask].reshape(-1, 1) # Multiply by depth
-    #     left_p_local = np.linalg.inv(intrinsic_hom) @ left_filt_pixels.T
-    #     # Also filter out points that are more than max dist height and width
-    #     left_p_local = left_p_local[:, left_p_local[0,:] <  finger_width_max_dist]
-    #     left_p_local = left_p_local[:, left_p_local[0,:] > -finger_width_max_dist]
-    #     left_p_local = left_p_local[:, left_p_local[1,:] <  finger_height_max_dist]
-    #     left_p_local = left_p_local[:, left_p_local[1,:] > -finger_height_max_dist]
-    #     left_p_world = np.linalg.inv(left_finger_extrinsic_bullet.as_matrix()) @ left_p_local
-
-    #     right_finger_depth_array = right_finger_depth_img.reshape(-1)
-    #     right_relevant_mask = right_finger_depth_array < (finger_max_measured_dist)# - depth_eps) # only depth values in range
-    #     right_filt_pixels = np.array(pixels[right_relevant_mask]) # only consider pixels with depth values in range
-        
-    #     right_filt_pixels = np.hstack((right_filt_pixels, np.ones((right_filt_pixels.shape[0], 2)))) # Homogenous co-ordinates
-    #     # Project pixels into camera space
-    #     right_filt_pixels[:,:3] *= right_finger_depth_array[right_relevant_mask].reshape(-1, 1) # Multiply by depth
-    #     right_p_local = np.linalg.inv(intrinsic_hom) @ right_filt_pixels.T
-    #     # Also filter out points that are more than max dist height and width
-    #     right_p_local = right_p_local[:, right_p_local[0,:] <  finger_width_max_dist]
-    #     right_p_local = right_p_local[:, right_p_local[0,:] > -finger_width_max_dist]
-    #     right_p_local = right_p_local[:, right_p_local[1,:] <  finger_height_max_dist]
-    #     right_p_local = right_p_local[:, right_p_local[1,:] > -finger_height_max_dist]
-    #     right_p_world = np.linalg.inv(right_finger_extrinsic_bullet.as_matrix()) @ right_p_local    
-
-    #     if args.debug:
-    #         # Viz
-    #         left_cam_world_depth_pc = o3d.geometry.PointCloud()
-    #         left_cam_world_depth_pc.points = o3d.utility.Vector3dVector(left_p_world[:3,:].T)
-    #         right_cam_world_depth_pc = o3d.geometry.PointCloud()
-    #         right_cam_world_depth_pc.points = o3d.utility.Vector3dVector(right_p_world[:3,:].T)
-
-    #         left_cam_world_depth_pc.colors = o3d.utility.Vector3dVector(np.tile(np.array([1, 0, 0]), (np.asarray(left_cam_world_depth_pc.points).shape[0], 1)))
-    #         right_cam_world_depth_pc.colors = o3d.utility.Vector3dVector(np.tile(np.array([0, 1, 0]), (np.asarray(right_cam_world_depth_pc.points).shape[0], 1)))
-    #         o3d.visualization.draw_geometries([left_cam_world_depth_pc, right_cam_world_depth_pc, gripper_pc, grasp_cam_world_depth_pc, pc])
 
         # Combine surface point cloud
         combined_world_points = np.hstack((p_world, left_p_world, right_p_world))
@@ -229,6 +121,7 @@ def generate_from_existing_grasps(grasp_data_entry, args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Generate surface point clouds for each grasp")
     parser.add_argument("--raw_root", type=Path)
+    parser.add_argument("n_sample_points", type=int, default=10000)
     parser.add_argument("--debug", type=bool, default=False)
     parser.add_argument("--scene", type=str, choices=["pile", "packed"], default="pile")
     parser.add_argument("--object_set", type=str, default="pile/train")
