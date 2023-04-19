@@ -21,6 +21,9 @@ python scripts/sim_grasp_multiple.py --num-view 1 --object-set pile/test --scene
 ## Different views and folders for scenes
 python scripts/sim_grasp_multiple.py --num-view 1 --object-set pile/test --scene pile --num-rounds 20 --add-noise dex --force --best --model data/runs_relevant/23-02-14-12-45_dataset\=data_pile_train_constructed_4M_HighRes_radomized_views\,augment\=False\,net\=6d_giga_hr\,batch_size\=48\,lr\=2e-04/best_vgn_giga_hr_val_acc\=0.8891.pt --resolution=64 --type giga_hr --result-path data/grasps --vis --sim-gui
 
+# Randomize scene images with and without table
+python scripts/randomize_scene_views.py /home/sjauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/pile/data_pile_train_random_raw_4M_radomized_views/ --add_table --num-proc=40
+
 # UNISURF: 
 ## DIFFERENT VIEWS - 5 scenes (to change number of scenes to 'x':: --num_grasps x)
 python scripts/generate_data_parallel.py --scene pile --object-set pile/train --num-grasps 5 --save-scene ./data/unisurf --random

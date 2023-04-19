@@ -12,13 +12,12 @@ def randomize_scene_view(mesh_pose_list_path, args):
     # Re-create the saved simulation
     sim = ClutterRemovalSim('pile', 'pile/train', gui=args.sim_gui) # parameters 'pile' and 'pile/train' are not used
     mesh_pose_list = np.load(mesh_pose_list_path, allow_pickle=True)['pc']
-    sim.setup_sim_scene_from_mesh_pose_list(mesh_pose_list)
+    sim.setup_sim_scene_from_mesh_pose_list(mesh_pose_list, table=args.add_table)
 
     # Render random scene view: depth images from random view on sphere
     depth_imgs, extrinsics = render_random_images(sim, 1) # generate single random view image (elevation: 0 to 75 degrees)
-    
     # Save to data_random_raw/scenes_randomized
-    save_root = os.path.join(args.raw, 'scenes_randomized')
+    save_root = args.save_root
     name = os.path.basename(mesh_pose_list_path) # same as scene_id
     np.savez_compressed(os.path.join(save_root,name), depth_imgs=depth_imgs, extrinsics=extrinsics)
 
@@ -89,10 +88,14 @@ if __name__ == "__main__":
     parser.add_argument("--num-proc", type=int, default=1)
     parser.add_argument("raw", type=str)
     parser.add_argument("--sim_gui", action='store_true')
+    parser.add_argument("--add_table", action='store_true')
     args = parser.parse_args()
     
     # Save to data_random_raw/scenes_randomized
-    save_root = os.path.join(args.raw, 'scenes_randomized')
-    os.makedirs(save_root)
+    if args.add_table == False:
+        args.save_root = os.path.join(args.raw, 'scenes_randomized_no_table')
+    else:
+        args.save_root = os.path.join(args.raw, 'scenes_randomized')
+    os.makedirs(args.save_root)
 
     main(args)
