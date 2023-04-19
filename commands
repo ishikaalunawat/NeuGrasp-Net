@@ -26,5 +26,8 @@ python scripts/sim_grasp_multiple.py --num-view 1 --object-set pile/test --scene
 python scripts/generate_data_parallel.py --scene pile --object-set pile/train --num-grasps 5 --save-scene ./data/unisurf --random
 
 
-# PointNetGPD
+# Train PointNetGPD
 nohup python scripts/train_pn_gpd.py --dataset data/pile/data_pile_train_constructed_4M_HighRes_radomized_views_GPG_only --dataset_raw data/pile/data_pile_train_random_raw_4M_radomized_views --epoch_length_frac 0.5 --log_wandb > nohup_logs/train_pointnetgpd_4M.out &
+
+# Generate Surface Point Clouds (GPD):
+nohup python scripts/generate_data_grasp_gpd_clouds.py --raw_root data/pile/data_pile_train_random_raw_4M_radomized_views > nohup_logs/generate_gpd_4M.out &

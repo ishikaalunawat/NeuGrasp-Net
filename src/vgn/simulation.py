@@ -308,6 +308,7 @@ class Gripper(object):
 
         self.max_opening_width = 0.08
         self.finger_depth = 0.05
+        self.height = 0.04 # Added as per PointNetGPD
         self.T_body_tcp = Transform(Rotation.identity(), [0.0, 0.0, 0.022])
         self.T_tcp_body = self.T_body_tcp.inverse()
 
