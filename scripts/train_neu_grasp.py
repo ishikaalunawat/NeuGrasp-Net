@@ -49,33 +49,34 @@ def main(args):
     if args.log_wandb:
         wandb.init(config=args, project="6dgrasp", resume=True, entity="irosa-ias", id=args.net+'_'+args.dataset.name+'_'+time_stamp, notes=note)
 
-    # # Batch size, num_worker search
-    # from time import time
-    # import multiprocessing as mp
-    # max_num_workers = mp.cpu_count()
-    # max_num_data_samples = 16384
-    # batch_size_list = [16, 32, 64, 128, 256]
-    # step_size = 4
-    # num_workers_list = np.arange(int(max_num_workers/2)-1, max_num_workers, step_size)
-    # first = True
-    # for batch_size in batch_size_list:
-    #     for num_workers in num_workers_list:
-    #         kwargs['num_workers'] = num_workers
-    #         train_loader, _ = create_train_val_loaders(args.dataset, args.dataset_raw, batch_size, args.val_split, args.augment, kwargs)
-    #         count = 0
-    #         start = time()
-    #         # for epoch in range(1, 3):            
-    #         for i, data in enumerate(train_loader, 0):
-    #             count += batch_size
-    #             if count > max_num_data_samples:
-    #                 break
-    #         end = time()
-    #         if first:
-    #             print("Skiping first run for warmup")
-    #             first = False
-    #         else:
-    #             print("Finish with:{} second, batch_size={}, num_workers={}".format(end - start, batch_size, num_workers))
-    # exit()
+    if args.test_bsize_num_workers:
+        # Batch size, num_worker search
+        from time import time
+        import multiprocessing as mp
+        max_num_workers = mp.cpu_count()
+        max_num_data_samples = 16384
+        batch_size_list = [16, 32, 64, 128, 256]
+        step_size = int(max_num_workers/4) # 4
+        num_workers_list = np.arange(int(max_num_workers/4)-1, max_num_workers, step_size)
+        first = True
+        for batch_size in batch_size_list:
+            for num_workers in num_workers_list:
+                kwargs['num_workers'] = num_workers
+                train_loader, _ = create_train_val_loaders(args.dataset, args.dataset_raw, batch_size, args.val_split, args.augment, kwargs)
+                count = 0
+                start = time()
+                # for epoch in range(1, 3):            
+                for i, data in enumerate(train_loader, 0):
+                    count += batch_size
+                    if count > max_num_data_samples:
+                        break
+                end = time()
+                if first:
+                    print("Skiping first run for warmup")
+                    first = False
+                else:
+                    print("Finish with:{} second, batch_size={}, num_workers={}".format(end - start, batch_size, num_workers))
+        exit()
 
     # create data loaders
     train_loader, val_loader = create_train_val_loaders(
@@ -324,7 +325,7 @@ if __name__ == "__main__":
     parser.add_argument("--dataset_raw", type=Path, required=True)
     parser.add_argument("--num_workers", type=int, default=10)
     parser.add_argument("--logdir", type=Path, default="data/runs")
-    parser.add_argument("--log_wandb", action="store_true")
+    parser.add_argument("--log_wandb", type=bool, default='')
     parser.add_argument("--description", type=str, default="")
     parser.add_argument("--savedir", type=str, default="")
     parser.add_argument("--epochs", type=int, default=20)
@@ -337,7 +338,8 @@ if __name__ == "__main__":
     parser.add_argument("--val_split", type=float, default=0.05, help="fraction of data used for validation")
     parser.add_argument("--augment", action="store_true")
     parser.add_argument("--silence", action="store_true")
-    parser.add_argument("--load_path", type=str, default='', help="load checkpoint network and continue")
+    parser.add_argument("--load_path", type=str, default='', help="load checkpoint network and continue")    
+    parser.add_argument("--test_bsize_num_workers", type=bool, default='')
     args, _ = parser.parse_known_args()
     print(args)
     main(args)
