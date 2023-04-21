@@ -406,6 +406,7 @@ class PickedPointDecoder(nn.Module):
     def __init__(self, dim=7, c_dim=32,
                  out_dim=1,
                  point_network='pointnet',
+                 concat_local_cloud=True,
                  sample_mode='bilinear', 
                  padding=0.1,
                  concat_feat=True):
@@ -414,8 +415,10 @@ class PickedPointDecoder(nn.Module):
         self.dim = dim # input
         self.out_dim = out_dim
         self.concat_feat = concat_feat
+        self.concat_local_cloud = concat_local_cloud
         if concat_feat:
             c_dim *= 3
+        if concat_local_cloud:
             c_dim += 3 # since we also append local grasp pc
         self.c_dim = c_dim
         self.sample_mode = sample_mode
@@ -461,8 +464,9 @@ class PickedPointDecoder(nn.Module):
             c[zero_pc_indices] *= torch.tensor(0, dtype=c.dtype, device=c.device)
         else:
             raise NotImplementedError
-        # concat grasp point cloud in local frame
-        c = torch.cat([grasps_pc_local, c], dim=2)
+        if self.concat_local_cloud:
+            # concat grasp point cloud in local frame
+            c = torch.cat([grasps_pc_local, c], dim=2)
         
         # Linear layer to encode input grasp center and orientation
         g = self.fc_g(f)

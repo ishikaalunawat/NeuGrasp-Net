@@ -56,10 +56,10 @@ def main(args):
         max_num_workers = mp.cpu_count()
         max_num_data_samples = 16384
         batch_size_list = [16, 32, 64, 128, 256]
-        step_size = int(max_num_workers/4) # 4
-        num_workers_list = np.arange(int(max_num_workers/4)-1, max_num_workers, step_size)
         first = True
         for batch_size in batch_size_list:
+            step_size = int(max_num_workers/8) # 4
+            num_workers_list = np.arange(int(max_num_workers/8)-1, min(max_num_workers,batch_size), step_size)
             for num_workers in num_workers_list:
                 kwargs['num_workers'] = num_workers
                 train_loader, _ = create_train_val_loaders(args.dataset, args.dataset_raw, batch_size, args.val_split, args.augment, kwargs)
