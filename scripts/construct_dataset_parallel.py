@@ -13,6 +13,7 @@ from vgn.utils.misc import apply_noise
 
 RESOLUTION = 64 # High Resolution
 # RESOLUTION = 40 # Low Resolution
+PCD_SIZE = 2048
 
 def process_one_scene(args, f):
     if f.suffix != ".npz":
@@ -29,12 +30,22 @@ def process_one_scene(args, f):
 
     pc = tsdf.get_cloud()
     # crop surface and borders from point cloud
-    lower = np.array([0.02 , 0.02 , 0.055])
-    upper = np.array([0.28, 0.28, 0.3])
+    # o3d.visualization.draw_geometries([pc])
+    lower = np.array([0.0 , 0.0 , 0.0])
+    upper = np.array([0.3, 0.3, 0.3])
     bounding_box = o3d.geometry.AxisAlignedBoundingBox(lower, upper)
-    pc = pc.crop(bounding_box)
-    pc = np.asarray(pc.points)
-    write_point_cloud(args.dataset, f.stem, pc)
+    pc_cropped = pc.crop(bounding_box)
+
+    # If more than max points in point cloud, uniformly sample
+    if len(pc_cropped.points) > PCD_SIZE:
+        indices = np.random.choice(np.arange(len(pc_cropped.points)), PCD_SIZE, replace=False)
+        pc_cropped = pc_cropped.select_by_index(indices)
+
+    pc_cropped = np.asarray(pc_cropped.points)
+
+    pc_final = np.zeros((PCD_SIZE, 3)) # pad zeros to have uniform size
+    pc_final[0:pc_cropped.shape[0]] = pc_cropped
+    write_point_cloud(args.dataset, f.stem, pc_final)
     return str(f.stem)
 
 def log_result(result):
