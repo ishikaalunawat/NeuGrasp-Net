@@ -18,6 +18,7 @@ def get_network(name):
         "neu_grasp_pn": NeuGraspPN,
         "neu_grasp_pn_detach": NeuGraspPNDetach,
         "neu_grasp_pn_no_local_cloud": NeuGraspPNNoLocalCloud,
+        "neu_grasp_pn_pn": NeuGraspPNPN,
         "neu_grasp_dgcnn": NeuGraspDGCNN,
         "neu_grasp_dgcnn_no_local_cloud": NeuGraspDGCNNNoLocalCloud,
     }
@@ -277,6 +278,33 @@ def NeuGraspPNNoLocalCloud():
         },
         'padding': 0,
         'c_dim': 32 
+    }
+    return get_model(config)
+
+def NeuGraspPNPN():
+    config = {
+        'encoder': 'pointnet_local_pool',
+        'encoder_kwargs': {
+            'plane_type': ['xz', 'xy', 'yz'],
+            'plane_resolution': 64,
+            'unet': True,
+            'unet_kwargs': {
+                'depth': 3,
+                'merge_mode': 'concat',
+                'start_filts': 32
+            }
+        },
+        'decoder': 'picked_points',
+        'decoder_tsdf': 'simple_local',
+        'decoder_kwargs': {
+            'dim': 7,
+            'point_network': 'pointnet',
+            'sample_mode': 'bilinear',
+            'concat_feat': True
+        },
+        'padding': 0,
+        'c_dim': 32 ,
+        'hidden_dim': 32
     }
     return get_model(config)
 
