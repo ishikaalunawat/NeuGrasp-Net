@@ -331,14 +331,14 @@ if __name__ == "__main__":
     parser.add_argument("--net", default="neu_grasp_pn")
     parser.add_argument("--dataset", type=Path, required=True)
     parser.add_argument("--dataset_raw", type=Path, required=True)
-    parser.add_argument("--num_workers", type=int, default=10)
+    parser.add_argument("--num_workers", type=int, default=23)
     parser.add_argument("--logdir", type=Path, default="data/runs")
     parser.add_argument("--log_wandb", type=bool, default='')
     parser.add_argument("--description", type=str, default="")
     parser.add_argument("--savedir", type=str, default="")
-    parser.add_argument("--epochs", type=int, default=20)
+    parser.add_argument("--epochs", type=int, default=35)
     parser.add_argument("--epoch_length_frac", type=float, default=1.0, help="fraction of training data that constitutes one epoch")
-    parser.add_argument("--batch_size", type=int, default=16)
+    parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--lr", type=float, default=2e-4)
     parser.add_argument("--lr_scheduler_patience", type=int, default=5) # How many epochs to wait before reducing lr
     parser.add_argument("--lr_scheduler_factor", type=float, default=0.5) # Reduce by this factor
