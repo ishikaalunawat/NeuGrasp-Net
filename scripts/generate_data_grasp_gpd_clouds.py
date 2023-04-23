@@ -61,16 +61,16 @@ def generate_from_existing_grasps(grasp_data_entry, args):
 
     # Find local surface point cloud around grasp
     # X limit (depth)
-    p_local = p_local[:, p_local[0,:] <  sim.gripper.finger_depth]
-    p_local = p_local[:, p_local[0,:] >  0]
+    p_local = p_local[p_local[:,0] <  sim.gripper.finger_depth]
+    p_local = p_local[p_local[:,0] >  0]
 
     # Y limit (max opening width)
-    p_local = p_local[:, p_local[1,:] <  sim.gripper.max_opening_width/2]
-    p_local = p_local[:, p_local[1,:] > -sim.gripper.max_opening_width/2]
+    p_local = p_local[p_local[:,1] <  sim.gripper.max_opening_width/2]
+    p_local = p_local[p_local[:,1] > -sim.gripper.max_opening_width/2]
 
     # Z limit (height)
-    p_local = p_local[:, p_local[2,:] <  sim.gripper.height]
-    p_local = p_local[:, p_local[2,:] >  0]
+    p_local = p_local[p_local[:,2] <  sim.gripper.height]
+    p_local = p_local[p_local[:,2] >  0]
 
     # Get 50 to 1000 points
     # If more than max points, uniformly sample
