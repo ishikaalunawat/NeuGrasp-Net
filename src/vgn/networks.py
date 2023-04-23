@@ -19,6 +19,7 @@ def get_network(name):
         "neu_grasp_pn_detach": NeuGraspPNDetach,
         "neu_grasp_pn_no_local_cloud": NeuGraspPNNoLocalCloud,
         "neu_grasp_dgcnn": NeuGraspDGCNN,
+        "neu_grasp_dgcnn_no_local_cloud": NeuGraspDGCNNNoLocalCloud,
     }
     return models[name.lower()]()
 
@@ -297,6 +298,33 @@ def NeuGraspDGCNN():
         'decoder_kwargs': {
             'dim': 7,
             'point_network': 'dgcnn',
+            'sample_mode': 'bilinear',
+            'concat_feat': True
+        },
+        'padding': 0,
+        'c_dim': 32 
+    }
+    return get_model(config)
+
+def NeuGraspDGCNNNoLocalCloud():
+    config = {
+        'encoder': 'voxel_simple_local',
+        'encoder_kwargs': {
+            'plane_type': ['xz', 'xy', 'yz'],
+            'plane_resolution': 64,
+            'unet': True,
+            'unet_kwargs': {
+                'depth': 3,
+                'merge_mode': 'concat',
+                'start_filts': 32
+            }
+        },
+        'decoder': 'picked_points',
+        'decoder_tsdf': 'simple_local',
+        'decoder_kwargs': {
+            'dim': 7,
+            'point_network': 'dgcnn',
+            'concat_local_cloud': False,
             'sample_mode': 'bilinear',
             'concat_feat': True
         },

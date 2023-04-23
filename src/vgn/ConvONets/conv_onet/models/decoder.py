@@ -144,6 +144,7 @@ class LocalDecoder(nn.Module):
         else:
             #print(p.size())
             f = p
+        zero_point_indices = p.sum(dim=2) == 0
 
         if self.c_dim != 0:
             plane_type = list(c_plane.keys())
@@ -170,6 +171,9 @@ class LocalDecoder(nn.Module):
                 if 'yz' in plane_type:
                     c += self.sample_plane_feature(p, c_plane['yz'], plane='yz')
                 c = c.transpose(1, 2)
+            # zero the features for zero points in the grasp_pc
+            c[zero_point_indices] *= torch.tensor(0, dtype=c.dtype, device=c.device)
+
 
         if self.no_xyz:
             net = torch.zeros(p.size(0), p.size(1), self.hidden_size).to(p.device)
