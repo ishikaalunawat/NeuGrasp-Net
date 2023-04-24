@@ -239,7 +239,7 @@ def loss_fn(y_pred, y):
     # loss_rot = _rot_loss_fn(rotation_pred, rotations)
     loss_width = _width_loss_fn(width_pred, width)
     loss_occ = _occ_loss_fn(occ_pred, occ)
-    loss = loss_qual + label * (0.01 * loss_width) + loss_occ # <-label * (loss_rot + 0.01 * loss_width): new one, Changed
+    loss = loss_qual + label * (0.01 * loss_width) + (3*loss_occ) # <-label * (loss_rot + 0.01 * loss_width): new one, Changed
     loss_dict = {'loss_qual': loss_qual.mean(),
                 #  'loss_rot': loss_rot.mean(),
                 'loss_width': loss_width.mean(),
