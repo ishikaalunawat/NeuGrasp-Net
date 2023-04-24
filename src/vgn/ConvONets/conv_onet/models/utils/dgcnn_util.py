@@ -17,7 +17,7 @@ def knn(x, k):
     return idx
 
 
-def get_graph_feature(x, k=20, idx=None, x_coord=None):
+def get_graph_feature(x, k=20, idx=None, x_coord=None, return_idx=False):
     batch_size = x.size(0)
     num_points = x.size(2)
     x = x.view(batch_size, -1, num_points)
@@ -26,6 +26,7 @@ def get_graph_feature(x, k=20, idx=None, x_coord=None):
             idx = knn(x, k=k)
         else:          # fixed knn graph with input point coordinates
             idx = knn(x_coord, k=k)
+    knn_idx = idx.clone()
 
     idx_base = torch.arange(0, batch_size, device=x.device).view(-1, 1, 1)*num_points
 
@@ -41,5 +42,8 @@ def get_graph_feature(x, k=20, idx=None, x_coord=None):
     x = x.view(batch_size, num_points, 1, num_dims).repeat(1, 1, k, 1)
     
     feature = torch.cat((feature-x, x), dim=3).permute(0, 3, 1, 2).contiguous()
-  
-    return feature
+    
+    if return_idx == True:
+        return feature, knn_idx
+    else:
+        return feature

@@ -213,12 +213,12 @@ def prepare_batch(batch, device):
     occ_value = occ_value.float().to(device)
 
     # Optional: also add grasp pc points to occupancy loss points
-    pos_occ = torch.cat([pos_occ,grasps_pc],dim=1)
-    grasp_point_occ_values = torch.ones(grasps_pc.shape[0],grasps_pc.shape[1]).to(device)
-    # points with all zeros have zero occupancy (and zero-ed features in the decoder)
-    zero_pc_indices = grasps_pc.sum(dim=2) == 0
-    grasp_point_occ_values[zero_pc_indices] = 0
-    occ_value = torch.cat([occ_value,grasp_point_occ_values],dim=1)
+    # pos_occ = torch.cat([pos_occ,grasps_pc],dim=1)
+    # grasp_point_occ_values = torch.ones(grasps_pc.shape[0],grasps_pc.shape[1]).to(device)
+    # # points with all zeros have zero occupancy (and zero-ed features in the decoder)
+    # zero_pc_indices = grasps_pc.sum(dim=2) == 0
+    # grasp_point_occ_values[zero_pc_indices] = 0
+    # occ_value = torch.cat([occ_value,grasp_point_occ_values],dim=1)
 
     return pc, (label, width, occ_value), (pos, rotations, grasps_pc_local, grasps_pc), pos_occ
 
@@ -331,7 +331,7 @@ if __name__ == "__main__":
     parser.add_argument("--net", default="neu_grasp_pn")
     parser.add_argument("--dataset", type=Path, required=True)
     parser.add_argument("--dataset_raw", type=Path, required=True)
-    parser.add_argument("--num_workers", type=int, default=23)
+    parser.add_argument("--num_workers", type=int, default=24)
     parser.add_argument("--logdir", type=Path, default="data/runs")
     parser.add_argument("--log_wandb", type=bool, default='')
     parser.add_argument("--description", type=str, default="")
