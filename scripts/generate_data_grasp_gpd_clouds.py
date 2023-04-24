@@ -69,8 +69,8 @@ def generate_from_existing_grasps(grasp_data_entry, args):
     p_local = p_local[p_local[:,1] > -sim.gripper.max_opening_width/2]
 
     # Z limit (height)
-    p_local = p_local[p_local[:,2] <  sim.gripper.height]
-    p_local = p_local[p_local[:,2] >  0]
+    p_local = p_local[p_local[:,2] <  sim.gripper.height/2]
+    p_local = p_local[p_local[:,2] > -sim.gripper.height/2]
 
     # Get 50 to 1000 points
     # If more than max points, uniformly sample
@@ -83,6 +83,9 @@ def generate_from_existing_grasps(grasp_data_entry, args):
         print("[Warning]: Points are too few! Skipping this grasp...")
         return False
 
+    # Convert local pointcloud to world frame    
+    p_world = transform_to_frame(p_local, grasp_tf.inverse())
+    
     # if args.debug:
     #     # viz original pc and gripper
     #     down_surface_pc.colors = o3d.utility.Vector3dVector(np.tile(np.array([1.0, 0.45, 0.]), (np.asarray(down_surface_pc.points).shape[0], 1)))
@@ -98,9 +101,9 @@ def generate_from_existing_grasps(grasp_data_entry, args):
                 grasp_id, scene_id, grasp_data_entry["qx"], grasp_data_entry["qy"], grasp_data_entry["qz"], grasp_data_entry["qw"],
                 grasp_data_entry['x'], grasp_data_entry['y'], grasp_data_entry['z'], grasp_data_entry['width'], grasp_data_entry['label'])
         # save surface point cloud
-        surface_pc_path = args.raw_root / "grasp_point_clouds" / f"{grasp_id}.npz"
-        # Saving grasp-local point clouds in gripper frame
-        np.savez_compressed(surface_pc_path, pc=np.asarray(p_local))
+        surface_pc_path = args.raw_root / "grasp_point_clouds_world" / f"{grasp_id}.npz"
+        # Saving grasp-local point clouds in world frame
+        np.savez_compressed(surface_pc_path, pc=np.asarray(p_world))
 
     if args.sim_gui:
         sim.world.p.disconnect()
@@ -140,9 +143,9 @@ if __name__ == "__main__":
         df.insert(0,'grasp_id',df.index)
     if not args.debug:
         # Create a directory for storing grasp point clouds
-        os.makedirs(args.raw_root / "grasp_point_clouds", exist_ok=True)
+        os.makedirs(args.raw_root / "grasp_point_clouds_world", exist_ok=True)
         # Crate another csv file for storing grasps that have point clouds
-        args.csv_path = args.raw_root / "grasps_with_clouds.csv"
+        args.csv_path = args.raw_root / "grasps_with_clouds_world.csv"
         if args.csv_path.exists():
             print("[Error]: CSV file with same name already exists. Exiting...")
             exit()
