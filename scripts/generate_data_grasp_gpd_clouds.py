@@ -37,6 +37,9 @@ def generate_from_existing_grasps(grasp_data_entry, args):
     pc.colors = o3d.utility.Vector3dVector(np.tile(np.array([0, 0, 0]), (np.asarray(pc.points).shape[0], 1)))
     # o3d.visualization.draw_geometries([pc])
 
+    # Voxel Downsample
+    pc = pc.voxel_down_sample(voxel_size=args.voxel_downsample_size)
+
     # Load the grasp
     pos = grasp_data_entry["x":"z"].to_numpy(np.single)
     rotation = Rotation.from_quat(grasp_data_entry["qx":"qw"].to_numpy(np.single))
@@ -101,7 +104,7 @@ def generate_from_existing_grasps(grasp_data_entry, args):
                 grasp_id, scene_id, grasp_data_entry["qx"], grasp_data_entry["qy"], grasp_data_entry["qz"], grasp_data_entry["qw"],
                 grasp_data_entry['x'], grasp_data_entry['y'], grasp_data_entry['z'], grasp_data_entry['width'], grasp_data_entry['label'])
         # save surface point cloud
-        surface_pc_path = args.raw_root / "grasp_point_clouds_world" / f"{grasp_id}.npz"
+        surface_pc_path = args.raw_root / "grasp_point_clouds_world_reduced" / f"{grasp_id}.npz"
         # Saving grasp-local point clouds in world frame
         np.savez_compressed(surface_pc_path, pc=np.asarray(p_world))
 
@@ -114,6 +117,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser("Generate surface point clouds for each grasp")
     parser.add_argument("--raw_root", type=Path)
     parser.add_argument("--sample_points", type=int, default=10000)
+    parser.add_argument("--voxel_downsample_size", type=float, default=0.005)
     parser.add_argument("--debug", type=bool, default=False)
     parser.add_argument("--scene", type=str, choices=["pile", "packed"], default="pile")
     parser.add_argument("--object_set", type=str, default="pile/train")
@@ -143,9 +147,9 @@ if __name__ == "__main__":
         df.insert(0,'grasp_id',df.index)
     if not args.debug:
         # Create a directory for storing grasp point clouds
-        os.makedirs(args.raw_root / "grasp_point_clouds_world", exist_ok=True)
+        os.makedirs(args.raw_root / "grasp_point_clouds_world_reduced", exist_ok=True)
         # Crate another csv file for storing grasps that have point clouds
-        args.csv_path = args.raw_root / "grasps_with_clouds_world.csv"
+        args.csv_path = args.raw_root / "grasps_with_clouds_world_reduced.csv"
         if args.csv_path.exists():
             print("[Error]: CSV file with same name already exists. Exiting...")
             exit()
