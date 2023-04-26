@@ -47,7 +47,7 @@ def main(args):
         note = (";").join(f.readlines()[1:5]).replace('\n', '')
 
     if args.log_wandb:
-        wandb.init(config=args, project="6dgrasp", resume=True, dir='/work/scratch/sj93qicy/potato-net', entity="irosa-ias", id=args.net+'_'+args.dataset.name+'_'+time_stamp, notes=note)
+        wandb.init(config=args, project="6dgrasp", dir='/work/scratch/sj93qicy/potato-net', entity="irosa-ias", id=args.net+'_'+args.dataset.name+'_'+time_stamp, notes=note)
 
     if args.test_bsize_num_workers:
         # Batch size, num_worker search
@@ -342,7 +342,7 @@ if __name__ == "__main__":
     parser.add_argument("--lr", type=float, default=2e-4)
     parser.add_argument("--lr_scheduler_patience", type=int, default=5) # How many epochs to wait before reducing lr
     parser.add_argument("--lr_scheduler_factor", type=float, default=0.5) # Reduce by this factor
-    parser.add_argument("--lr_scheduler_threshold", type=float, default=0.05) # Consider reducing when improved by this much percentage
+    parser.add_argument("--lr_scheduler_threshold", type=float, default=0.1) # Consider reducing when improved by this much percentage
     parser.add_argument("--val_split", type=float, default=0.05, help="fraction of data used for validation")
     parser.add_argument("--augment", action="store_true")
     parser.add_argument("--silence", action="store_true")
