@@ -22,7 +22,7 @@ def main(args):
 
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
-    kwargs = {"num_workers": args.num_workers, "pin_memory": True} if use_cuda else {}
+    kwargs = {"num_workers": args.num_workers, "pin_memory": True, "persistent_workers": True} if use_cuda else {}
 
     # create log directory
     time_stamp = datetime.now().strftime("%y-%m-%d-%H-%M-%S")
@@ -47,7 +47,7 @@ def main(args):
         note = (";").join(f.readlines()[1:5]).replace('\n', '')
 
     if args.log_wandb:
-        wandb.init(config=args, project="6dgrasp", resume=True, entity="irosa-ias", id=args.net+'_'+args.dataset.name+'_'+time_stamp, notes=note)
+        wandb.init(config=args, project="6dgrasp", resume=True, dir='/work/scratch/sj93qicy/potato-net', entity="irosa-ias", id=args.net+'_'+args.dataset.name+'_'+time_stamp, notes=note)
 
     if args.test_bsize_num_workers:
         # Batch size, num_worker search
@@ -130,7 +130,7 @@ def main(args):
 
     @trainer.on(Events.EPOCH_COMPLETED)
     def log_validation_results(engine):
-        
+        print('Starting validation run')
         evaluator.run(val_loader)
         epoch, metrics = trainer.state.epoch, evaluator.state.metrics
         # out = evaluator.state.output
