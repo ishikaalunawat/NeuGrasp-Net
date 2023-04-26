@@ -39,7 +39,7 @@ class DatasetVoxelGraspPC(torch.utils.data.Dataset):
         # Transform grasp point cloud to local frame and return this too
         grasp_pc_local = transform_to_frame(grasp_pc, Rotation.from_quat(rotation[0]), pos[0])
         
-        tsdf, y, rot = voxel_grid[0], (label, width), rotation # <- Changed to predict only grasp quality
+        tsdf, y, rot = voxel_grid[0], (label, width), rotation # Predict grasp quality, width
 
         grasp_query = (pos, rot, grasp_pc_local, grasp_pc)
         
@@ -106,7 +106,7 @@ class DatasetVoxelGraspPCOcc(torch.utils.data.Dataset):
         return tsdf, y, grasp_query, occ_points, occ
 
     def read_grasp_pc(self, grasp_id):
-        grasp_pc_path = self.raw_root / 'grasp_point_clouds' / (str(grasp_id) + '.npz')
+        grasp_pc_path = self.raw_root / 'grasp_point_clouds_world_reduced' / (str(grasp_id) + '.npz')
         grasp_pc_data = np.load(grasp_pc_path)
         grasp_pc = grasp_pc_data['pc']
         return grasp_pc

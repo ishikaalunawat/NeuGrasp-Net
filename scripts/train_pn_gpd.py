@@ -43,7 +43,7 @@ def main(args):
     else:
         logdir = Path(args.savedir)
     
-    filename = 'summary_%s.txt' % (args.dataset_raw.name)
+    filename = 'summary/summary_%s.txt' % (args.dataset_raw.name)
     with open(filename, 'r') as f:
         note = (";").join(f.readlines()[1:5]).replace('\n', '')
 
