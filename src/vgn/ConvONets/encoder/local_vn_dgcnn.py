@@ -43,7 +43,7 @@ class LocalPool_VN_DGCNN(nn.Module):
         padding (float): conventional padding paramter of ONet for unit cube, so [-0.5, 0.5] -> [-0.55, 0.55]
     '''
 
-    def __init__(self, c_dim=128, dim=3, hidden_dim=128, n_knn=10, use_dg=False, use_bnorm=False,
+    def __init__(self, c_dim=128, dim=3, hidden_dim=128, n_knn=5, use_dg=False, use_bnorm=False,
                  scatter_type='mean', unet=False, unet_kwargs=None, unet3d=False, unet3d_kwargs=None, 
                  plane_resolution=None, grid_resolution=None, plane_type=['xz', 'xy', 'yz'], padding=0.1):
         super(LocalPool_VN_DGCNN, self).__init__()
