@@ -19,6 +19,7 @@ def get_network(name):
         "neu_grasp_pn_detach": NeuGraspPNDetach,
         "neu_grasp_pn_no_local_cloud": NeuGraspPNNoLocalCloud,
         "neu_grasp_pn_pn": NeuGraspPNPN,
+        "neu_grasp_vn_pn_pn": NeuGraspVNPNPN,
         "neu_grasp_dgcnn": NeuGraspDGCNN,
         "neu_grasp_dgcnn_no_local_cloud": NeuGraspDGCNNNoLocalCloud,
         "neu_grasp_dgcnn_pn": NeuGraspDGCNNPN,
@@ -417,6 +418,32 @@ def NeuGraspVNDGCNNPN():
     }
     return get_model(config)
 
+def NeuGraspVNPNPN():
+    config = {
+        'encoder': 'vn_pointnet_local_pool',
+        'encoder_kwargs': {
+            'plane_type': ['xz', 'xy', 'yz'],
+            'plane_resolution': 64,
+            'unet': True,
+            'unet_kwargs': {
+                'depth': 3,
+                'merge_mode': 'concat',
+                'start_filts': 32
+            }
+        },
+        'decoder': 'picked_points',
+        'decoder_tsdf': 'simple_local',
+        'decoder_kwargs': {
+            'dim': 7,
+            'point_network': 'pointnet',
+            'sample_mode': 'bilinear',
+            'concat_feat': True
+        },
+        'padding': 0,
+        'c_dim': 32,
+        'hidden_dim': 128
+    }
+    return get_model(config)
 
 class Encoder(nn.Module):
     def __init__(self, in_channels, filters, kernels):

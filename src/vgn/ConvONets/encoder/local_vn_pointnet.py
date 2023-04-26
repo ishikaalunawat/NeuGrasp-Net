@@ -16,19 +16,18 @@ def meanpool(x, dim=-1, keepdim=False):
     return out
 
 
-class LocalPool_VN_DGCNN(nn.Module):
-    ''' VectorNeuron-DGCNN encoder (point-wise) with projection to local plane/grid features
+class LocalPool_VN_Pointnet(nn.Module):
+    ''' VectorNeuron-PointNet encoder (point-wise) with projection to local plane/grid features
         VectorNeuron layers provide a rotation-invariant feature representation
         Number of input points are fixed.
         Points get mean pooled locally to build the grid/plane features
-        We have the option to use a dynamic or static graph
     
     Args:
         c_dim (int): dimension of latent code c
         dim (int): input points dimension
         hidden_dim (int): hidden dimension of the network
-        n_knn (int): number of neighbors for knn graph
-        use_dg (bool): weather to use a dynamic graph (like dgcnn) or a static knn graph
+        n_knn (int): number of neighbors for input knn graph projection
+        n_blocks (int): number of blocks ResNetBlockFC layers
         use_bnorm (bool): weather to use batch normalization
         scatter_type (str): feature aggregation when doing pooling
         unet (bool): weather to use U-Net
@@ -41,25 +40,25 @@ class LocalPool_VN_DGCNN(nn.Module):
         padding (float): conventional padding paramter of ONet for unit cube, so [-0.5, 0.5] -> [-0.55, 0.55]
     '''
 
-    def __init__(self, c_dim=128, dim=3, hidden_dim=128, n_knn=5, use_dg=False, use_bnorm=False,
+    def __init__(self, c_dim=128, dim=3, hidden_dim=128, n_knn=10, n_blocks=5, use_bnorm=True,
                  scatter_type='mean', unet=False, unet_kwargs=None, unet3d=False, unet3d_kwargs=None, 
                  plane_resolution=None, grid_resolution=None, plane_type=['xz', 'xy', 'yz'], padding=0.1):
-        super(LocalPool_VN_DGCNN, self).__init__()
+        super(LocalPool_VN_Pointnet, self).__init__()
         self.c_dim = c_dim
         self.hidden_dim = hidden_dim
         self.n_knn = n_knn
-        self.use_dg = use_dg
         
-        self.pool1 = meanpool
-        self.pool2 = meanpool
-        self.pool3 = meanpool
-        self.pool4 = meanpool
-        
-        self.conv1 = VNLinearLeakyReLU(2, hidden_dim, use_batchnorm=use_bnorm)
-        self.conv2 = VNLinearLeakyReLU(hidden_dim*2, hidden_dim, use_batchnorm=use_bnorm)
-        self.conv3 = VNLinearLeakyReLU(hidden_dim*2, hidden_dim, use_batchnorm=use_bnorm)
-        self.conv4 = VNLinearLeakyReLU(hidden_dim*2, hidden_dim, use_batchnorm=use_bnorm)
-        self.conv5 = VNLinearLeakyReLU(hidden_dim*4, c_dim, dim=4, share_nonlinearity=False)
+        self.conv_pos = VNLinearLeakyReLU(3, hidden_dim, negative_slope=0.0, share_nonlinearity=False, use_batchnorm=False)
+        self.fc_pos = VNLinear(hidden_dim, hidden_dim)
+        self.block_0 = VNResnetBlockFC(hidden_dim, hidden_dim)
+        self.block_1 = VNResnetBlockFC(hidden_dim, hidden_dim)
+        self.block_2 = VNResnetBlockFC(hidden_dim, hidden_dim)
+        self.block_3 = VNResnetBlockFC(hidden_dim, hidden_dim)
+        self.block_4 = VNResnetBlockFC(hidden_dim, c_dim)
+        # self.fc_c = VNLinear(hidden_dim, c_dim)
+
+        # self.actvn_c = VNLeakyReLU(hidden_dim, negative_slope=0.0, share_nonlinearity=False)
+        self.pool = meanpool
 
         # conversion to invariant point-wise scalar features
         self.inv_std_feature = VNStdFeature(c_dim, dim=4, normalize_frame=True, use_batchnorm=False)
@@ -120,35 +119,27 @@ class LocalPool_VN_DGCNN(nn.Module):
     def forward(self, p):
         batch_size, N, D = p.size()
 
-        x = p.clone().transpose(1, 2) # dgcnn needs B x D x N
+        x = p.clone().transpose(1, 2) # pn needs B x D x N
         
         x = x.unsqueeze(1) # Add dimensions for 3D vectors
-        x, knn_idx = get_graph_feature(x, k=self.n_knn, return_idx=True)
-        x = self.conv1(x)
-        x1 = self.pool1(x)
+        feat = get_graph_feature_cross(x, k=self.n_knn)
+        net = self.conv_pos(feat)
+        net = self.pool(net, dim=-1)
 
-        if self.use_dg:
-            knn_idx = None # dynamic graph
-        else:
-            pass # keep using the first knn graph
+        net = self.fc_pos(net)
 
-        x = get_graph_feature(x1, k=self.n_knn, idx=knn_idx)
-        x = self.conv2(x)
-        x2 = self.pool2(x)
+        net = self.block_0(net)
+        # Don't pool because this will result in global features
+        # pooled = self.pool(net, dim=-1, keepdim=True).expand(net.size())
+        # net = torch.cat([net, pooled], dim=1)
 
-        x = get_graph_feature(x2, k=self.n_knn, idx=knn_idx)
-        x = self.conv3(x)
-        x3 = self.pool3(x)
-
-        x = get_graph_feature(x3, k=self.n_knn, idx=knn_idx)
-        x = self.conv4(x)
-        x4 = self.pool4(x)
-
-        x = torch.cat((x1, x2, x3, x4), dim=1)
-        x = self.conv5(x)
+        net = self.block_1(net)
+        net = self.block_2(net)
+        net = self.block_3(net)
+        net = self.block_4(net)
 
         # conversion to invariant point-wise scalar features
-        x_inv, _ = self.inv_std_feature(x) # invariant vector
+        x_inv, _ = self.inv_std_feature(net) # invariant vector
         x_inv = (x_inv * x_inv).sum(2) # norm to get scalar
 
         # latent features per-point
