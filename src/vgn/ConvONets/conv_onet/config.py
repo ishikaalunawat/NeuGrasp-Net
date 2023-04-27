@@ -64,10 +64,14 @@ def get_model(cfg, device=None, dataset=None, **kwargs):
         )
         decoders = [decoder_qual, decoder_width] # <- Changed to predict only grasp quality 
     if cfg['decoder_tsdf'] or tsdf_only:
+        if 'hidden_dim' in cfg.keys():
+            hidden_size = cfg['hidden_dim']
+        else:
+            hidden_size = 32
         decoder_tsdf = models.decoder_dict[cfg['decoder_tsdf']](dim=3,
             c_dim=c_dim, padding=padding, out_dim=1,
             sample_mode= 'bilinear',
-            hidden_size= 32,
+            hidden_size= hidden_size,
             concat_feat= True
         )
         decoders.append(decoder_tsdf)
