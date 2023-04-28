@@ -20,6 +20,7 @@ from vgn.grasp_sampler import GpgGraspSamplerPcl
 
 OBJECT_COUNT_LAMBDA = 4
 # MAX_VIEWPOINT_COUNT = 6
+RESOLUTION = 64
 
 
 def main(args, rank):
@@ -98,7 +99,7 @@ def main(args, rank):
             write_grasp(args.root, scene_id, grasp, label)
             pbar.update()
 
-        # sample remaining grasps with regular sampling
+        # Optional: sample remaining grasps with regular sampling
         for _ in range(GRASPS_PER_SCENE-len(grasps)):
             # sample and evaluate a grasp point
             point, normal = sample_grasp_point(pc, finger_depth)
@@ -124,11 +125,32 @@ def generate_from_existing_scene(mesh_pose_list_path, args):
 
     sim.save_state()
 
-    # Get scene point cloud and normals using ground truth meshes
-    scene_mesh = get_scene_from_mesh_pose_list(mesh_pose_list)
-    o3d_scene_mesh = scene_mesh.as_open3d
-    o3d_scene_mesh.compute_vertex_normals()
-    pc = o3d_scene_mesh.sample_points_uniformly(number_of_points=1000)
+    if args.partial_pc == True:
+        if args.random == True:
+            # Render random scene view: depth image from random view on sphere (elevation: 0 to 75 degrees)
+            depth_imgs, extrinsics = render_random_images(sim, 1)
+        else:
+            depth_imgs, extrinsics = render_images(sim, 1)
+        if args.save_scene:
+            # store the raw data    
+            # Save to data_random_raw/scenes
+            save_root = os.path.join(args.root,'scenes')
+            name = os.path.basename(mesh_pose_list_path) # same as scene_id
+            np.savez_compressed(os.path.join(save_root,name), depth_imgs=depth_imgs, extrinsics=extrinsics)
+            write_point_cloud(args.root, scene_id, mesh_pose_list, name="mesh_pose_list")
+        
+        # construct point cloud
+        tsdf = create_tsdf(sim.size, RESOLUTION, depth_imgs, sim.camera.intrinsic, extrinsics)
+        # voxels = tsdf.get_grid()
+        pc = tsdf.get_cloud()
+        # Downsample PC:
+        pc = pc.voxel_down_sample(voxel_size=0.005)
+    else:
+        # Get scene point cloud and normals using ground truth meshes
+        scene_mesh = get_scene_from_mesh_pose_list(mesh_pose_list)
+        o3d_scene_mesh = scene_mesh.as_open3d
+        o3d_scene_mesh.compute_vertex_normals()
+        pc = o3d_scene_mesh.sample_points_uniformly(number_of_points=1000)
 
     # # crop surface and borders from point cloud
     # bounding_box = o3d.geometry.AxisAlignedBoundingBox(sim.lower, sim.upper)
@@ -148,14 +170,14 @@ def generate_from_existing_scene(mesh_pose_list_path, args):
             # store the sample
             write_grasp(args.root, scene_id, grasp, label)
 
-    # Optional: sample remaining grasps with regular sampling
-    for _ in range(GRASPS_PER_SCENE-len(grasps)):
-        # sample and evaluate a grasp point
-        point, normal = sample_grasp_point(pc, sim.gripper.finger_depth)
-        grasp, label = evaluate_grasp_point(sim, point, normal)
+    # # Optional: sample remaining grasps with regular sampling
+    # for _ in range(GRASPS_PER_SCENE-len(grasps)):
+    #     # sample and evaluate a grasp point
+    #     point, normal = sample_grasp_point(pc, sim.gripper.finger_depth)
+    #     grasp, label = evaluate_grasp_point(sim, point, normal)
 
-        # store the sample
-        write_grasp(args.root, scene_id, grasp, label)
+    #     # store the sample
+    #     write_grasp(args.root, scene_id, grasp, label)
 
 
 def render_images(sim, n):
@@ -203,6 +225,30 @@ def render_side_images(sim, n=1, random=False):
 
     return depth_imgs, extrinsics
 
+def render_random_images(sim, n): # Adapted from render_images in scripts/generate_data_parallel.py
+    height, width = sim.camera.intrinsic.height, sim.camera.intrinsic.width
+    origin = Transform(Rotation.identity(), np.r_[sim.size / 2, sim.size / 2, 0.0])
+
+    extrinsics = np.empty((n, 7), np.float32)
+    depth_imgs = np.empty((n, height, width), np.float32)
+
+    for i in range(n):
+        r = np.random.uniform(1.6, 2.4) * sim.size
+        theta = np.random.uniform(0.0, 5* np.pi / 12.0) # elevation: 0 to 75 degrees
+        phi = np.random.uniform(0.0, 2.0 * np.pi)
+        # # Edge grasp randomizations
+        # r = np.random.uniform(2, 2.5) * sim.size
+        # theta = np.random.uniform(np.pi/4, np.pi/3)
+        # phi = np.random.uniform(0.0, 2.0 * np.pi)
+
+
+        extrinsic = camera_on_sphere(origin, r, theta, phi)
+        depth_img = sim.camera.render(extrinsic)[1]
+
+        extrinsics[i] = extrinsic.to_list()
+        depth_imgs[i] = depth_img
+
+    return depth_imgs, extrinsics
 
 def sample_grasp_point(point_cloud, finger_depth, eps=0.1):
     points = np.asarray(point_cloud.points)
@@ -273,6 +319,7 @@ if __name__ == "__main__":
     parser.add_argument("--grasps_per_scene_gpg", type=int, default=60)
     parser.add_argument("--num_proc", type=int, default=1)
     parser.add_argument("--save_scene", type=bool, default=False)
+    parser.add_argument("--partial_pc", type=bool, default=False, help="Use partial point cloud to sample grasps")
     parser.add_argument("--random", type=bool, default=False, help="Add distrubation to camera pose")
     parser.add_argument("--sim_gui", type=bool, default=False)
     args, _ = parser.parse_known_args()
