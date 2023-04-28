@@ -184,6 +184,7 @@ def generate_neur_grasp_clouds(sim, render_settings, grasps, size, tsdf, net, de
     # Normalize and convert to query for network
     p_scaled_proposal_query = ((p_proposal_world_combined)/size - 0.5).view(batch_size,-1, 3)
     # Query network
+    torch.cuda.empty_cache()
     with torch.no_grad():
         val = net.infer_occ(p_scaled_proposal_query.clone().to(device), tsdf_t)
     val = val.cpu()
@@ -220,6 +221,7 @@ def generate_neur_grasp_clouds(sim, render_settings, grasps, size, tsdf, net, de
 
     # Apply surface depth refinement step (e.g. Secant method)
     if mask.sum() > 0:
+        torch.cuda.empty_cache()
         with torch.no_grad():
             d_pred = secant(net, tsdf_t[0].unsqueeze(0), # we don't care about batch size here
                 f_low, f_high, d_low, d_high, n_secant_steps, ray0_masked,

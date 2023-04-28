@@ -11,7 +11,7 @@ from vgn.utils.misc import set_random_seed
 
 def main(args):
 
-    if args.type in ['giga', 'giga_hr', 'giga_aff', 'neu_grasp_pn', 'neu_grasp_dgcnn']:
+    if args.type in ['giga', 'giga_hr', 'giga_aff', 'neu_grasp_pn', 'neu_grasp_pn_no_local_cloud', 'neu_grasp_dgcnn']:
         grasp_planner = VGNImplicit(args.model,
                                     args.type,
                                     best=args.best,
@@ -92,7 +92,7 @@ if __name__ == "__main__":
     parser.add_argument("--seeds", type=int, nargs='+', default=[100, 0, 1, 2, 3, 4])
     parser.add_argument("--sim-gui", action="store_true")
     # parser.add_argument("--grad-refine", action="store_true")
-    parser.add_argument("--qual-th", type=float, default=0.5)
+    parser.add_argument("--qual-th", type=float, default=0.9)
     parser.add_argument("--eval-geo",
                         action="store_true",
                         help='whether evaluate geometry prediction')

@@ -187,13 +187,22 @@ class ClutterRemovalSim(object):
         if self.sideview:
             origin = Transform(Rotation.identity(), np.r_[self.size / 2, self.size / 2, self.size / 3])
             theta = np.pi / 3.0
+            r = 2.0 * self.size
         else:
             origin = Transform(Rotation.identity(), np.r_[self.size / 2, self.size / 2, 0])
             if randomize_view:
-                theta = np.random.uniform(0.0, 5* np.pi / 12.0) # elevation: 0 to 75 degrees
+                # theta = np.random.uniform(0.0, 5* np.pi / 12.0) # elevation: 0 to 75 degrees
+                theta = np.random.uniform(np.pi/4, np.pi/3) # elevation: 45 to 60 degrees
+                r = np.random.uniform(2, 2.4) * self.size
             else:
                 theta = np.pi / 6.0
-        r = 2.0 * self.size
+                r = 2.0 * self.size
+        # # randomizations of edge grasp network:
+        # r = np.random.uniform(2, 2.5) * sim.size
+        # theta = np.random.uniform(np.pi/4, np.pi/3)
+        # phi = np.random.uniform(0.0, 2*np.pi)
+
+        
 
         N = N if N else n
         if self.sideview:
@@ -207,7 +216,6 @@ class ClutterRemovalSim(object):
         for extrinsic in extrinsics:
             # Multiple views -> for getting other sides of pc
             depth_img = self.camera.render(extrinsic)[1]
-
             # add noise
             depth_img = apply_noise(depth_img, self.add_noise)
             

@@ -25,8 +25,7 @@ class VGNImplicit(object):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         # self.device = "cpu"
         self.net = load_network(model_path, self.device, model_type=model_type)
-        # set to eval mode
-        self.net.eval()
+        self.net.eval() # Set to eval mode
         self.model_type = model_type
         self.qual_th = qual_th
         self.best = best
@@ -122,7 +121,9 @@ class VGNImplicit(object):
                 num_grasps_gpg = 15
         else:
             o3d_vis = None
-            num_grasps_gpg = 40
+            # num_grasps_gpg = 40
+            num_grasps_gpg = 60
+            pc_extended = state.pc # Use only seen areas for grasp sampling
 
         if debug_data is not None:
             # debug validation
@@ -139,7 +140,7 @@ class VGNImplicit(object):
                 debug_labels.append(debug_data.loc[i, "label"])
                 # if len(grasps) >= 16:
                 #     break
-            best_only = False # Show all grasps and not just the best one
+            # best_only = False # Show all grasps and not just the best one
         else:
             # Use GPG grasp sampling:
             # Optional: Get GT point cloud from scene mesh:
@@ -154,8 +155,8 @@ class VGNImplicit(object):
             safety_dist_above_table = 0.05 # table is spawned at finger_depth
             grasps, pos_queries, rot_queries = sampler.sample_grasps(pc_extended_down, num_grasps=num_grasps_gpg, max_num_samples=180,
                                                 safety_dis_above_table=safety_dist_above_table, show_final_grasps=False, verbose=False)
-            self.qual_th = 0.5
-            best_only = False # Show all grasps and not just the best one
+            # self.qual_th = 0.9
+            # best_only = False # Show all grasps and not just the best one
 
             # Use standard GIGA grasp sampling:
             # points, normals = self.sample_grasp_points(pc_extended, self.finger_depth)
@@ -164,7 +165,6 @@ class VGNImplicit(object):
 
             if (len(pos_queries) < 2):
                 print("[Warning]: No grasps found by GPG")
-                # import pdb; pdb.set_trace()
                 if self.visualize:
                     return [], [], 0.0, scene_mesh
                 else:
@@ -208,9 +208,19 @@ class VGNImplicit(object):
                 sim.place_table(height=sim.gripper.finger_depth)
             else:
                 # Use neural rendered grasp point clouds
-                bad_indices, grasps_pc_local, grasps_pc, grasps_viz_list = generate_neur_grasp_clouds(sim, render_settings, grasps, size, tsdf_vol, 
-                                                                    self.net, self.device, scene_mesh, debug=False, o3d_vis=o3d_vis)
-
+                while(1): # Be careful with this loop, it can run forever if there is no CUDA memory available
+                    try:
+                        torch.cuda.empty_cache()
+                        bad_indices, grasps_pc_local, grasps_pc, grasps_viz_list = generate_neur_grasp_clouds(sim, render_settings, grasps, size, tsdf_vol, 
+                                                                            self.net, self.device, scene_mesh, debug=False, o3d_vis=o3d_vis)
+                    except RuntimeError as e:
+                        if "CUDA out of memory. " in str(e):
+                            print("CUDA out of memory. Trying again...")
+                            continue
+                        else:
+                            raise
+                    break
+            
             # Make separate queries for each grasp
             pos_queries = pos_queries.transpose(0,1)
             rot_queries = rot_queries.transpose(0,1)
@@ -250,12 +260,12 @@ class VGNImplicit(object):
         # qual_vol = qual_vol.reshape((self.resolution, self.resolution, self.resolution))
         # rot_queries = rot_queries.reshape((self.resolution, self.resolution, self.resolution, 4))
         # width_vol = width_vol.reshape((self.resolution, self.resolution, self.resolution))
-
+        
         if self.visualize:
             ### TODO - check affordance - visual (WEIRD)
             colored_scene_mesh = scene_mesh
             # colored_scene_mesh = visual.affordance_visual(qual_vol, rot, scene_mesh, size, self.resolution, **aff_kwargs)
-        grasps, scores, bad_grasps, bad_scores = select(qual_vol.copy(), pos_queries[0].squeeze().cpu(), rot_queries[0].squeeze().cpu(), width_vol, best_only=best_only, threshold=self.qual_th, force_detection=self.force_detection, max_filter_size=8 if self.visualize else 4)
+        grasps, scores, bad_grasps, bad_scores = select(qual_vol.copy(), pos_queries[0].squeeze().cpu(), rot_queries[0].squeeze().cpu(), width_vol, best_only=self.best, threshold=self.qual_th, force_detection=self.force_detection, max_filter_size=8 if self.visualize else 4)
         toc = time.time() - tic
 
         bad_grasps, bad_scores = np.asarray(bad_grasps), np.asarray(bad_scores)
@@ -323,9 +333,18 @@ def predict(tsdf_vol, pos, net, device, seed=0):
 
     # forward pass
     # if seed != 100:
-    net.eval()
-    with torch.no_grad():
-        qual_vol, width_vol = net(tsdf_vol, pos)
+    while(1): # Be careful with this loop, it can run forever if there is no CUDA memory available
+        try:
+            torch.cuda.empty_cache()
+            with torch.no_grad():
+                qual_vol, width_vol = net(tsdf_vol, pos)
+        except RuntimeError as e:
+            if "CUDA out of memory. " in str(e):
+                print("CUDA out of memory. Trying again...")
+                continue
+            else:
+                raise
+        break
 
     # move output back to the CPU
     qual_vol = qual_vol.cpu().squeeze().numpy()
@@ -366,21 +385,21 @@ def process(
 
 
 def select(qual_vol, center_vol, rot_vol, width_vol, threshold=0.90, max_filter_size=4, force_detection=False, best_only=False):
-    
-    bad_mask = np.where(qual_vol<LOW_TH, 1.0, 0.0)
 
-    qual_vol[qual_vol < LOW_TH] = 0.0
-    if force_detection and (qual_vol >= threshold).sum() == 0:
-        pass
-        # best_only = True
-    else:
-        # threshold on grasp quality
-        qual_vol[qual_vol < threshold] = 0.0
+    bad_mask = np.where(qual_vol<threshold, 1.0, 0.0)
+
+    # qual_vol[qual_vol < threshold] = 0.0
+    # if force_detection and (qual_vol >= threshold).sum() == 0:
+    #     pass
+    #     # best_only = True
+    # else:
+    #     # threshold on grasp quality
+    #     qual_vol[qual_vol < threshold] = 0.0
 
     # non maximum suppression. TODO: Check if needed
     # max_vol = ndimage.maximum_filter(qual_vol, size=max_filter_size)
     # qual_vol = np.where(qual_vol == max_vol, qual_vol, 0.0)
-    mask = np.where(qual_vol, 1.0, 0.0)
+    mask = np.where(qual_vol>=threshold, 1.0, 0.0)
 
     # construct grasps
     bad_grasps, bad_scores = [], []
