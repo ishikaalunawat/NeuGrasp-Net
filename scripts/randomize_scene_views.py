@@ -32,6 +32,11 @@ def render_random_images(sim, n): # Adapted from render_images in scripts/genera
         r = np.random.uniform(1.6, 2.4) * sim.size
         theta = np.random.uniform(0.0, 5* np.pi / 12.0) # elevation: 0 to 75 degrees
         phi = np.random.uniform(0.0, 2.0 * np.pi)
+        # # Edge grasp randomizations
+        # r = np.random.uniform(2, 2.5) * sim.size
+        # theta = np.random.uniform(np.pi/4, np.pi/3)
+        # phi = np.random.uniform(0.0, 2.0 * np.pi)
+
 
         extrinsic = camera_on_sphere(origin, r, theta, phi)
         depth_img = sim.camera.render(extrinsic)[1]
