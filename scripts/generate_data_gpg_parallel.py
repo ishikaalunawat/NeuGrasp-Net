@@ -126,17 +126,18 @@ def generate_from_existing_scene(mesh_pose_list_path, args):
     sim.save_state()
 
     if args.partial_pc == True:
+        sim.world.remove_body(sim.world.bodies[0]) # remove table because we dont want to render it # normally table is the first body
         if args.random == True:
             # Render random scene view: depth image from random view on sphere (elevation: 0 to 75 degrees)
             depth_imgs, extrinsics = render_random_images(sim, 1)
         else:
             depth_imgs, extrinsics = render_images(sim, 1)
+        sim.place_table(height=sim.gripper.finger_depth) # Add table back
         if args.save_scene:
             # store the raw data    
             # Save to data_random_raw/scenes
-            save_root = os.path.join(args.root,'scenes')
             name = os.path.basename(mesh_pose_list_path) # same as scene_id
-            np.savez_compressed(os.path.join(save_root,name), depth_imgs=depth_imgs, extrinsics=extrinsics)
+            np.savez_compressed(os.path.join(args.save_root,name), depth_imgs=depth_imgs, extrinsics=extrinsics)
             write_point_cloud(args.root, scene_id, mesh_pose_list, name="mesh_pose_list")
         
         # construct point cloud
@@ -323,7 +324,6 @@ if __name__ == "__main__":
     parser.add_argument("--random", type=bool, default=False, help="Add distrubation to camera pose")
     parser.add_argument("--sim_gui", type=bool, default=False)
     args, _ = parser.parse_known_args()
-    args.save_scene = True
 
     if args.use_previous_scenes:
         if args.previous_root is None:
@@ -332,6 +332,11 @@ if __name__ == "__main__":
         # Write GPG grasp sampler parameters
         (args.root).mkdir(parents=True)
         write_json(GpgGraspSamplerPcl().params, args.root / "gpg_setup.json")
+
+        if args.save_scene:
+            args.save_root = os.path.join(args.root,'scenes')
+            os.makedirs(args.save_root)
+            (args.root / "mesh_pose_list").mkdir(parents=True)
         
         mesh_list_files = glob.glob(os.path.join(args.previous_root, 'mesh_pose_list', '*.npz'))
         global g_completed_jobs
