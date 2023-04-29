@@ -112,8 +112,8 @@ class DatasetVoxelGraspPCOcc(torch.utils.data.Dataset):
             grasp_pc_occ_points = grasp_pc_occ_points / self.size - 0.5
             # Make sure size is always the same. Pad zeros
             if grasp_pc_occ_points.shape[0] < self.max_points_grasp_pc:
+                grasp_pc_occ = np.hstack((grasp_pc_occ, np.zeros(self.max_points_grasp_pc - grasp_pc_occ_points.shape[0], dtype=bool)))
                 grasp_pc_occ_points = np.vstack((grasp_pc_occ_points, np.zeros((self.max_points_grasp_pc - grasp_pc_occ_points.shape[0], 3))))
-                grasp_pc_occ = np.vstack((grasp_pc_occ, np.zeros(self.max_points_grasp_pc - grasp_pc_occ_points.shape[0])))
             occ_points = np.concatenate([occ_points, grasp_pc_occ_points])
             occ = np.concatenate([occ, grasp_pc_occ])
 
