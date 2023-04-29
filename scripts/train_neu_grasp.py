@@ -42,12 +42,12 @@ def main(args):
     else:
         logdir = Path(args.savedir)
     
-    filename = 'summary_%s.txt' % (args.dataset_raw.name)
-    with open(filename, 'r') as f:
-        note = (";").join(f.readlines()[1:5]).replace('\n', '')
+    # filename = 'summary_%s.txt' % (args.dataset_raw.name)
+    # with open(filename, 'r') as f:
+    #     note = (";").join(f.readlines()[1:5]).replace('\n', '')
 
     if args.log_wandb:
-        wandb.init(config=args, project="6dgrasp", dir='/work/scratch/sj93qicy/potato-net', entity="irosa-ias", id=args.net+'_'+args.dataset.name+'_'+time_stamp, notes=note)
+        wandb.init(config=args, project="6dgrasp", dir='/work/scratch/sj93qicy/potato-net', entity="irosa-ias", id=args.net+'_'+args.dataset.name+'_'+time_stamp)#, notes=note)
 
     if args.test_bsize_num_workers:
         # Batch size, num_worker search
@@ -80,7 +80,7 @@ def main(args):
 
     # create data loaders
     train_loader, val_loader = create_train_val_loaders(
-        args.dataset, args.dataset_raw, args.batch_size, args.val_split, args.augment, kwargs)
+        args.dataset, args.dataset_raw, args.batch_size, args.val_split, args.net_with_grasp_occ, kwargs)
 
     # build the network or load
     if args.load_path == '':
@@ -179,10 +179,10 @@ def main(args):
     trainer.run(train_loader, max_epochs=args.epochs, epoch_length=epoch_length)
 
 
-def create_train_val_loaders(root, root_raw, batch_size, val_split, augment, kwargs):
+def create_train_val_loaders(root, root_raw, batch_size, val_split, net_with_grasp_occ, kwargs):
     # load the dataset
 
-    dataset = DatasetVoxelGraspPCOcc(root, root_raw)
+    dataset = DatasetVoxelGraspPCOcc(root, root_raw, use_grasp_occ=net_with_grasp_occ)
 
     # split into train and validation sets
     val_size = int(val_split * len(dataset))
@@ -211,14 +211,6 @@ def prepare_batch(batch, device):
     grasps_pc = grasps_pc.float().to(device)
     pos_occ = pos_occ.float().to(device)
     occ_value = occ_value.float().to(device)
-
-    # Optional: also add grasp pc points to occupancy loss points
-    # pos_occ = torch.cat([pos_occ,grasps_pc],dim=1)
-    # grasp_point_occ_values = torch.ones(grasps_pc.shape[0],grasps_pc.shape[1]).to(device)
-    # # points with all zeros have zero occupancy (and zero-ed features in the decoder)
-    # zero_pc_indices = grasps_pc.sum(dim=2) == 0
-    # grasp_point_occ_values[zero_pc_indices] = 0
-    # occ_value = torch.cat([occ_value,grasp_point_occ_values],dim=1)
 
     return pc, (label, width, occ_value), (pos, rotations, grasps_pc_local, grasps_pc), pos_occ
 
@@ -329,6 +321,7 @@ def create_summary_writers(net, device, log_dir):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--net", default="neu_grasp_pn")
+    parser.add_argument("--net_with_grasp_occ", type=bool, default='', help="Also use grasp pc occupancy values")
     parser.add_argument("--dataset", type=Path, required=True)
     parser.add_argument("--dataset_raw", type=Path, required=True)
     parser.add_argument("--num_workers", type=int, default=24)
@@ -339,7 +332,7 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=35)
     parser.add_argument("--epoch_length_frac", type=float, default=1.0, help="fraction of training data that constitutes one epoch")
     parser.add_argument("--batch_size", type=int, default=32)
-    parser.add_argument("--lr", type=float, default=2e-4)
+    parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--lr_scheduler_patience", type=int, default=5) # How many epochs to wait before reducing lr
     parser.add_argument("--lr_scheduler_factor", type=float, default=0.5) # Reduce by this factor
     parser.add_argument("--lr_scheduler_threshold", type=float, default=0.1) # Consider reducing when improved by this much percentage

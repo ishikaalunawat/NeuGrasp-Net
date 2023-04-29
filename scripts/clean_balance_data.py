@@ -38,13 +38,13 @@ def main(args):
     df = df.drop(i)
     write_df(df, root)
 
-    # remove unreferenced scenes.
+    # Optional: remove unreferenced scenes.
     # df = read_df(root)
-    scenes = df["scene_id"].values
-    for f in (root / "scenes").iterdir():
-        if f.suffix == ".npz" and f.stem not in scenes:
-            print("Removed", f)
-            f.unlink()
+    # scenes = df["scene_id"].values
+    # for f in (root / "scenes").iterdir():
+    #     if f.suffix == ".npz" and f.stem not in scenes:
+    #         print("Removed", f)
+    #         f.unlink()
 
     # print
     df = read_df(root)
