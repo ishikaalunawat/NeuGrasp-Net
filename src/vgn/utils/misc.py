@@ -17,7 +17,7 @@ def set_random_seed(seed=0):
 
 def apply_noise(img, noise_type, gp_rate=0.5):
     if noise_type == 'mod_dex':
-        return apply_mod_dex_noise(img, gp_rate=gp_rate)
+        return apply_mod_dex_noise(img)
     elif noise_type == 'dex':
         return apply_dex_noise(img, gp_rate=gp_rate)
     elif noise_type =='trans':
@@ -33,9 +33,9 @@ def apply_mod_dex_noise(img,
                 gp_sigma=0.005,
                 gp_scale=4.0,
                 gp_rate=0.5):
-    gamma_noise = 2 - np.random.gamma(gamma_shape, gamma_scale)
+    gamma_noise = np.random.gamma(gamma_shape, gamma_scale)
     img = img * gamma_noise
-    if np.random.rand() < gp_rate:
+    if True: # Removed np.random.rand() < gp_rate:
         h, w = img.shape[:2]
         gp_sample_height = int(h / gp_scale)
         gp_sample_width = int(w / gp_scale)

@@ -185,7 +185,7 @@ class ClutterRemovalSim(object):
         high_res_tsdf = TSDFVolume(self.size, 120)
 
         if self.sideview:
-            origin = Transform(Rotation.identity(), np.r_[self.size / 2, self.size / 2, self.size / 3])
+            # origin = Transform(Rotation.identity(), np.r_[self.size / 2, self.size / 2, self.size / 3])
             theta = np.pi / 3.0
             r = 2.0 * self.size
         else:
