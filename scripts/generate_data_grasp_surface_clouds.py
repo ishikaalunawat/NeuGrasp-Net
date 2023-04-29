@@ -81,7 +81,7 @@ if __name__ == "__main__":
     parser.add_argument("--voxel_downsample_size", type=float, default=0.002) # 2mm
     parser.add_argument("--max_points", type=int, default=1023)
     parser.add_argument("--min_points", type=int, default=50)
-    parser.add_argument("--add_noise", type=bool, default=False, help="Add dex noise to point clouds and depth images")
+    parser.add_argument("--add_noise", type=bool, default='', help="Add dex noise to point clouds and depth images")
     parser.add_argument("--save_occ_values", type=bool, default='', help="Also save the occupancy values of the grasp clpud")    
     parser.add_argument("--sim_gui", type=bool, default=False)
     args, _ = parser.parse_known_args()
@@ -110,14 +110,14 @@ if __name__ == "__main__":
     print('Num grasps in raw dataset: %d' % len(df))
     if 'grasp_id' not in df.columns:
         # Add a column for grasp id. Use index values
-        df.insert(0,'grasp_id',df.index+1371786)
+        df.insert(0,'grasp_id',df.index)
     if not args.debug:
         # Create a directory for storing grasp point clouds
         os.makedirs(args.raw_root / "grasp_point_clouds_noisy", exist_ok=True)
         if args.save_occ_values == True:
             os.makedirs(args.raw_root / "occ_grasp_point_clouds_noisy", exist_ok=True)
         # Crate another csv file for storing grasps that have point clouds
-        args.csv_path = args.raw_root / "grasps_gpg_partial_with_clouds.csv"
+        args.csv_path = args.raw_root / "grasps_gpg_balanced_with_clouds_noisy.csv"
         if args.csv_path.exists():
             print("[Error]: CSV file with same name already exists. Exiting...")
             exit()
