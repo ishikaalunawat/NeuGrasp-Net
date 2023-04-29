@@ -10,6 +10,8 @@ nohup python scripts/sim_grasp_multiple.py --num-view 1 --object-set pile/test -
 # dataset creation
 python scripts/generate_data_parallel.py --scene pile --object-set pile/train --num-grasps 4000000 --num-proc 40 --save-scene ./data/pile/data_pile_train_random_raw_4M
 
+python generate_data_gpg_parallel.py --root /work/scratch/sj93qicy/potato-net/data/pile/data_pile_train_random_raw_4M_GPG_60_PARTIAL --use_previous_scenes True --previous_root /work/scratch/sj93qicy/potato-net/data/pile/data_pile_train_random_raw_4M_GPG_60 --num_proc 96 --grasps_per_scene 60 --grasps_per_scene_gpg 60 --partial_pc True --save_scene True --random True
+
 nohup python scripts/clean_balance_data.py ./data/pile/data_pile_train_random_raw_4M > nohup_logs/dataset4M_2.out &
 
 nohup python scripts/construct_dataset_parallel.py --num-proc 40 --single-view --add-noise dex ./data/pile/data_pile_train_random_raw_4M ./data/pile/data_pile_train_constructed_4M > nohup_logs/dataset4M_3.out &

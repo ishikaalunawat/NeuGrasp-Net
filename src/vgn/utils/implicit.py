@@ -91,6 +91,15 @@ def sample_iou_points(mesh_list, bounds, num_point, padding=0.02, uniform=False,
 
     return points, occ
 
+def get_occ_specific_points(mesh_list, points):
+    num_point = points.shape[0]
+    occ = np.zeros(num_point).astype(bool)
+    for mesh in mesh_list:
+        occi = check_mesh_contains(mesh, points)
+        occ = occ | occi
+    
+    return points, occ
+    
 def get_occ_from_world(world, object_set):
     mesh_pose_list = get_mesh_pose_list_from_world(world, object_set)
     scene, mesh_list = get_scene_from_mesh_pose_list(mesh_pose_list, return_list=True)

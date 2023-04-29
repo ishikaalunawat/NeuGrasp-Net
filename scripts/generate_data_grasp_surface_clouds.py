@@ -11,7 +11,7 @@ from vgn.perception import *
 from vgn.grasp import Grasp
 from vgn.simulation import ClutterRemovalSim
 from vgn.utils.transform import Rotation, Transform
-from vgn.utils.implicit import get_scene_from_mesh_pose_list, as_mesh
+from vgn.utils.implicit import get_scene_from_mesh_pose_list, as_mesh, get_occ_specific_points
 from vgn.utils.misc import apply_noise
 from vgn.grasp_renderer import generate_gt_grasp_cloud
 
@@ -50,9 +50,18 @@ def generate_from_existing_grasps(grasp_data_entry, args, render_settings):
                     grasp_id, scene_id, grasp_data_entry["qx"], grasp_data_entry["qy"], grasp_data_entry["qz"], grasp_data_entry["qw"],
                     grasp_data_entry['x'], grasp_data_entry['y'], grasp_data_entry['z'], grasp_data_entry['width'], grasp_data_entry['label'])
             # save surface point cloud
-            surface_pc_path = args.raw_root / "grasp_point_clouds" / f"{grasp_id}.npz"
+            surface_pc_path = args.raw_root / "grasp_point_clouds_noisy" / f"{grasp_id}.npz"
             np.savez_compressed(surface_pc_path, pc=grasp_pc)
             
+            if args.save_occ_values:
+                # Also get occupancies of the points and save these occupancy values
+                scene, mesh_list = get_scene_from_mesh_pose_list(mesh_pose_list, return_list=True)
+                points, occ = get_occ_specific_points(mesh_list, grasp_pc)
+
+                # save occupancy values
+                surface_pc_occ_path = args.raw_root / "occ_grasp_point_clouds_noisy" / f"{grasp_id}.npz"
+                np.savez_compressed(surface_pc_occ_path, points=points, occ=occ)
+        
         return True
     else:
         # Points are too few! Skipping this grasp...
@@ -73,6 +82,7 @@ if __name__ == "__main__":
     parser.add_argument("--max_points", type=int, default=1023)
     parser.add_argument("--min_points", type=int, default=50)
     parser.add_argument("--add_noise", type=bool, default=False, help="Add dex noise to point clouds and depth images")
+    parser.add_argument("--save_occ_values", type=bool, default='', help="Also save the occupancy values of the grasp clpud")    
     parser.add_argument("--sim_gui", type=bool, default=False)
     args, _ = parser.parse_known_args()
 
@@ -100,12 +110,14 @@ if __name__ == "__main__":
     print('Num grasps in raw dataset: %d' % len(df))
     if 'grasp_id' not in df.columns:
         # Add a column for grasp id. Use index values
-        df.insert(0,'grasp_id',df.index)
+        df.insert(0,'grasp_id',df.index+1371786)
     if not args.debug:
         # Create a directory for storing grasp point clouds
-        os.makedirs(args.raw_root / "grasp_point_clouds", exist_ok=True)
+        os.makedirs(args.raw_root / "grasp_point_clouds_noisy", exist_ok=True)
+        if args.save_occ_values == True:
+            os.makedirs(args.raw_root / "occ_grasp_point_clouds_noisy", exist_ok=True)
         # Crate another csv file for storing grasps that have point clouds
-        args.csv_path = args.raw_root / "grasps_with_clouds.csv"
+        args.csv_path = args.raw_root / "grasps_gpg_partial_with_clouds.csv"
         if args.csv_path.exists():
             print("[Error]: CSV file with same name already exists. Exiting...")
             exit()
