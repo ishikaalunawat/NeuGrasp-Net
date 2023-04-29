@@ -76,14 +76,14 @@ def main(args):
     assert np.isclose(size, 6.0 * finger_depth)
     voxel_size = size / RESOLUTION
 
-    # create df
-    df = read_df(args.raw)
-    df["x"] /= voxel_size
-    df["y"] /= voxel_size
-    df["z"] /= voxel_size
-    df["width"] /= voxel_size
-    df = df.rename(columns={"x": "i", "y": "j", "z": "k"})
-    write_df(df, args.dataset)
+    # Optional: create new df
+    # df = read_df(args.raw)
+    # df["x"] /= voxel_size
+    # df["y"] /= voxel_size
+    # df["z"] /= voxel_size
+    # df["width"] /= voxel_size
+    # df = df.rename(columns={"x": "i", "y": "j", "z": "k"})
+    # write_df(df, args.dataset)
 
     g_num_completed_jobs = []
     file_list = list((args.raw / "scenes").iterdir())
