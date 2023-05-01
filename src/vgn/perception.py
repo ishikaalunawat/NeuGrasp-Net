@@ -67,11 +67,14 @@ class CameraIntrinsic(object):
 class TSDFVolume(object):
     """Integration of multiple depth images using a TSDF."""
 
-    def __init__(self, size, resolution):
+    def __init__(self, size, resolution, sdf_trunc=None):
         self.size = size
         self.resolution = resolution
         self.voxel_size = self.size / self.resolution
-        self.sdf_trunc = 4 * self.voxel_size
+        if sdf_trunc is None:
+            self.sdf_trunc = 4 * self.voxel_size
+        else:
+            self.sdf_trunc = sdf_trunc
 
         self._volume = o3d.pipelines.integration.UniformTSDFVolume(
             length=self.size,
