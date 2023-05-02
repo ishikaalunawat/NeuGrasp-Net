@@ -272,8 +272,9 @@ def render_images(sim, n):
     extrinsics = np.empty((n, 7), np.float32)
     depth_imgs = np.empty((n, height, width), np.float32)
     for i in range(n):
-        r = np.random.uniform(1.5, 2.5) * sim.size
-        theta = np.random.uniform(np.pi/4, np.pi/3)
+        # Changed to neuGrasp
+        r = np.random.uniform(1.6, 2.4) * sim.size 
+        theta = np.random.uniform(0, 5* np.pi / 12.0)
         phi = np.random.uniform(0.0, 2.0 * np.pi)
         extrinsic = camera_on_sphere(origin, r, theta, phi)
         depth_img = sim.camera.render(extrinsic)[1]
