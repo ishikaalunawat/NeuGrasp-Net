@@ -13,6 +13,7 @@ def get_network(name):
         "giga_aff": GIGAAff,
         "giga": GIGA,
         "giga_hr": GIGAHighRes,
+        "giga_hr_deeper": GIGAHighResDeeper,
         "giga_geo": GIGAGeo,
         "giga_detach": GIGADetach,
         "neu_grasp_pn": NeuGraspPN,
@@ -21,7 +22,9 @@ def get_network(name):
         "neu_grasp_pn_no_local_cloud": NeuGraspPNNoLocalCloud,
         "neu_grasp_pn_pn": NeuGraspPNPN,
         "neu_grasp_vn_pn_pn": NeuGraspVNPNPN,
+        "neu_grasp_vn_pn_pn_deeper": NeuGraspVNPNPNDeeper,
         "neu_grasp_dgcnn": NeuGraspDGCNN,
+        "neu_grasp_dgcnn_deeper": NeuGraspDGCNNDeeper,
         "neu_grasp_dgcnn_no_local_cloud": NeuGraspDGCNNNoLocalCloud,
         "neu_grasp_dgcnn_pn": NeuGraspDGCNNPN,
         "neu_grasp_vn_dgcnn_pn": NeuGraspVNDGCNNPN,
@@ -148,6 +151,33 @@ def GIGAHighRes():
         },
         'padding': 0,
         'c_dim': 32 
+    }
+    return get_model(config)
+
+def GIGAHighResDeeper():
+    config = {
+        'encoder': 'voxel_simple_local',
+        'encoder_kwargs': {
+            'plane_type': ['xz', 'xy', 'yz'],
+            'plane_resolution': 64,
+            'unet': True,
+            'unet_kwargs': {
+                'depth': 5,
+                'merge_mode': 'concat',
+                'start_filts': 64
+            }
+        },
+        'decoder': 'simple_local',
+        'decoder_tsdf': 'simple_local',
+        'decoder_kwargs': {
+            'dim': 7, # <- 3:7 Changed to predict only grasp quality
+            'sample_mode': 'bilinear',
+            'hidden_size': 256,
+            'concat_feat': True
+        },
+        'padding': 0,
+        'c_dim': 128,
+        'hidden_size': 256, 
     }
     return get_model(config)
 
@@ -365,6 +395,33 @@ def NeuGraspDGCNN():
     }
     return get_model(config)
 
+def NeuGraspDGCNNDeeper():
+    config = {
+        'encoder': 'voxel_simple_local',
+        'encoder_kwargs': {
+            'plane_type': ['xz', 'xy', 'yz'],
+            'plane_resolution': 64,
+            'unet': True,
+            'unet_kwargs': {
+                'depth': 5,
+                'merge_mode': 'concat',
+                'start_filts': 64
+            }
+        },
+        'decoder': 'picked_points',
+        'decoder_tsdf': 'simple_local',
+        'decoder_kwargs': {
+            'dim': 7,
+            'point_network': 'dgcnn',
+            'sample_mode': 'bilinear',
+            'concat_feat': True
+        },
+        'padding': 0,
+        'c_dim': 128,
+        'hidden_dim': 256 # for simple_local decoder
+    }
+    return get_model(config)
+
 def NeuGraspDGCNNNoLocalCloud():
     config = {
         'encoder': 'voxel_simple_local',
@@ -470,6 +527,33 @@ def NeuGraspVNPNPN():
         'padding': 0,
         'c_dim': 32,
         'hidden_dim': 128
+    }
+    return get_model(config)
+
+def NeuGraspVNPNPNDeeper():
+    config = {
+        'encoder': 'vn_pointnet_local_pool',
+        'encoder_kwargs': {
+            'plane_type': ['xz', 'xy', 'yz'],
+            'plane_resolution': 64,
+            'unet': True,
+            'unet_kwargs': {
+                'depth': 5,
+                'merge_mode': 'concat',
+                'start_filts': 64
+            }
+        },
+        'decoder': 'picked_points',
+        'decoder_tsdf': 'simple_local',
+        'decoder_kwargs': {
+            'dim': 7,
+            'point_network': 'pointnet',
+            'sample_mode': 'bilinear',
+            'concat_feat': True
+        },
+        'padding': 0,
+        'c_dim': 128,
+        'hidden_dim': 256 # for simple_local decoder
     }
     return get_model(config)
 
