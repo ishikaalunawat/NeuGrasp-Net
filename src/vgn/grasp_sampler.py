@@ -102,7 +102,8 @@ class GpgGraspSamplerPcl():
         self.params['gripper_hand_depth'] = gripper_hand_depth
         self.params['debug_vis'] = debug_vis
 
-    def sample_grasps(self, point_cloud, num_grasps=20, max_num_samples=180, safety_dis_above_table=0.005, show_final_grasps=False, verbose=False,
+    def sample_grasps(self, point_cloud, num_grasps=20, max_num_samples=180, safety_dis_above_table=0.005,
+                       show_final_grasps=False, verbose=False, return_origin_point=False,
                       **kwargs):
         """
         Returns a list of candidate grasps for the given point cloud.
@@ -136,6 +137,8 @@ class GpgGraspSamplerPcl():
         potential_grasps_vgn_pos = []
         potential_grasps_vgn_rot_quat = []
         processed_potential_grasps_vgn = []
+        if return_origin_point:
+            origin_points = []
 
         hand_points = self.get_hand_points(np.array([0, 0, 0]), np.array([1, 0, 0]), np.array([0, 1, 0]))
 
@@ -316,6 +319,9 @@ class GpgGraspSamplerPcl():
                                 potential_grasps_vgn_rot_quat.append(curr_grasp_rot.as_quat())  # quaternion
                                 processed_potential_grasps_vgn.append(curr_grasp)
 
+                                if return_origin_point:
+                                    origin_points.append(selected_surface)
+
                                 if self.params['debug_vis']:
                                     # Show grasp and the surface point with open3d
                                     self.show_grasps_and_pcl_open3d([curr_grasp], point_cloud)
@@ -335,12 +341,18 @@ class GpgGraspSamplerPcl():
                 if show_final_grasps:
                     # Show all grasps and the surface point cloud with open3d
                     self.show_grasps_and_pcl_open3d(processed_potential_grasps_vgn, point_cloud)
-                return processed_potential_grasps_vgn, potential_grasps_vgn_pos, potential_grasps_vgn_rot_quat
+                if return_origin_point:
+                    return processed_potential_grasps_vgn, potential_grasps_vgn_pos, potential_grasps_vgn_rot_quat, origin_points
+                else:
+                    return processed_potential_grasps_vgn, potential_grasps_vgn_pos, potential_grasps_vgn_rot_quat
 
         if show_final_grasps:
             # Show all grasps and the surface point cloud with open3d
             self.show_grasps_and_pcl_open3d(processed_potential_grasps_vgn, point_cloud)
-        return processed_potential_grasps_vgn, potential_grasps_vgn_pos, potential_grasps_vgn_rot_quat
+        if return_origin_point:
+            return processed_potential_grasps_vgn, potential_grasps_vgn_pos, potential_grasps_vgn_rot_quat, origin_points
+        else:
+            return processed_potential_grasps_vgn, potential_grasps_vgn_pos, potential_grasps_vgn_rot_quat
 
     def show_grasps_and_pcl_open3d(self, grasps, point_cloud):
         grasps_scene = trimesh.Scene()
