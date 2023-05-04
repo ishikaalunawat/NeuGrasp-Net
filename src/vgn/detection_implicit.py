@@ -15,13 +15,13 @@ from vgn.utils import visual
 import trimesh
 from vgn.grasp_sampler import GpgGraspSamplerPcl
 from vgn.grasp_renderer import generate_gt_grasp_cloud, generate_neur_grasp_clouds
+from vgn.scene_renderer import get_scene_surf_render
 
-LOW_TH = 0.5
 axes_cond = lambda x,z: np.isclose(np.abs(np.dot(x, z)), 1.0, 1e-4)
 
 
 class VGNImplicit(object):
-    def __init__(self, model_path, model_type, best=False, force_detection=False, qual_th=0.9, out_th=0.5, visualize=False, resolution=40, **kwargs):
+    def __init__(self, model_path, model_type, best=False, force_detection=False, qual_th=0.5, out_th=0.5, visualize=False, resolution=40, **kwargs):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         # self.device = "cpu"
         self.net = load_network(model_path, self.device, model_type=model_type)
@@ -106,24 +106,60 @@ class VGNImplicit(object):
 
         tic = time.time()
 
-        if o3d_vis is not None:
-            # Running simulation of the scene, grasps generated and grasp clouds
-            state.pc.colors = o3d.utility.Vector3dVector(np.tile(np.array([0, 0, 0]), (np.asarray(state.pc.points).shape[0], 1)))
-            if first_call:
-                o3d_vis.add_geometry(state.pc, reset_bounding_box=True) # HACK TO SET O3D CAMERA VIEW for seed 100!!
-                o3d_vis.poll_events()
-                o3d_vis.update_renderer()
-                return [], [], 0.0, scene_mesh
-            else:
-                o3d_vis.add_geometry(state.pc, reset_bounding_box=False) # input point cloud
-                pc_extended = state.pc # Use only seen areas for grasp sampling
-                o3d_vis.poll_events()
-                num_grasps_gpg = 15
-        else:
-            o3d_vis = None
-            # num_grasps_gpg = 40
-            num_grasps_gpg = 60
-            pc_extended = state.pc # Use only seen areas for grasp sampling
+        ## Get scene render
+        while(1): # Be careful with this loop, it can run forever if there is no CUDA memory available
+            try:
+                torch.cuda.empty_cache()
+                if o3d_vis is not None:
+                    # Running simulation of the scene, grasps generated and grasp clouds
+                    state.pc.colors = o3d.utility.Vector3dVector(np.tile(np.array([0, 0, 0]), (np.asarray(state.pc.points).shape[0], 1)))
+                    if first_call:
+                        o3d_vis.add_geometry(state.pc, reset_bounding_box=True) # HACK TO SET O3D CAMERA VIEW for seed 100!!
+                        o3d_vis.poll_events()
+                        o3d_vis.update_renderer()
+                        return [], [], 0.0, scene_mesh
+                    else:
+                        # Viz input point cloud
+                        o3d_vis.add_geometry(state.pc, reset_bounding_box=False) # point cloud
+                        o3d_vis.poll_events()
+                        # pc_extended = state.pc # Use only seen areas for grasp sampling
+                        # Use full rendered cloud for grasp sampling
+                        pc_extended = get_scene_surf_render(sim, size, self.resolution, self.net, tsdf_vol, device=self.device)
+                        o3d_vis.add_geometry(pc_extended, reset_bounding_box=False) # point cloud
+                        o3d_vis.poll_events()
+                        # num_grasps_gpg = 20
+                        num_grasps_gpg = 60
+                else:
+                    o3d_vis = None
+                    # num_grasps_gpg = 40
+                    num_grasps_gpg = 60
+                    # pc_extended = state.pc # Use only seen areas for grasp sampling
+                    # Use full rendered cloud for grasp sampling
+                    # pc_extended = get_scene_surf_render(sim, size, self.resolution, self.net, tsdf_vol, device=self.device)
+            except RuntimeError as e:
+                if "CUDA out of memory. " in str(e):
+                    print("CUDA out of memory. Trying again...")
+                    continue
+                else:
+                    raise
+            break
+        
+        ## Test with point input?
+        point_input = False
+        if point_input:
+            lower = np.array([0.0 , 0.0 , 0.0])
+            upper = np.array([0.3, 0.3, 0.3])
+            bounding_box = o3d.geometry.AxisAlignedBoundingBox(lower, upper)
+            pc_cropped = state.pc.crop(bounding_box)
+            # If more than max points in point cloud, uniformly sample
+            if len(pc_cropped.points) > 2048:
+                indices = np.random.choice(np.arange(len(pc_cropped.points)), 2048, replace=False)
+                pc_cropped = pc_cropped.select_by_index(indices)
+            pc_cropped = np.asarray(pc_cropped.points)
+            pc_final = np.zeros((2048, 3), dtype=np.float32) # pad zeros to have uniform size
+            pc_final[0:pc_cropped.shape[0]] = pc_cropped
+            pc_final = pc_final / size - 0.5
+            tsdf_vol = np.expand_dims(pc_final,0)
 
         if debug_data is not None:
             # debug validation
@@ -155,8 +191,6 @@ class VGNImplicit(object):
             safety_dist_above_table = 0.05 # table is spawned at finger_depth
             grasps, pos_queries, rot_queries = sampler.sample_grasps(pc_extended_down, num_grasps=num_grasps_gpg, max_num_samples=180,
                                                 safety_dis_above_table=safety_dist_above_table, show_final_grasps=False, verbose=False)
-            # self.qual_th = 0.9
-            # best_only = False # Show all grasps and not just the best one
 
             # Use standard GIGA grasp sampling:
             # points, normals = self.sample_grasp_points(pc_extended, self.finger_depth)
@@ -240,9 +274,12 @@ class VGNImplicit(object):
                 for ind, grasp_viz_mesh in enumerate(grasps_viz_list):
                     if qual_vol[ind] > self.qual_th:
                         grasp_viz_mesh.paint_uniform_color([0,1,0])
+                        o3d_vis.update_geometry(grasp_viz_mesh)
                     else:
+                        # Either remove the bad grasps from viz or color them red
+                        # o3d_vis.remove_geometry(grasp_viz_mesh)
                         grasp_viz_mesh.paint_uniform_color([1,0,0])
-                    o3d_vis.update_geometry(grasp_viz_mesh)
+                        o3d_vis.update_geometry(grasp_viz_mesh)
                     o3d_vis.poll_events()
                     # o3d_vis.update_renderer()
         else:
@@ -265,7 +302,7 @@ class VGNImplicit(object):
             ### TODO - check affordance - visual (WEIRD)
             colored_scene_mesh = scene_mesh
             # colored_scene_mesh = visual.affordance_visual(qual_vol, rot, scene_mesh, size, self.resolution, **aff_kwargs)
-        grasps, scores, bad_grasps, bad_scores = select(qual_vol.copy(), pos_queries[0].squeeze().cpu(), rot_queries[0].squeeze().cpu(), width_vol, best_only=self.best, threshold=self.qual_th, force_detection=self.force_detection, max_filter_size=8 if self.visualize else 4)
+        grasps, scores, bad_grasps, bad_scores = select(qual_vol.copy(), pos_queries[0].squeeze().cpu(), rot_queries[0].squeeze().cpu(), width_vol, threshold=self.qual_th, force_detection=self.force_detection)
         toc = time.time() - tic
 
         bad_grasps, bad_scores = np.asarray(bad_grasps), np.asarray(bad_scores)
@@ -274,12 +311,8 @@ class VGNImplicit(object):
         new_bad_grasps = []
         new_grasps = []
         if len(grasps) > 0:
-            if self.best:
-                p = np.arange(len(grasps))
-                p_bad = np.arange(len(bad_grasps))
-            else:
-                p = np.random.permutation(len(grasps))
-                p_bad = np.random.permutation(len(bad_grasps))
+            p = np.arange(len(grasps))
+            p_bad = np.arange(len(bad_grasps))
             for bad_g in bad_grasps[p_bad]:
                 pose = bad_g.pose
                 # Un-normalize
@@ -384,22 +417,18 @@ def process(
     return qual_vol, width_vol
 
 
-def select(qual_vol, center_vol, rot_vol, width_vol, threshold=0.90, max_filter_size=4, force_detection=False, best_only=False):
+def select(qual_vol, center_vol, rot_vol, width_vol, threshold=0.50, force_detection=False):
 
     bad_mask = np.where(qual_vol<threshold, 1.0, 0.0)
 
-    # qual_vol[qual_vol < threshold] = 0.0
-    # if force_detection and (qual_vol >= threshold).sum() == 0:
-    #     pass
-    #     # best_only = True
-    # else:
-    #     # threshold on grasp quality
-    #     qual_vol[qual_vol < threshold] = 0.0
-
-    # non maximum suppression. TODO: Check if needed
-    # max_vol = ndimage.maximum_filter(qual_vol, size=max_filter_size)
-    # qual_vol = np.where(qual_vol == max_vol, qual_vol, 0.0)
-    mask = np.where(qual_vol>=threshold, 1.0, 0.0)
+    if force_detection and (qual_vol >= threshold).sum() == 0:
+        pass
+    else:
+        # zero if lower than threshold
+        qual_vol[qual_vol < threshold] = 0.0
+    
+    # Remaining values are above threshold
+    mask = np.where(qual_vol, 1.0, 0.0)
 
     # construct grasps
     bad_grasps, bad_scores = [], []
@@ -426,19 +455,6 @@ def select(qual_vol, center_vol, rot_vol, width_vol, threshold=0.90, max_filter_
     sorted_bad_scores = [bad_scores[i] for i in np.argsort(bad_scores)]
     sorted_grasps = [grasps[i] for i in reversed(np.argsort(scores))]
     sorted_scores = [scores[i] for i in reversed(np.argsort(scores))]
-
-    if best_only:
-        # Take only best grasp(s)
-        if len(sorted_grasps) >= 100:
-            max_grasps = 10
-        else:
-            max_grasps = 1
-
-        sorted_grasps = [sorted_grasps[i] for i in range(max_grasps)]
-        sorted_scores = [sorted_scores[i] for i in range(max_grasps)]
-
-        sorted_bad_grasps = [sorted_bad_grasps[i] for i in range(max_grasps)]
-        sorted_bad_scores = [sorted_bad_scores[i] for i in range(max_grasps)]
 
         
     return sorted_grasps, sorted_scores, sorted_bad_grasps, sorted_bad_scores

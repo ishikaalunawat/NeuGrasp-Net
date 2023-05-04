@@ -296,7 +296,7 @@ def generate_neur_grasp_clouds(sim, render_settings, grasps, size, tsdf, net, de
             # o3d.visualization.draw_geometries([down_surf_pc_local, down_surf_pc, origin_pc, pc, gripper_pc])
 
         if o3d_vis is not None:
-            down_surf_pc.colors = o3d.utility.Vector3dVector(np.tile(np.array([0.6, 0.0, 1]), (np.asarray(down_surf_pc.points).shape[0], 1)))
+            down_surf_pc.colors = o3d.utility.Vector3dVector(np.tile(np.array([0.9, 0.9, 0.0]), (np.asarray(down_surf_pc.points).shape[0], 1)))
             o3d_vis.add_geometry(down_surf_pc, reset_bounding_box=False)
             o3d_vis.poll_events()
             # o3d_vis.update_renderer()

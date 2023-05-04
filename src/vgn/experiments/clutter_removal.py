@@ -117,9 +117,9 @@ def run(
             timings = {}
 
             # scan the scene: with RANDOMIZED view
-            sim.world.remove_body(sim.world.bodies[0]) # remove table because we dont want to render it # normally table is the first body
-            tsdf, pc, timings["integration"] = sim.acquire_tsdf(n=n, N=N, resolution=resolution, randomize_view=True)            
-            sim.place_table(height=sim.gripper.finger_depth) # Add table back
+            # sim.world.remove_body(sim.world.bodies[0]) # remove table because we dont want to render it # normally table is the first body
+            tsdf, pc, timings["integration"] = sim.acquire_tsdf(n=n, N=N, resolution=resolution, randomize_view=False)            
+            # sim.place_table(height=sim.gripper.finger_depth) # Add table back
             # Also sampling extended scene PC for more grasp queries
             # while True:
             _, pc_extended, _ = sim.acquire_tsdf(n=6, N=N, resolution=resolution)
