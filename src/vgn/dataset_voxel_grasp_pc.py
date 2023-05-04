@@ -60,10 +60,11 @@ from vgn.utils.implicit import get_scene_from_mesh_pose_list
 
 
 class DatasetVoxelGraspPCOcc(torch.utils.data.Dataset):
-    def __init__(self, root, raw_root, num_point=2048, num_point_occ=8000, augment=False, use_grasp_occ=False):
+    def __init__(self, root, raw_root, num_point=2048, num_point_occ=8000, augment=False, use_grasp_occ=False, use_input_pc=False):
         self.root = root# Why don't you just read the pandas df here?????
         self.augment = augment
         self.use_grasp_occ = use_grasp_occ
+        self.use_input_pc = use_input_pc
         self.num_point = num_point
         self.num_point_occ = num_point_occ
         self.raw_root = raw_root
@@ -81,12 +82,15 @@ class DatasetVoxelGraspPCOcc(torch.utils.data.Dataset):
         pos = self.df.loc[i, "x":"z"].to_numpy(np.single).reshape(1, 3)
         width = self.df.loc[i, "width"].astype(np.single)
         label = self.df.loc[i, "label"].astype(np.long)
-        voxel_grid = read_voxel_grid(self.root, scene_id) # TODO: Can I load the whole thing into memory?
+        if self.use_input_pc:
+            pc = read_point_cloud(self.root, scene_id)
+            # Normalize
+            pc = pc / self.size - 0.5
+        else:
+            voxel_grid = read_voxel_grid(self.root, scene_id) # TODO: Can I load the whole thing into memory?
         # if self.augment:
         #     voxel_grid, ori, pos = apply_aug_transform(voxel_grid, ori, pos)
-        # pc = read_point_cloud(self.root, scene_id)
-        # # Normalize
-        # pc = pc / self.size - 0.5
+        
         grasp_pc = self.read_grasp_pc(self.df.loc[i, "grasp_id"]) # Load grasp point cloud
         
         # Normalize
@@ -101,8 +105,10 @@ class DatasetVoxelGraspPCOcc(torch.utils.data.Dataset):
             grasp_pc = np.vstack((grasp_pc, np.zeros((self.max_points_grasp_pc - grasp_pc.shape[0], 3))))
             grasp_pc_local = np.vstack((grasp_pc_local, np.zeros((self.max_points_grasp_pc - grasp_pc_local.shape[0], 3))))
         
-        tsdf, y, rot = voxel_grid[0], (label, width), rotation # <- Changed to predict only grasp quality
-        # pc, y, rot = pc, (label, width), rotation # <- Changed to predict only grasp quality
+        if self.use_input_pc:
+            pc, y, rot = pc, (label, width), rotation # <- Changed to predict only grasp quality
+        else:
+            pc, y, rot = voxel_grid[0], (label, width), rotation # <- Changed to predict only grasp quality
 
         occ_points, occ = self.read_occ(scene_id, self.num_point_occ) # TODO: Can I load the whole thing into memory?
         occ_points = occ_points / self.size - 0.5
@@ -119,11 +125,10 @@ class DatasetVoxelGraspPCOcc(torch.utils.data.Dataset):
 
         grasp_query = (pos, rot, grasp_pc_local, grasp_pc)
         
-        return tsdf, y, grasp_query, occ_points, occ
-        # return pc, y, grasp_query, occ_points, occ
+        return pc, y, grasp_query, occ_points, occ
 
     def read_grasp_pc(self, grasp_id):
-        grasp_pc_path = self.raw_root / 'grasp_point_clouds' / (str(grasp_id) + '.npz')
+        grasp_pc_path = self.raw_root / 'grasp_point_clouds_gt' / (str(grasp_id) + '.npz')
         grasp_pc_data = np.load(grasp_pc_path)
         grasp_pc = grasp_pc_data['pc']
         return grasp_pc

@@ -49,6 +49,12 @@ def main(args):
     if args.log_wandb:
         wandb.init(config=args, project="6dgrasp", dir='/work/scratch/sj93qicy/potato-net', entity="irosa-ias", id=args.net+'_'+args.dataset.name+'_'+time_stamp)#, notes=note)
 
+    if 'pn_pn' in args.net:
+        # This kind of network uses pointnet encoder and hence needs a pc as input
+        use_input_pc = True
+    else:
+        use_input_pc = False
+
     if args.test_bsize_num_workers:
         # Batch size, num_worker search
         from time import time
@@ -62,7 +68,7 @@ def main(args):
             num_workers_list = np.arange(int(max_num_workers/8)-1, min(max_num_workers,batch_size), step_size)
             for num_workers in num_workers_list:
                 kwargs['num_workers'] = num_workers
-                train_loader, _ = create_train_val_loaders(args.dataset, args.dataset_raw, batch_size, args.val_split, args.augment, kwargs)
+                train_loader, _ = create_train_val_loaders(args.dataset, args.dataset_raw, batch_size, args.val_split, args.net_with_grasp_occ, use_input_pc, kwargs)
                 count = 0
                 start = time()
                 # for epoch in range(1, 3):            
@@ -80,7 +86,7 @@ def main(args):
 
     # create data loaders
     train_loader, val_loader = create_train_val_loaders(
-        args.dataset, args.dataset_raw, args.batch_size, args.val_split, args.net_with_grasp_occ, kwargs)
+        args.dataset, args.dataset_raw, args.batch_size, args.val_split, args.net_with_grasp_occ, use_input_pc, kwargs)
 
     # build the network or load
     if args.load_path == '':
@@ -179,10 +185,10 @@ def main(args):
     trainer.run(train_loader, max_epochs=args.epochs, epoch_length=epoch_length)
 
 
-def create_train_val_loaders(root, root_raw, batch_size, val_split, net_with_grasp_occ, kwargs):
+def create_train_val_loaders(root, root_raw, batch_size, val_split, net_with_grasp_occ, use_input_pc, kwargs):
     # load the dataset
 
-    dataset = DatasetVoxelGraspPCOcc(root, root_raw, use_grasp_occ=net_with_grasp_occ)
+    dataset = DatasetVoxelGraspPCOcc(root, root_raw, use_grasp_occ=net_with_grasp_occ, use_input_pc=use_input_pc)
 
     # split into train and validation sets
     val_size = int(val_split * len(dataset))
@@ -231,7 +237,7 @@ def loss_fn(y_pred, y):
     # loss_rot = _rot_loss_fn(rotation_pred, rotations)
     loss_width = _width_loss_fn(width_pred, width)
     loss_occ = _occ_loss_fn(occ_pred, occ)
-    loss = loss_qual + label * (0.01 * loss_width) + (3*loss_occ) # <-label * (loss_rot + 0.01 * loss_width): new one, Changed
+    loss = loss_qual + label * (0.01 * loss_width) + (2*loss_occ) # <-label * (loss_rot + 0.01 * loss_width): new one, Changed
     loss_dict = {'loss_qual': loss_qual.mean(),
                 #  'loss_rot': loss_rot.mean(),
                 'loss_width': loss_width.mean(),
