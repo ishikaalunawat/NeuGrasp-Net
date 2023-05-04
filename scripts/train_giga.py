@@ -23,7 +23,7 @@ def main(args):
 
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
-    kwargs = {"num_workers": args.num_workers, "pin_memory": True} if use_cuda else {}
+    kwargs = {"num_workers": args.num_workers, "pin_memory": True, "persistent_workers": True} if use_cuda else {}
 
     # create log directory
     time_stamp = datetime.now().strftime("%y-%m-%d-%H-%M-%S")
@@ -43,12 +43,12 @@ def main(args):
     else:
         logdir = Path(args.savedir)
     
-    filename = 'summary_%s.txt' % (args.dataset_raw.name)
-    with open(filename, 'r') as f:
-        note = (";").join(f.readlines()[1:5]).replace('\n', '')
+    # filename = 'summary_%s.txt' % (args.dataset_raw.name)
+    # with open(filename, 'r') as f:
+    #     note = (";").join(f.readlines()[1:5]).replace('\n', '')
 
     if args.log_wandb:
-        wandb.init(config=args, project="6dgrasp", resume=True, entity="irosa-ias", id=args.net+'_'+args.dataset.name+'_'+time_stamp, notes=note)
+        wandb.init(config=args, project="6dgrasp", dir='/work/scratch/sj93qicy/potato-net', entity="irosa-ias", id=args.net+'_'+args.dataset.name+'_'+time_stamp)#, notes=note)
 
     # create data loaders
     train_loader, val_loader = create_train_val_loaders(
@@ -62,7 +62,9 @@ def main(args):
     
     # define optimizer and metrics
     optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, mode='min')
+    # if 'metric' does not reduce by 'threshold' percentage for 'patience' epochs, reduce lr by 'factor'
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer,
+                mode='min', factor=args.lr_scheduler_factor, patience=args.lr_scheduler_patience, threshold=args.lr_scheduler_threshold, verbose=True)
 
     metrics = {
         "accuracy": Accuracy(lambda out: (torch.round(out[1][0]), out[2][0])), # out[1][0] => y_pred -> quality
@@ -294,18 +296,21 @@ def create_summary_writers(net, device, log_dir):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--net", default="giga_hr")
+    parser.add_argument("--net", default="giga_hr_deeper")
     parser.add_argument("--dataset", type=Path, required=True)
     parser.add_argument("--dataset_raw", type=Path, required=True)
-    parser.add_argument("--num_workers", type=int, default=10)
+    parser.add_argument("--num_workers", type=int, default=24)
     parser.add_argument("--logdir", type=Path, default="data/runs")
-    parser.add_argument("--log_wandb", type=bool, default=True)
+    parser.add_argument("--log_wandb", type=bool, default='')
     parser.add_argument("--description", type=str, default="")
     parser.add_argument("--savedir", type=str, default="")
-    parser.add_argument("--epochs", type=int, default=20)
+    parser.add_argument("--epochs", type=int, default=35)
     parser.add_argument("--epoch_length_frac", type=float, default=1.0, help="fraction of training data that constitutes one epoch")
-    parser.add_argument("--batch_size", type=int, default=16)
-    parser.add_argument("--lr", type=float, default=2e-4)
+    parser.add_argument("--batch_size", type=int, default=32)
+    parser.add_argument("--lr", type=float, default=1e-4)
+    parser.add_argument("--lr_scheduler_patience", type=int, default=5) # How many epochs to wait before reducing lr
+    parser.add_argument("--lr_scheduler_factor", type=float, default=0.5) # Reduce by this factor
+    parser.add_argument("--lr_scheduler_threshold", type=float, default=0.1) # Consider reducing when improved by this much percentage
     parser.add_argument("--val_split", type=float, default=0.05, help="fraction of data used for validation")
     parser.add_argument("--augment", action="store_true")
     parser.add_argument("--silence", action="store_true")
