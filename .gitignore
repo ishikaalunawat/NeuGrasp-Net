@@ -1,3 +1,4 @@
 data_robot/
 raw_data/
 edge_grasp_net_pretrained_para/
+*.out

@@ -1,7 +1,7 @@
 import numpy as np
 import torch.nn.functional as F
 from torch_geometric.nn import  PPFConv,knn_graph,global_max_pool
-from torch_geometric.nn import PointConv as PointNetConv
+from torch_geometric.nn.conv import PointConv as PointNetConv
 from torch.nn import Sequential, Linear, ReLU
 import torch
 from sklearn.metrics import accuracy_score,balanced_accuracy_score

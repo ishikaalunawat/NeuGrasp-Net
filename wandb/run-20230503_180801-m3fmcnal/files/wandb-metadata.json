@@ -1,0 +1,168 @@
+{
+    "os": "Linux-5.4.0-148-generic-x86_64-with-glibc2.27",
+    "python": "3.9.16",
+    "heartbeatAt": "2023-05-03T16:08:06.156804",
+    "startedAt": "2023-05-03T16:08:01.044645",
+    "docker": null,
+    "cuda": null,
+    "args": [
+        "--train",
+        "--verbose"
+    ],
+    "state": "running",
+    "program": "/home/hypatia/6D-DAAD/Edge-Grasp-Network/train.py",
+    "codePath": "train.py",
+    "git": {
+        "remote": "https://github.com/ishikaa25/GIGA-6DoF",
+        "commit": "f922b338aed7219e78e0dcf92f5d8cec3fc86b92"
+    },
+    "email": "sophie.lueth@me.com",
+    "root": "/home/hypatia/6D-DAAD/Edge-Grasp-Network",
+    "host": "hypatia",
+    "username": "hypatia",
+    "executable": "/home/hypatia/anaconda3/envs/edge_grasp/bin/python",
+    "cpu_count": 12,
+    "cpu_count_logical": 24,
+    "cpu_freq": {
+        "current": 2243.2637916666667,
+        "min": 2200.0,
+        "max": 3800.0
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 2199.441,
+            "min": 2200.0,
+            "max": 3800.0
+        },
+        {
+            "current": 2199.169,
+            "min": 2200.0,
+            "max": 3800.0
+        },
+        {
+            "current": 2197.92,
+            "min": 2200.0,
+            "max": 3800.0
+        },
+        {
+            "current": 2705.694,
+            "min": 2200.0,
+            "max": 3800.0
+        },
+        {
+            "current": 1967.214,
+            "min": 2200.0,
+            "max": 3800.0
+        },
+        {
+            "current": 1871.135,
+            "min": 2200.0,
+            "max": 3800.0
+        },
+        {
+            "current": 2156.305,
+            "min": 2200.0,
+            "max": 3800.0
+        },
+        {
+            "current": 3908.625,
+            "min": 2200.0,
+            "max": 3800.0
+        },
+        {
+            "current": 2158.11,
+            "min": 2200.0,
+            "max": 3800.0
+        },
+        {
+            "current": 2157.071,
+            "min": 2200.0,
+            "max": 3800.0
+        },
+        {
+            "current": 2332.812,
+            "min": 2200.0,
+            "max": 3800.0
+        },
+        {
+            "current": 2196.958,
+            "min": 2200.0,
+            "max": 3800.0
+        },
+        {
+            "current": 2199.456,
+            "min": 2200.0,
+            "max": 3800.0
+        },
+        {
+            "current": 2198.011,
+            "min": 2200.0,
+            "max": 3800.0
+        },
+        {
+            "current": 2199.447,
+            "min": 2200.0,
+            "max": 3800.0
+        },
+        {
+            "current": 2211.511,
+            "min": 2200.0,
+            "max": 3800.0
+        },
+        {
+            "current": 1868.741,
+            "min": 2200.0,
+            "max": 3800.0
+        },
+        {
+            "current": 1872.424,
+            "min": 2200.0,
+            "max": 3800.0
+        },
+        {
+            "current": 2186.661,
+            "min": 2200.0,
+            "max": 3800.0
+        },
+        {
+            "current": 2278.046,
+            "min": 2200.0,
+            "max": 3800.0
+        },
+        {
+            "current": 2137.835,
+            "min": 2200.0,
+            "max": 3800.0
+        },
+        {
+            "current": 2194.356,
+            "min": 2200.0,
+            "max": 3800.0
+        },
+        {
+            "current": 2253.801,
+            "min": 2200.0,
+            "max": 3800.0
+        },
+        {
+            "current": 2187.588,
+            "min": 2200.0,
+            "max": 3800.0
+        }
+    ],
+    "disk": {
+        "total": 1832.2072448730469,
+        "used": 1475.7498245239258
+    },
+    "gpu": "NVIDIA GeForce RTX 2080 SUPER",
+    "gpu_count": 1,
+    "gpu_devices": [
+        {
+            "name": "NVIDIA GeForce RTX 2080 SUPER",
+            "memory_total": 8589934592
+        }
+    ],
+    "memory": {
+        "total": 62.81929397583008
+    }
+}

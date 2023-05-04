@@ -61,6 +61,9 @@ def main(args):
         success_object = 0
         total_objects = 0
         no_candidate_object = 0
+
+        num_scenes = 1659 if args.scene == 'pile' else 1658
+
         for scene_num in range(NUMBER_SCENE):
             object_count = np.random.poisson(OBJECT_COUNT_LAMBDA) + 1
             sim.reset(object_count)

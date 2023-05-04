@@ -14,11 +14,12 @@ import warnings
 from torch_geometric.transforms import Compose
 import numpy as np
 from torch.backends import cudnn
+
 warnings.filterwarnings("ignore")
 
 
 parser = argparse.ArgumentParser(description='edge_grasper_ball')
-parser.add_argument('--dataset_dir', type=str, default='./grasp_raw_data')
+parser.add_argument('--dataset_dir', type=str, default='./raw_data')
 parser.add_argument('--save_dir', type=str, default='./edge_grasp_net_pretrained_para')
 parser.add_argument('--vn_save_dir', type=str, default='./vn_edge_pretrained_para')
 parser.add_argument('--load', type=int, default=0)
@@ -42,12 +43,12 @@ def main(args):
         tr_dataset = Grasp_Dataset(root=args.dataset_dir, pre_transform=PreTransformBallBox(),transform=Compose([GraspNormalization(),SubsampleBall()]), train=True)
         tr_loader = DataLoader(tr_dataset[:len(tr_dataset)], batch_size=1, shuffle=True)
         edge_grasper = VNEdgeGrasper(device=1, root_dir=args.vn_save_dir, sample_num=args.sample_num, lr=0.5 * 1e-4,
-                                     load=args.load, ubn=False, normal=True, aggr='max')
+                                     load=args.load, ubn=False, normal=True, aggr='max', args=args)
     else:
         tr_dataset = Grasp_Dataset(root=args.dataset_dir, pre_transform=PreTransformBallBox(max_width=True),
                                    transform=Compose([GraspNormalization(), GraspAugmentation()]), train=True)
         tr_loader = DataLoader(tr_dataset[:], batch_size=1, shuffle=True)
-        edge_grasper = EdgeGrasper(device=1,root_dir=args.save_dir, sample_num=args.sample_num, lr=1e-4, load=args.load)
+        edge_grasper = EdgeGrasper(device=1,root_dir=args.save_dir, sample_num=args.sample_num, lr=1e-4, load=args.load, args=args)
 
     # set up the dataset
     tst_dataset = Grasp_Dataset(root=args.dataset_dir, transform=GraspNormalization(), train=False)
@@ -57,6 +58,6 @@ def main(args):
     train = args.train
     if train:
         edge_grasper.train_test_save(tr_loader, tst_loader,tr_epoch=args.epoch,test_interval=args.test_interval,
-                                     save_interval=args.save_interval,log=False,verbose=args.verbose)
+                                     save_interval=args.save_interval,log=True,verbose=args.verbose)
 if __name__ == "__main__":
     main(args)

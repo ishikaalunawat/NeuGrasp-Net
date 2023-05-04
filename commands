@@ -1,0 +1,6 @@
+# Dataset generation
+nohup python clutter_grasp_data_generator.py --scene packed --object-set packed/train --sample_number 32 > datatset_packed_3M.out &
+nohup python clutter_grasp_data_generator.py --scene pile --object-set pile/train --sample_number 32 > datatset_pile_3M.out &
+
+# Train (Classic)
+nohup python train.py --train --verbose > train_classic.out &

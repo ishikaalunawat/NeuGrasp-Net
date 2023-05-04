@@ -15,12 +15,13 @@ import warnings
 from torch_geometric.transforms import Compose
 import numpy as np
 from torch.backends import cudnn
-warnings.filterwarnings("ignore")
+import wandb
 
+warnings.filterwarnings("ignore")
 
 class EdgeGrasper:
     def __init__(self, device, root_dir='./store', sample_num=32, position_emd=True, lr=1e-5, load=False, ubn=False,
-                 normal=True, aggr='max'):
+                 normal=True, aggr='max', args=None):
         if device == 1:
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         else:
@@ -41,15 +42,25 @@ class EdgeGrasper:
             self.epoch_num = load + 1
         else:
             self.epoch_num = 1
+        
+        wandb.init(config=args, project="6dgrasp", entity="irosa-ias", note = "Vector-Neuron Edge Grasp Network")
+        # wandb.watch(self.model, log_freq=100)
 
     def train_test_save(self, train_dataset, test_dataset, tr_epoch=200, verbose=True, test_interval=1,save_interval=100,log=True):
         #time0 = time.time()
         for epoch_num in range(self.epoch_num,tr_epoch+1):
             step = 1
+            run_loss = 0.0
+            run_accu = 0.0
+            run_ba_acc = 0.0
+
             for batch in train_dataset:
                 res= self.model.train(batch.to(self.device))
                 if res is not None:
                     loss, accu, ba_acc = res
+                    run_loss += loss
+                    run_accu += accu
+                    run_ba_acc += ba_acc
                 else:
                     continue
                 if log:
@@ -67,6 +78,9 @@ class EdgeGrasper:
             if epoch_num % save_interval ==0:
                 self.save()
             self.epoch_num += 1
+
+            wandb.log({"train_loss":run_loss/(step-1),
+                        "train_accuracy": run_accu/(step-1)})
 
     def test(self,test_dataset):
         total_loss = 0.
@@ -89,6 +103,8 @@ class EdgeGrasper:
                       total_loss/tst_step, total_accu/tst_step, total_ba_accu/tst_step,))
 
         write_test(self.root_dir,self.epoch_num, 0, total_loss/tst_step, total_accu/tst_step, total_ba_accu/tst_step,)
+        wandb.log({"val_loss":total_loss/tst_step,
+                    "val_accuracy": total_accu/tst_step})
         return total_loss / tst_step
 
     def save(self,):
