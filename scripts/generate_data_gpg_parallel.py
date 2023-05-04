@@ -31,11 +31,11 @@ def main(args, rank):
     np.random.seed(seed)
     sim = ClutterRemovalSim(args.scene, args.object_set, gui=args.sim_gui)
     finger_depth = sim.gripper.finger_depth
-    grasps_per_worker = args.num_grasps // args.num_proc
-    pbar = tqdm(total=grasps_per_worker, disable=rank != 0)
+    scenes_per_worker = args.num_scenes // args.num_proc
+    pbar = tqdm(total=scenes_per_worker, disable=rank != 0)
 
     if rank == 0:
-        (args.root / "scenes").mkdir(parents=True)
+        (args.root / "scenes").mkdir(parents=True, exist_ok=True)
         write_setup(
             args.root,
             sim.size,
@@ -44,9 +44,9 @@ def main(args, rank):
             sim.gripper.finger_depth,
         )
         if args.save_scene:
-            (args.root / "mesh_pose_list").mkdir(parents=True)
+            (args.root / "mesh_pose_list").mkdir(parents=True, exist_ok=True)
 
-    for _ in range(grasps_per_worker // GRASPS_PER_SCENE):
+    for _ in range(scenes_per_worker):
         # generate heap
         object_count = np.random.poisson(OBJECT_COUNT_LAMBDA) + 1
         sim.reset(object_count)
@@ -79,8 +79,8 @@ def main(args, rank):
         pc = o3d_scene_mesh.sample_points_uniformly(number_of_points=1000)
 
         # # crop surface and borders from point cloud
-        # bounding_box = o3d.geometry.AxisAlignedBoundingBox(sim.lower, sim.upper)
-        # pc = pc.crop(bounding_box)
+        bounding_box = o3d.geometry.AxisAlignedBoundingBox(sim.lower, sim.upper)
+        pc = pc.crop(bounding_box)
         # o3d.visualization.draw_geometries([pc], point_show_normal=True)
 
         if pc.is_empty():
@@ -100,7 +100,7 @@ def main(args, rank):
             pbar.update()
 
         # Optional: sample remaining grasps with regular sampling
-        for _ in range(GRASPS_PER_SCENE-len(grasps)):
+        for _ in range(GRASPS_PER_SCENE-GRASPS_PER_SCENE_GPG):
             # sample and evaluate a grasp point
             point, normal = sample_grasp_point(pc, finger_depth)
             grasp, label = evaluate_grasp_point(sim, point, normal)
@@ -172,7 +172,7 @@ def generate_from_existing_scene(mesh_pose_list_path, args):
             write_grasp(args.root, scene_id, grasp, label)
 
     # # Optional: sample remaining grasps with regular sampling
-    # for _ in range(GRASPS_PER_SCENE-len(grasps)):
+    # for _ in range(GRASPS_PER_SCENE-GRASPS_PER_SCENE_GPG):
     #     # sample and evaluate a grasp point
     #     point, normal = sample_grasp_point(pc, sim.gripper.finger_depth)
     #     grasp, label = evaluate_grasp_point(sim, point, normal)
@@ -315,7 +315,7 @@ if __name__ == "__main__":
     parser.add_argument("--previous_root", type=Path, default="")
     parser.add_argument("--scene", type=str, choices=["pile", "packed"], default="pile")
     parser.add_argument("--object_set", type=str, default="pile/train")
-    parser.add_argument("--num_grasps", type=int, default=10000)
+    parser.add_argument("--num_scenes", type=int, default=33313)
     parser.add_argument("--grasps_per_scene", type=int, default=60)
     parser.add_argument("--grasps_per_scene_gpg", type=int, default=60)
     parser.add_argument("--num_proc", type=int, default=1)
@@ -330,13 +330,13 @@ if __name__ == "__main__":
             raise ValueError("Previous root directory is not specified")
         
         # Write GPG grasp sampler parameters
-        (args.root).mkdir(parents=True)
+        (args.root).mkdir(parents=True, exist_ok=True)
         write_json(GpgGraspSamplerPcl().params, args.root / "gpg_setup.json")
 
         if args.save_scene:
             args.save_root = os.path.join(args.root,'scenes')
-            os.makedirs(args.save_root)
-            (args.root / "mesh_pose_list").mkdir(parents=True)
+            os.makedirs(args.save_root, exist_ok=True)
+            (args.root / "mesh_pose_list").mkdir(parents=True, exist_ok=True)
         
         mesh_list_files = glob.glob(os.path.join(args.previous_root, 'mesh_pose_list', '*.npz'))
         global g_completed_jobs
