@@ -96,17 +96,35 @@ class VGNImplicit(object):
             tsdf_vol = state.tsdf
             voxel_size = 0.3 / self.resolution
             size = 0.3
-            pc_extended = state.pc_extended # If debug: Using extended PC for grasp sampling
+            # pc_extended = state.pc_extended # If debug: Using extended PC for grasp sampling
 
         else:
             tsdf_vol = state.tsdf.get_grid()
             voxel_size = tsdf_process.voxel_size
             tsdf_process = tsdf_process.get_grid()
             size = state.tsdf.size
-            pc_extended = state.pc_extended # If debug: Using extended PC for grasp sampling
+            # pc_extended = state.pc_extended # If debug: Using extended PC for grasp sampling
 
         tic = time.time()
 
+        encoded_tsdf = None
+        ## Test with point input?
+        point_input = False
+        if point_input:
+            lower = np.array([0.0 , 0.0 , 0.0])
+            upper = np.array([size, size, size])
+            bounding_box = o3d.geometry.AxisAlignedBoundingBox(lower, upper)
+            pc_cropped = state.pc.crop(bounding_box)
+            # If more than max points in point cloud, uniformly sample
+            if len(pc_cropped.points) > 2048:
+                indices = np.random.choice(np.arange(len(pc_cropped.points)), 2048, replace=False)
+                pc_cropped = pc_cropped.select_by_index(indices)
+            pc_cropped = np.asarray(pc_cropped.points)
+            pc_final = np.zeros((2048, 3), dtype=np.float32) # pad zeros to have uniform size
+            pc_final[0:pc_cropped.shape[0]] = pc_cropped
+            pc_final = pc_final / size - 0.5
+            tsdf_vol = np.expand_dims(pc_final,0)
+        
         ## Get scene render
         while(1): # Be careful with this loop, it can run forever if there is no CUDA memory available
             try:
@@ -125,7 +143,9 @@ class VGNImplicit(object):
                         o3d_vis.poll_events()
                         # pc_extended = state.pc # Use only seen areas for grasp sampling
                         # Use full rendered cloud for grasp sampling
-                        pc_extended = get_scene_surf_render(sim, size, self.resolution, self.net, tsdf_vol, device=self.device)
+                        with torch.no_grad():
+                            encoded_tsdf = self.net.encode_inputs(torch.from_numpy(tsdf_vol).to(self.device))
+                        pc_extended = get_scene_surf_render(sim, size, self.resolution, self.net, encoded_tsdf, device=self.device)
                         o3d_vis.add_geometry(pc_extended, reset_bounding_box=False) # point cloud
                         o3d_vis.poll_events()
                         # num_grasps_gpg = 20
@@ -138,7 +158,9 @@ class VGNImplicit(object):
                         pc_extended = state.pc # Use only seen areas for grasp sampling
                     else:
                         # Use full rendered cloud for grasp sampling
-                        pc_extended = get_scene_surf_render(sim, size, self.resolution, self.net, tsdf_vol, device=self.device)
+                        with torch.no_grad():
+                            encoded_tsdf = self.net.encode_inputs(torch.from_numpy(tsdf_vol).to(self.device))
+                        pc_extended = get_scene_surf_render(sim, size, self.resolution, self.net, encoded_tsdf, device=self.device)
             except RuntimeError as e:
                 if "CUDA out of memory. " in str(e):
                     print("CUDA out of memory. Trying again...")
@@ -146,23 +168,6 @@ class VGNImplicit(object):
                 else:
                     raise
             break
-        
-        ## Test with point input?
-        point_input = False
-        if point_input:
-            lower = np.array([0.0 , 0.0 , 0.0])
-            upper = np.array([size, size, size])
-            bounding_box = o3d.geometry.AxisAlignedBoundingBox(lower, upper)
-            pc_cropped = state.pc.crop(bounding_box)
-            # If more than max points in point cloud, uniformly sample
-            if len(pc_cropped.points) > 2048:
-                indices = np.random.choice(np.arange(len(pc_cropped.points)), 2048, replace=False)
-                pc_cropped = pc_cropped.select_by_index(indices)
-            pc_cropped = np.asarray(pc_cropped.points)
-            pc_final = np.zeros((2048, 3), dtype=np.float32) # pad zeros to have uniform size
-            pc_final[0:pc_cropped.shape[0]] = pc_cropped
-            pc_final = pc_final / size - 0.5
-            tsdf_vol = np.expand_dims(pc_final,0)
 
         if debug_data is not None:
             # debug validation
@@ -249,6 +254,9 @@ class VGNImplicit(object):
                 sim.place_table(height=sim.gripper.finger_depth)
             else:
                 # Use neural rendered grasp point clouds
+                if encoded_tsdf is None:
+                    with torch.no_grad():
+                        encoded_tsdf = self.net.encode_inputs(torch.from_numpy(tsdf_vol).to(self.device))
                 while(1): # Be careful with this loop, it can run forever if there is no CUDA memory available
                     try:
                         torch.cuda.empty_cache()
@@ -262,7 +270,7 @@ class VGNImplicit(object):
                             if remaining_grasps > max_grasps_at_once:
                                 grasps_batch = grasps[grasp_idx:grasp_idx+max_grasps_at_once]
                                 
-                                curr_bad_indices, curr_grasps_pc_local, curr_grasps_pc, curr_grasps_viz_list = generate_neur_grasp_clouds(sim, render_settings, grasps_batch, size, tsdf_vol, 
+                                curr_bad_indices, curr_grasps_pc_local, curr_grasps_pc, curr_grasps_viz_list = generate_neur_grasp_clouds(sim, render_settings, grasps_batch, size, encoded_tsdf, 
                                                                                     self.net, self.device, scene_mesh, debug=False, o3d_vis=o3d_vis)
                                 bad_indices += curr_bad_indices
                                 grasps_pc_local[grasp_idx:grasp_idx+max_grasps_at_once] = curr_grasps_pc_local
@@ -274,7 +282,7 @@ class VGNImplicit(object):
                             else:
                                 grasps_batch = grasps[grasp_idx:]
 
-                                curr_bad_indices, curr_grasps_pc_local, curr_grasps_pc, curr_grasps_viz_list = generate_neur_grasp_clouds(sim, render_settings, grasps_batch, size, tsdf_vol, 
+                                curr_bad_indices, curr_grasps_pc_local, curr_grasps_pc, curr_grasps_viz_list = generate_neur_grasp_clouds(sim, render_settings, grasps_batch, size, encoded_tsdf, 
                                                                                 self.net, self.device, scene_mesh, debug=False, o3d_vis=o3d_vis)
                                 bad_indices += curr_bad_indices
                                 grasps_pc_local[grasp_idx:] = curr_grasps_pc_local
@@ -294,10 +302,13 @@ class VGNImplicit(object):
             # Make separate queries for each grasp
             pos_queries = pos_queries.transpose(0,1)
             rot_queries = rot_queries.transpose(0,1)
-            if tsdf_vol.shape[0] == 1:
-                tsdf_vol = np.repeat(tsdf_vol,len(grasps), axis=0)
-
-            qual_vol, width_vol = predict(tsdf_vol, (pos_queries.to(self.device), rot_queries.to(self.device), grasps_pc_local.to(self.device), grasps_pc.to(self.device)), self.net, self.device, seed=seed)
+            # if tsdf_vol.shape[0] == 1:
+            #     tsdf_vol = np.repeat(tsdf_vol,len(grasps), axis=0)
+            if encoded_tsdf is None:
+                with torch.no_grad():
+                    encoded_tsdf = self.net.encode_inputs(torch.from_numpy(tsdf_vol).to(self.device))
+            qual_vol, width_vol = predict(encoded_tsdf, (pos_queries.to(self.device), rot_queries.to(self.device), grasps_pc_local.to(self.device), grasps_pc.to(self.device)),
+                                          self.net, self.device, seed=seed, encoded_input=True)
             # import pdb; pdb.set_trace()
             qual_vol[bad_indices] = 0.0 # set bad grasp scores to zero
             
@@ -395,10 +406,15 @@ def bound(qual_vol, voxel_size, limit=[0.02, 0.02, 0.055]):
     qual_vol[:, :, :z_lim] = 0.0
     return qual_vol
 
-def predict(tsdf_vol, pos, net, device, seed=0):
+def predict(tsdf_vol, pos, net, device, seed=0, encoded_input=False):
     #_, rot = pos
-    # move input to the GPU
-    tsdf_vol = torch.from_numpy(tsdf_vol).to(device)
+    if encoded_input == False:
+        # move input to the GPU
+        tsdf_vol = torch.from_numpy(tsdf_vol).to(device)
+    else:
+        batched_encoded_tsdf = {}
+        for keyz, encoded_feats in tsdf_vol.items():
+            batched_encoded_tsdf[keyz] = encoded_feats.repeat(pos[0].shape[0], 1, 1, 1)
 
     # forward pass
     # if seed != 100:
@@ -406,7 +422,10 @@ def predict(tsdf_vol, pos, net, device, seed=0):
         try:
             torch.cuda.empty_cache()
             with torch.no_grad():
-                qual_vol, width_vol = net(tsdf_vol, pos)
+                if encoded_input == False:
+                    qual_vol, width_vol = net(tsdf_vol, pos)
+                else:
+                    qual_vol, width_vol = net.decode(pos, batched_encoded_tsdf) # careful of the order!
         except RuntimeError as e:
             if "CUDA out of memory. " in str(e):
                 print("CUDA out of memory. Trying again...")

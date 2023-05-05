@@ -47,8 +47,8 @@ def get_simple_proposal(ray0, ray_direction, n_steps=256, depth_range=[0.001, 0.
 
     return p_proposal, d_proposal
 
-def secant(net, tsdf, f_low, f_high, d_low, d_high, n_secant_steps,
-                          ray0_masked, ray_direction_masked, tau):
+def secant(net, encoded_tsdf, f_low, f_high, d_low, d_high, n_secant_steps,
+                          ray0_masked, ray_direction_masked, tau, scale_size):
     ''' Runs the secant method for interval [d_low, d_high].
 
     Args:
@@ -60,13 +60,15 @@ def secant(net, tsdf, f_low, f_high, d_low, d_high, n_secant_steps,
         model (nn.Module): model model to evaluate point occupancies
         c (tensor): latent conditioned code c
         tau (float): threshold value in logits
+        scale_size (float): optional scaling factor for the input points
     '''
     d_pred = - f_low * (d_high - d_low) / (f_high - f_low) + d_low
     for i in range(n_secant_steps):
         p_mid = ray0_masked + d_pred.unsqueeze(-1) * ray_direction_masked
-        p_scaled_mid = (p_mid/0.3 - 0.5).to(tsdf.device).float()
+        p_scaled_mid = (p_mid/scale_size - 0.5).float()
         with torch.no_grad():
-            f_mid = (net.infer_occ(p_scaled_mid.view(1, -1, 3),  tsdf)- tau).squeeze()#.cpu()
+            f_mid = (net.infer_occ(p_scaled_mid.view(1, -1, 3), encoded_tsdf, encoded_inputs=True)- tau).squeeze()
+            torch.cuda.empty_cache()
         ind_low = f_mid < 0
         ind_low = ind_low
         if ind_low.sum() > 0:
@@ -79,7 +81,7 @@ def secant(net, tsdf, f_low, f_high, d_low, d_high, n_secant_steps,
         d_pred = - f_low * (d_high - d_low) / (f_high - f_low) + d_low
     return d_pred
 
-def render_occ(intrinsic, extrinsics, net, input_tsdf, min_measured_depth, max_measured_depth, size, device, n_steps=256):
+def render_occ(intrinsic, extrinsics, net, encoded_tsdf, min_measured_depth, max_measured_depth, size, device, n_steps=256):
 
     width, height = (intrinsic.K[:2, 2]*2).astype(int)
     batch_size = n_images = 1 # Use 1 for now because GPU memory len(extrinsics)
@@ -131,7 +133,7 @@ def render_occ(intrinsic, extrinsics, net, input_tsdf, min_measured_depth, max_m
     # Query network
     torch.cuda.empty_cache()
     with torch.no_grad():
-        val = net.infer_occ(p_scaled_proposal_query.clone().to(device), input_tsdf)
+        val = net.infer_occ(p_scaled_proposal_query.clone().to(device), encoded_tsdf, encoded_inputs=True)
     val = val.cpu()
     torch.cuda.empty_cache()
     val = (val - 0.5) # Center occupancies around 0
@@ -174,9 +176,9 @@ def render_occ(intrinsic, extrinsics, net, input_tsdf, min_measured_depth, max_m
     n_secant_steps = 8
     torch.cuda.empty_cache()
     with torch.no_grad():
-        d_pred = secant(net, input_tsdf,
-            f_low.cuda(), f_high.cuda(), d_low.cuda(), d_high.cuda(), n_secant_steps, ray0_masked.cuda(),
-            ray_direction_masked.cuda(), tau=torch.tensor(0.5, device=device))
+        d_pred = secant(net, encoded_tsdf, # we don't care about batch size here
+            f_low.to(device), f_high.to(device), d_low.to(device), d_high.to(device), n_secant_steps, ray0_masked.to(device),
+            ray_direction_masked.to(device), tau=torch.tensor(0.5, device=device, dtype=torch.float), scale_size=torch.tensor(size, device=device, dtype=torch.float))
     d_pred = d_pred.cpu()
     torch.cuda.empty_cache()
     points_out = torch.zeros(batch_size, n_pts, 3, dtype=torch.float)#*t_nan # set default (invalid) values
@@ -185,17 +187,17 @@ def render_occ(intrinsic, extrinsics, net, input_tsdf, min_measured_depth, max_m
     return points_out, mask
 
 
-def get_scene_surf_render(sim, size, resolution, net, tsdf, device, args=None):
+def get_scene_surf_render(sim, size, resolution, net, encoded_tsdf, device, args=None):
 
     # Get views from a circular path around the scene
     depth_imgs_full, extrinsics_full = render_n_images(sim, n=6, random=False, noise_type='', size=size)
 
-    # Make tsdf and pc from the images
-    tsdf_full = TSDFVolume(size, resolution)
-    for depth_img, extrinsic in zip(depth_imgs_full, extrinsics_full):
-        tsdf_full.integrate(depth_img, sim.camera.intrinsic, extrinsic)
-    pc_full = tsdf_full.get_cloud()
-    pc_full.colors = o3d.utility.Vector3dVector(np.tile(np.array([0, 0.0, 0.0]), (np.asarray(pc_full.points).shape[0], 1)))
+    # For Debug: Make tsdf and pc from the images
+    # tsdf_full = TSDFVolume(size, resolution)
+    # for depth_img, extrinsic in zip(depth_imgs_full, extrinsics_full):
+    #     tsdf_full.integrate(depth_img, sim.camera.intrinsic, extrinsic)
+    # pc_full = tsdf_full.get_cloud()
+    # pc_full.colors = o3d.utility.Vector3dVector(np.tile(np.array([0, 0.0, 0.0]), (np.asarray(pc_full.points).shape[0], 1)))
 
     ## Render the scene using the occupancy network with the same extrinsics
 
@@ -211,11 +213,11 @@ def get_scene_surf_render(sim, size, resolution, net, tsdf, device, args=None):
     min_measured_depth = size
     max_measured_depth = 2.4*size + size/2 # max distance from the origin
 
-    tsdf_t = torch.tensor(tsdf, device=device, dtype=torch.float32)
+    # tsdf_t = torch.tensor(tsdf, device=device, dtype=torch.float32)
 
     surface_points_combined = None
     for cam_extrinsic in extrinsics_full:
-        surf_points_world, surf_mask = render_occ(intrinsic, [cam_extrinsic], net, tsdf_t, min_measured_depth, max_measured_depth, size=size, device=device)
+        surf_points_world, surf_mask = render_occ(intrinsic, [cam_extrinsic], net, encoded_tsdf, min_measured_depth, max_measured_depth, size=size, device=device)
         if surface_points_combined is None:
             surface_points_combined = surf_points_world[0, surf_mask[0]]
         else:

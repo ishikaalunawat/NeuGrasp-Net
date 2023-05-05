@@ -124,7 +124,7 @@ def run(
             
             # FOR DEBUG: sample extended scene PC for grasp queries on GT cloud
             # while True:
-            _, pc_extended, _ = sim.acquire_tsdf(n=6, N=N, resolution=resolution)
+            # _, pc_extended, _ = sim.acquire_tsdf(n=6, N=N, resolution=resolution)
                 # if len(pc_extended.points) >= 1000:
                 #     break
             
@@ -132,7 +132,7 @@ def run(
                 # Use tsdf from the dataset
                 tsdf = io.read_voxel_grid(root, scene_id)
             
-            state = argparse.Namespace(tsdf=tsdf, pc=pc, pc_extended=pc_extended)
+            state = argparse.Namespace(tsdf=tsdf, pc=pc)#, pc_extended=pc_extended)
             # if resolution != 40:
             #     extra_tsdf, _, _ = sim.acquire_tsdf(n=n, N=N, resolution=resolution)
             #     state.tsdf_process = extra_tsdf

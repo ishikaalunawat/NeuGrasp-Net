@@ -20,7 +20,7 @@ def get_simple_proposal(ray0, ray_direction, n_steps=25, depth_range=[0.001, 0.1
     return p_proposal, d_proposal
 
 
-def secant(net, tsdf, f_low, f_high, d_low, d_high, n_secant_steps,
+def secant(net, encoded_tsdf, f_low, f_high, d_low, d_high, n_secant_steps,
                           ray0_masked, ray_direction_masked, tau, scale_size):
     ''' Runs the secant method for interval [d_low, d_high].
 
@@ -38,10 +38,10 @@ def secant(net, tsdf, f_low, f_high, d_low, d_high, n_secant_steps,
     d_pred = - f_low * (d_high - d_low) / (f_high - f_low) + d_low
     for i in range(n_secant_steps):
         p_mid = ray0_masked + d_pred.unsqueeze(-1) * ray_direction_masked
-        p_scaled_mid = (p_mid/scale_size - 0.5).to(tsdf.device).float()
+        p_scaled_mid = (p_mid/scale_size - 0.5).float()
         with torch.no_grad():
-            f_mid = (net.infer_occ(p_scaled_mid.view(1, -1, 3),  tsdf).cpu() - tau).squeeze()
-        torch.cuda.empty_cache()
+            f_mid = (net.infer_occ(p_scaled_mid.view(1, -1, 3), encoded_tsdf, encoded_inputs=True)- tau).squeeze()
+            torch.cuda.empty_cache()
         ind_low = f_mid < 0
         ind_low = ind_low
         if ind_low.sum() > 0:
@@ -55,7 +55,7 @@ def secant(net, tsdf, f_low, f_high, d_low, d_high, n_secant_steps,
     return d_pred
 
 
-def generate_neur_grasp_clouds(sim, render_settings, grasps, size, tsdf, net, device=torch.device("cuda"), scene_mesh=None, debug=False, o3d_vis=None):
+def generate_neur_grasp_clouds(sim, render_settings, grasps, size, encoded_tsdf, net, device=torch.device("cuda"), scene_mesh=None, debug=False, o3d_vis=None):
     max_points = render_settings['max_points']
     voxel_downsample_size = render_settings['voxel_downsample_size']
     width = height = render_settings['camera_image_res']
@@ -64,9 +64,14 @@ def generate_neur_grasp_clouds(sim, render_settings, grasps, size, tsdf, net, de
     n_steps = render_settings['n_proposal_steps']
     n_pts = width*height*3
     n_secant_steps = 8 # For surface refinement (crucial)
-    if tsdf.shape[0] == 1:
-        tsdf = np.repeat(tsdf,len(grasps), axis=0)
-    tsdf_t = torch.tensor(tsdf, device=device, dtype=torch.float32)
+    # if tsdf.shape[0] == 1:
+    #     tsdf = np.repeat(tsdf,len(grasps), axis=0)
+    # tsdf_t = torch.tensor(tsdf, device=device, dtype=torch.float32)
+    # if encoded_tsdf.shape[0] == 1: # We assume this is always the case!
+    # add batch dimension
+    batched_encoded_tsdf = {}
+    for keyz, encoded_feats in encoded_tsdf.items():
+        batched_encoded_tsdf[keyz] = encoded_feats.repeat(len(grasps), 1, 1, 1)
     
     # Camera settings
     width_fov  = np.deg2rad(render_settings['camera_fov']) # angular FOV (120 by default)
@@ -186,7 +191,7 @@ def generate_neur_grasp_clouds(sim, render_settings, grasps, size, tsdf, net, de
     # Query network
     torch.cuda.empty_cache()
     with torch.no_grad():
-        val = net.infer_occ(p_scaled_proposal_query.clone().to(device), tsdf_t)
+        val = net.infer_occ(p_scaled_proposal_query.clone().to(device), batched_encoded_tsdf, encoded_inputs=True)
     val = val.cpu()
     torch.cuda.empty_cache()
     val = (val - 0.5) # Center occupancies around 0
@@ -223,9 +228,11 @@ def generate_neur_grasp_clouds(sim, render_settings, grasps, size, tsdf, net, de
     if mask.sum() > 0:
         torch.cuda.empty_cache()
         with torch.no_grad():
-            d_pred = secant(net, tsdf_t[0].unsqueeze(0), # we don't care about batch size here
-                f_low, f_high, d_low, d_high, n_secant_steps, ray0_masked,
-                ray_direction_masked, tau=0.5, scale_size=size)
+            d_pred = secant(net, encoded_tsdf, # we don't care about batch size here
+                f_low.to(device), f_high.to(device), d_low.to(device), d_high.to(device), n_secant_steps, ray0_masked.to(device),
+                ray_direction_masked.to(device), tau=torch.tensor(0.5, device=device, dtype=torch.float), scale_size=torch.tensor(size, device=device, dtype=torch.float))
+        d_pred = d_pred.cpu()
+        torch.cuda.empty_cache()
     else:
         d_pred = torch.zeros(0, dtype=torch.float32)
 
