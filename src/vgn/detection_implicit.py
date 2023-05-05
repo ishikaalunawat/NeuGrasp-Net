@@ -148,7 +148,7 @@ class VGNImplicit(object):
         point_input = False
         if point_input:
             lower = np.array([0.0 , 0.0 , 0.0])
-            upper = np.array([0.3, 0.3, 0.3])
+            upper = np.array([size, size, size])
             bounding_box = o3d.geometry.AxisAlignedBoundingBox(lower, upper)
             pc_cropped = state.pc.crop(bounding_box)
             # If more than max points in point cloud, uniformly sample
@@ -184,7 +184,11 @@ class VGNImplicit(object):
             # o3d_scene_mesh = scene_mesh.as_open3d
             # o3d_scene_mesh.compute_vertex_normals()
             # pc_extended = o3d_scene_mesh.sample_points_uniformly(number_of_points=1000)
-            # Optional: Downsample point cloud if too large
+            # Optional: Crop pc and downsample point cloud if too large
+            lower = np.array([0.0 , 0.0 , 0.0])
+            upper = np.array([size, size, size])
+            bounding_box = o3d.geometry.AxisAlignedBoundingBox(lower, upper)
+            pc_extended = pc_extended.crop(bounding_box)
             pc_extended_down = pc_extended.voxel_down_sample(voxel_size=0.005)
 
             sampler = GpgGraspSamplerPcl(0.05-0.0075) # Franka finger depth is actually a little less than 0.05

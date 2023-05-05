@@ -31,3 +31,6 @@ python scripts/randomize_scene_views.py /home/sjauhri/IAS_WS/potato-net/GIGA-TSD
 # UNISURF: 
 ## DIFFERENT VIEWS - 5 scenes (to change number of scenes to 'x':: --num_grasps x)
 python scripts/generate_data_parallel.py --scene pile --object-set pile/train --num-grasps 5 --save-scene ./data/unisurf --random
+
+# TESTING:
+python -u scripts/sim_grasp_multiple.py --num-view 1 --object-set pile/test --scene pile --num-rounds 100 --model /home/sjauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/runs_relevant/23-05-01-08-11-39_dataset=data_pile_train_constructed_4M_HighRes_radomized_views,augment=False,net=6d_neu_grasp_pn_deeper,batch_size=32,lr=5e-05,PN_deeper_DIMS_CONT/best_neural_grasp_neu_grasp_pn_deeper_val_acc=0.9097.pt --resolution=64 --type neu_grasp_pn_deeper --qual-th 0.5 --result-path ./data/results/pn_deeper_fixed_view_extended_pc >> ./data/results/pn_deeper_fixed_view_extended_pc.txt
