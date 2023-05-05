@@ -18,6 +18,7 @@ def main(args):
                                     best=args.best,
                                     qual_th=args.qual_th,
                                     force_detection=args.force,
+                                    seen_pc_only=args.seen_pc_only,
                                     out_th=0.1,
                                     select_top=False,
                                     resolution=args.resolution,
@@ -51,6 +52,7 @@ def main(args):
             sim_gui=args.sim_gui,
             result_path=None,
             add_noise=args.add_noise,
+            randomize_view=args.randomize_view,
             sideview=args.sideview,
             silence=args.silence,
             visualize=args.vis)
@@ -101,6 +103,14 @@ if __name__ == "__main__":
         "--best",
         action="store_true",
         help="UNUSED. Whether to use best valid grasp (or random valid grasp). UNUSED")
+    parser.add_argument(
+        "--randomize_view",
+        type=bool, default='',
+        help="Whether to use a random view input tsdf/point cloud")
+    parser.add_argument(
+        "--seen_pc_only",
+        type=bool, default='',
+        help="Whether to use the 'seen' point cloud or the reconstructed point cloud for grasp candidate generation")
     parser.add_argument("--result-path", type=str)
     parser.add_argument(
         "--force",

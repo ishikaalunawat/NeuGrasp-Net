@@ -38,6 +38,7 @@ def run(
     sim_gui=False,
     result_path=None,
     add_noise=False,
+    randomize_view=False,
     sideview=False,
     resolution=40,
     silence=False,
@@ -118,9 +119,10 @@ def run(
 
             # scan the scene: with RANDOMIZED view
             # sim.world.remove_body(sim.world.bodies[0]) # remove table because we dont want to render it # normally table is the first body
-            tsdf, pc, timings["integration"] = sim.acquire_tsdf(n=n, N=N, resolution=resolution, randomize_view=False)            
+            tsdf, pc, timings["integration"] = sim.acquire_tsdf(n=n, N=N, resolution=resolution, randomize_view=randomize_view)
             # sim.place_table(height=sim.gripper.finger_depth) # Add table back
-            # Also sampling extended scene PC for more grasp queries
+            
+            # FOR DEBUG: sample extended scene PC for grasp queries on GT cloud
             # while True:
             _, pc_extended, _ = sim.acquire_tsdf(n=6, N=N, resolution=resolution)
                 # if len(pc_extended.points) >= 1000:

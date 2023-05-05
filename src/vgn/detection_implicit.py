@@ -21,7 +21,7 @@ axes_cond = lambda x,z: np.isclose(np.abs(np.dot(x, z)), 1.0, 1e-4)
 
 
 class VGNImplicit(object):
-    def __init__(self, model_path, model_type, best=False, force_detection=False, qual_th=0.5, out_th=0.5, visualize=False, resolution=40, **kwargs):
+    def __init__(self, model_path, model_type, best=False, force_detection=False, seen_pc_only=False, qual_th=0.5, out_th=0.5, visualize=False, resolution=40, **kwargs):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         # self.device = "cpu"
         self.net = load_network(model_path, self.device, model_type=model_type)
@@ -30,6 +30,7 @@ class VGNImplicit(object):
         self.qual_th = qual_th
         self.best = best
         self.force_detection = force_detection
+        self.seen_pc_only = seen_pc_only
         self.out_th = out_th
         self.visualize = visualize
         
@@ -95,14 +96,14 @@ class VGNImplicit(object):
             tsdf_vol = state.tsdf
             voxel_size = 0.3 / self.resolution
             size = 0.3
-            pc_extended = state.pc_extended # Using extended PC for grasp sampling
+            pc_extended = state.pc_extended # If debug: Using extended PC for grasp sampling
 
         else:
             tsdf_vol = state.tsdf.get_grid()
             voxel_size = tsdf_process.voxel_size
             tsdf_process = tsdf_process.get_grid()
             size = state.tsdf.size
-            pc_extended = state.pc_extended # Using extended PC for grasp sampling
+            pc_extended = state.pc_extended # If debug: Using extended PC for grasp sampling
 
         tic = time.time()
 
@@ -133,9 +134,11 @@ class VGNImplicit(object):
                     o3d_vis = None
                     # num_grasps_gpg = 40
                     num_grasps_gpg = 60
-                    # pc_extended = state.pc # Use only seen areas for grasp sampling
-                    # Use full rendered cloud for grasp sampling
-                    # pc_extended = get_scene_surf_render(sim, size, self.resolution, self.net, tsdf_vol, device=self.device)
+                    if (self.seen_pc_only == True):
+                        pc_extended = state.pc # Use only seen areas for grasp sampling
+                    else:
+                        # Use full rendered cloud for grasp sampling
+                        pc_extended = get_scene_surf_render(sim, size, self.resolution, self.net, tsdf_vol, device=self.device)
             except RuntimeError as e:
                 if "CUDA out of memory. " in str(e):
                     print("CUDA out of memory. Trying again...")
