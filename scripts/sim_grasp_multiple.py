@@ -11,7 +11,8 @@ from vgn.utils.misc import set_random_seed
 
 def main(args):
 
-    if args.type in ['giga', 'giga_hr', 'giga_aff', 'neu_grasp_pn', 'neu_grasp_pn_no_local_cloud', 'neu_grasp_dgcnn', 'neu_grasp_vn_pn_pn']:
+    if args.type in ['giga', 'giga_hr', 'giga_aff', 'neu_grasp_pn', 'neu_grasp_pn_deeper',
+                     'neu_grasp_pn_no_local_cloud', 'neu_grasp_dgcnn', 'neu_grasp_vn_pn_pn']:
         grasp_planner = VGNImplicit(args.model,
                                     args.type,
                                     best=args.best,
@@ -88,18 +89,18 @@ if __name__ == "__main__":
     parser.add_argument("--num-objects", type=int, default=5)
     parser.add_argument("--num-view", type=int, default=1) # No need to change
     parser.add_argument("--num-rounds", type=int, default=100)
-    parser.add_argument("--resolution", type=int, default=40)
-    parser.add_argument("--seeds", type=int, nargs='+', default=[100, 0, 1, 2, 3, 4])
+    parser.add_argument("--resolution", type=int, default=64)
+    parser.add_argument("--seeds", type=int, nargs='+', default=[0, 1, 2, 3, 4])
     parser.add_argument("--sim-gui", action="store_true")
     # parser.add_argument("--grad-refine", action="store_true")
-    parser.add_argument("--qual-th", type=float, default=0.9)
+    parser.add_argument("--qual-th", type=float, default=0.5)
     parser.add_argument("--eval-geo",
                         action="store_true",
                         help='whether evaluate geometry prediction')
     parser.add_argument(
         "--best",
         action="store_true",
-        help="Whether to use best valid grasp (or random valid grasp)")
+        help="UNUSED. Whether to use best valid grasp (or random valid grasp). UNUSED")
     parser.add_argument("--result-path", type=str)
     parser.add_argument(
         "--force",

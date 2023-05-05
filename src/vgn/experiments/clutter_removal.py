@@ -166,9 +166,9 @@ def run(
 
             # execute grasp
             grasp, score = grasps[0], scores[0]
-            # print("[BEST Score: %.2f]" % score)
+            print("[BEST Score: %.2f]" % score)
             label, _ = sim.execute_grasp(grasp, allow_contact=True)
-            # print("[RESULT: %s]" % label)
+            print("[RESULT: %s]" % label)
             cnt += 1
             if label != Label.FAILURE:
                 success += 1

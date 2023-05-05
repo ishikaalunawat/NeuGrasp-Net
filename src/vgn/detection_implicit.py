@@ -245,8 +245,37 @@ class VGNImplicit(object):
                 while(1): # Be careful with this loop, it can run forever if there is no CUDA memory available
                     try:
                         torch.cuda.empty_cache()
-                        bad_indices, grasps_pc_local, grasps_pc, grasps_viz_list = generate_neur_grasp_clouds(sim, render_settings, grasps, size, tsdf_vol, 
-                                                                            self.net, self.device, scene_mesh, debug=False, o3d_vis=o3d_vis)
+                        # split into parts to avoid CUDA memory issues
+                        n = len(grasps)
+                        remaining_grasps = n
+                        max_grasps_at_once = 15
+                        grasp_idx = 0
+                        bad_indices, grasps_pc_local, grasps_pc, grasps_viz_list = [], torch.zeros((len(grasps),render_settings['max_points'],3), device=self.device), torch.zeros((len(grasps),render_settings['max_points'],3), device=self.device), []
+                        while remaining_grasps > 1: # Because we can't use just 1 grasp
+                            if remaining_grasps > max_grasps_at_once:
+                                grasps_batch = grasps[grasp_idx:grasp_idx+max_grasps_at_once]
+                                
+                                curr_bad_indices, curr_grasps_pc_local, curr_grasps_pc, curr_grasps_viz_list = generate_neur_grasp_clouds(sim, render_settings, grasps_batch, size, tsdf_vol, 
+                                                                                    self.net, self.device, scene_mesh, debug=False, o3d_vis=o3d_vis)
+                                bad_indices += curr_bad_indices
+                                grasps_pc_local[grasp_idx:grasp_idx+max_grasps_at_once] = curr_grasps_pc_local
+                                grasps_pc[grasp_idx:grasp_idx+max_grasps_at_once] = curr_grasps_pc
+                                grasps_viz_list += curr_grasps_viz_list
+
+                                remaining_grasps -= max_grasps_at_once
+                                grasp_idx += max_grasps_at_once
+                            else:
+                                grasps_batch = grasps[grasp_idx:]
+
+                                curr_bad_indices, curr_grasps_pc_local, curr_grasps_pc, curr_grasps_viz_list = generate_neur_grasp_clouds(sim, render_settings, grasps_batch, size, tsdf_vol, 
+                                                                                self.net, self.device, scene_mesh, debug=False, o3d_vis=o3d_vis)
+                                bad_indices += curr_bad_indices
+                                grasps_pc_local[grasp_idx:] = curr_grasps_pc_local
+                                grasps_pc[grasp_idx:] = curr_grasps_pc
+                                grasps_viz_list += curr_grasps_viz_list
+                                
+                                remaining_grasps = 0
+                            
                     except RuntimeError as e:
                         if "CUDA out of memory. " in str(e):
                             print("CUDA out of memory. Trying again...")
