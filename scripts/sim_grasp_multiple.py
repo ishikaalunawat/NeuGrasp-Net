@@ -36,7 +36,7 @@ def main(args):
 
     gsr = []
     dr = []
-    for seed in args.seeds:
+    for seed in args.zeeds:
         set_random_seed(seed)
         success_rate, declutter_rate = clutter_removal.run(
             grasp_plan_fn=grasp_planner,
@@ -53,6 +53,7 @@ def main(args):
             result_path=None,
             add_noise=args.add_noise,
             randomize_view=args.randomize_view,
+            see_table=args.see_table,
             sideview=args.sideview,
             silence=args.silence,
             visualize=args.vis)
@@ -87,16 +88,16 @@ if __name__ == "__main__":
                         type=str,
                         choices=["pile", "packed"],
                         default="pile")
-    parser.add_argument("--object-set", type=str, default="blocks")
+    parser.add_argument("--object_set", type=str, default="blocks")
     parser.add_argument("--num-objects", type=int, default=5)
-    parser.add_argument("--num-view", type=int, default=1) # No need to change
-    parser.add_argument("--num-rounds", type=int, default=100)
+    parser.add_argument("--num_view", type=int, default=1) # No need to change
+    parser.add_argument("--num_rounds", type=int, default=100)
     parser.add_argument("--resolution", type=int, default=64)
-    parser.add_argument("--seeds", type=int, nargs='+', default=[0, 1, 2, 3, 4])
+    parser.add_argument("--zeeds", type=int, nargs='+', default=[0, 1, 2, 3, 4])
     parser.add_argument("--sim-gui", action="store_true")
     # parser.add_argument("--grad-refine", action="store_true")
-    parser.add_argument("--qual-th", type=float, default=0.5)
-    parser.add_argument("--eval-geo",
+    parser.add_argument("--qual_th", type=float, default=0.5)
+    parser.add_argument("--eval_geo",
                         action="store_true",
                         help='whether evaluate geometry prediction')
     parser.add_argument(
@@ -108,10 +109,14 @@ if __name__ == "__main__":
         type=bool, default='',
         help="Whether to use a random view input tsdf/point cloud")
     parser.add_argument(
+        "--see_table",
+        type=bool, default='',
+        help="Whether the network sees the table in the input tsdf/point cloud")
+    parser.add_argument(
         "--seen_pc_only",
         type=bool, default='',
         help="Whether to use the 'seen' point cloud or the reconstructed point cloud for grasp candidate generation")
-    parser.add_argument("--result-path", type=str)
+    parser.add_argument("--result_path", type=str)
     parser.add_argument(
         "--force",
         action="store_true",
@@ -119,7 +124,7 @@ if __name__ == "__main__":
         "When all grasps are under threshold, force the detector to select the best grasp"
     )
     parser.add_argument(
-        "--add-noise",
+        "--add_noise",
         type=str,
         default='',
         help="Whether add noise to depth observation, trans | dex | norm | ''")
@@ -136,5 +141,5 @@ if __name__ == "__main__":
                         action="store_true",
                         help="Save grasp failure visualizations")
     
-    args = parser.parse_args()
+    args, _ = parser.parse_known_args()
     main(args)

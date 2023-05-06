@@ -39,6 +39,7 @@ def run(
     result_path=None,
     add_noise=False,
     randomize_view=False,
+    see_table=False,
     sideview=False,
     resolution=40,
     silence=False,
@@ -117,10 +118,12 @@ def run(
             trial_id += 1
             timings = {}
 
-            # scan the scene: with RANDOMIZED view
-            # sim.world.remove_body(sim.world.bodies[0]) # remove table because we dont want to render it # normally table is the first body
+            # scan the scene: with optionally, RANDOMIZED view
+            if see_table == False:
+                sim.world.remove_body(sim.world.bodies[0]) # remove table because we dont want to render it # normally table is the first body
             tsdf, pc, timings["integration"] = sim.acquire_tsdf(n=n, N=N, resolution=resolution, randomize_view=randomize_view)
-            # sim.place_table(height=sim.gripper.finger_depth) # Add table back
+            if see_table == False:
+                sim.place_table(height=sim.gripper.finger_depth) # Add table back            
             
             # FOR DEBUG: sample extended scene PC for grasp queries on GT cloud
             # while True:
