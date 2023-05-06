@@ -40,7 +40,7 @@ def main(args):
     unseen_gsr = []
     seen_cnts = []
     unseen_cnts = []
-    for seed in args.seeds:
+    for seed in args.zeeds:
         set_random_seed(seed)
         success_rate, declutter_rate, seen_success_rate, unseen_success_rate, seen_cnt, unseen_cnt = clutter_removal.run(
             grasp_plan_fn=grasp_planner,
