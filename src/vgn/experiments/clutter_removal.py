@@ -73,7 +73,11 @@ def run(
         # vc.convert_from_pinhole_camera_parameters(cam_params, allow_arbitrary=True)
 
     cnt = 0
+    seen_cnt = 1 # to avoid division by zero
+    unseen_cnt = 1 # to avoid division by zero
     success = 0
+    seen_success = 0
+    unseen_success = 0
     left_objs = 0
     total_objs = 0
     cons_fail = 0
@@ -152,14 +156,14 @@ def run(
                 # Also return the scene mesh with or without grasps
                 mesh_pose_list = get_mesh_pose_list_from_world(sim.world, object_set)
                 scene_mesh = get_scene_from_mesh_pose_list(mesh_pose_list)
-                grasps, scores, timings["planning"], visual_mesh = grasp_plan_fn(state, scene_mesh, sim=sim, debug_data=data_for_scene, seed=seed, o3d_vis=o3d_vis, first_call=first_call)
+                grasps, scores, unseen_flags, timings["planning"], visual_mesh = grasp_plan_fn(state, scene_mesh, sim=sim, debug_data=data_for_scene, seed=seed, o3d_vis=o3d_vis, first_call=first_call)
                 first_call = False
                 # assert not visual_mesh.is_empty
                 # o3d.visualization.draw_geometries([visual_mesh.as_open3d])
                 # logger.log_mesh(scene_mesh, visual_mesh, f'round_{round_id:03d}_trial_{trial_id:03d}')
                 
             else:
-                grasps, scores, timings["planning"] = grasp_plan_fn(state, sim=sim, debug_data=data_for_scene, seed=seed)
+                grasps, scores, unseen_flags, timings["planning"] = grasp_plan_fn(state, sim=sim, debug_data=data_for_scene, seed=seed)
             planning_times.append(timings["planning"])
             total_times.append(timings["planning"] + timings["integration"])
 
@@ -170,13 +174,22 @@ def run(
                 continue  # no good grasps found, skip
 
             # execute grasp
-            grasp, score = grasps[0], scores[0]
+            grasp, score, unseen_flag = grasps[0], scores[0], unseen_flags[0]
+            print(f"[Unseen grasp?: {unseen_flag}]")
             print("[BEST Score: %.2f]" % score)
             label, _ = sim.execute_grasp(grasp, allow_contact=True)
             print("[RESULT: %s]" % label)
             cnt += 1
+            if unseen_flag:
+                unseen_cnt += 1
+            else:
+                seen_cnt += 1
             if label != Label.FAILURE:
                 success += 1
+                if unseen_flag:
+                    unseen_success += 1
+                else:
+                    seen_success += 1
 
             if not debug_validation:
                 # log the grasp
@@ -194,14 +207,19 @@ def run(
                 break
         left_objs += sim.num_objects
     success_rate = 100.0 * success / cnt
+    seen_success_rate = 100.0 * seen_success / seen_cnt
+    unseen_success_rate = 100.0 * unseen_success / unseen_cnt
     declutter_rate = 100.0 * success / total_objs
     print('Grasp success rate: %.2f %%, Declutter rate: %.2f %%' % (success_rate, declutter_rate))
+    print('Seen success rate: %.2f %%, Unseen success rate: %.2f %%' % (seen_success_rate, unseen_success_rate))
+    print('Seen grasp count: %d, Unseen grasp count: %d' % (seen_cnt, unseen_cnt))
     print(f'Average planning time: {np.mean(planning_times)}, total time: {np.mean(total_times)}')
     print('Consecutive failures and no detections: %d, %d' % (cons_fail, no_grasp))
     if result_path is not None:
         with open(result_path, 'w') as f:
-            f.write('%.2f%%, %.2f%%; %d, %d\n' % (success_rate, declutter_rate, cons_fail, no_grasp))
-    return success_rate, declutter_rate
+            f.write('%.2f%%, %.2f%%, %.2f%%, %.2f%%; %d, %d, %d, %d\n' % (success_rate, declutter_rate, seen_success_rate, unseen_success_rate,
+                                                   seen_cnt, unseen_cnt, cons_fail, no_grasp))
+    return success_rate, declutter_rate, seen_success_rate, unseen_success_rate, seen_cnt, unseen_cnt
     
 
 

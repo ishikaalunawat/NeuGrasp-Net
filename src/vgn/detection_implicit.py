@@ -136,7 +136,7 @@ class VGNImplicit(object):
                         o3d_vis.add_geometry(state.pc, reset_bounding_box=True) # HACK TO SET O3D CAMERA VIEW for seed 100!!
                         o3d_vis.poll_events()
                         o3d_vis.update_renderer()
-                        return [], [], 0.0, scene_mesh
+                        return [], [], [], 0.0, scene_mesh
                     else:
                         # Viz input point cloud
                         o3d_vis.add_geometry(state.pc, reset_bounding_box=False) # point cloud
@@ -197,12 +197,28 @@ class VGNImplicit(object):
             upper = np.array([size, size, size])
             bounding_box = o3d.geometry.AxisAlignedBoundingBox(lower, upper)
             pc_extended = pc_extended.crop(bounding_box)
-            pc_extended_down = pc_extended.voxel_down_sample(voxel_size=0.005)
+            voxel_size = 0.005
+            pc_extended_down = pc_extended.voxel_down_sample(voxel_size)
 
             sampler = GpgGraspSamplerPcl(0.05-0.0075) # Franka finger depth is actually a little less than 0.05
             safety_dist_above_table = 0.05 # table is spawned at finger_depth
-            grasps, pos_queries, rot_queries = sampler.sample_grasps(pc_extended_down, num_grasps=num_grasps_gpg, max_num_samples=180,
-                                                safety_dis_above_table=safety_dist_above_table, show_final_grasps=False, verbose=False)
+            grasps, pos_queries, rot_queries, gpg_origin_points = sampler.sample_grasps(pc_extended_down, num_grasps=num_grasps_gpg, max_num_samples=180,
+                                                safety_dis_above_table=safety_dist_above_table, show_final_grasps=False, verbose=False,
+                                                return_origin_point=True)
+            # Optional: Find out if the point comes from a seen or unseen area
+            if (self.seen_pc_only == True):
+                unseen_flags = None # will be set to 0 for all grasps in select()
+            else:
+                unseen_flags = []
+                distance_threshold = np.float32(voxel_size - 0.0001) # 4.9 mm
+                current_pc = o3d.geometry.PointCloud() # Point cloud with one point
+                for grasp, origin_point in zip(grasps, gpg_origin_points):
+                    current_pc.points = o3d.utility.Vector3dVector(np.array([origin_point]))
+                    dist = current_pc.compute_point_cloud_distance(pc_extended_down) 
+                    if dist < distance_threshold: # If close to a seen point
+                        unseen_flags.append(0) # Seen
+                    else:
+                        unseen_flags.append(1) # Unseen
 
             # Use standard GIGA grasp sampling:
             # points, normals = self.sample_grasp_points(pc_extended, self.finger_depth)
@@ -212,9 +228,9 @@ class VGNImplicit(object):
             if (len(pos_queries) < 2):
                 print("[Warning]: No grasps found by GPG")
                 if self.visualize:
-                    return [], [], 0.0, scene_mesh
+                    return [], [], [], 0.0, scene_mesh
                 else:
-                    return [], [], 0.0
+                    return [], [], [], 0.0
 
         # Convert to torch tensor
         pos_queries = torch.Tensor(pos_queries).view(1, -1, 3).to(self.device)
@@ -232,7 +248,7 @@ class VGNImplicit(object):
         # Query network
         if 'neu' in self.model_type:
             # Also generate grasp point clouds
-            render_settings = read_json(Path("data/pile/data_pile_train_random_raw_4M_radomized_views/grasp_cloud_setup.json"))
+            render_settings = read_json(Path("/home/jauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/pile/grasp_cloud_setup.json"))
             gt_render = False
             if gt_render:
                 # remove table because we dont want to render it
@@ -263,7 +279,7 @@ class VGNImplicit(object):
                         # split into parts to avoid CUDA memory issues
                         n = len(grasps)
                         remaining_grasps = n
-                        max_grasps_at_once = 15
+                        max_grasps_at_once = 30
                         grasp_idx = 0
                         bad_indices, grasps_pc_local, grasps_pc, grasps_viz_list = [], torch.zeros((len(grasps),render_settings['max_points'],3), device=self.device), torch.zeros((len(grasps),render_settings['max_points'],3), device=self.device), []
                         while remaining_grasps > 1: # Because we can't use just 1 grasp
@@ -349,7 +365,8 @@ class VGNImplicit(object):
             ### TODO - check affordance - visual (WEIRD)
             colored_scene_mesh = scene_mesh
             # colored_scene_mesh = visual.affordance_visual(qual_vol, rot, scene_mesh, size, self.resolution, **aff_kwargs)
-        grasps, scores, bad_grasps, bad_scores = select(qual_vol.copy(), pos_queries[0].squeeze().cpu(), rot_queries[0].squeeze().cpu(), width_vol, threshold=self.qual_th, force_detection=self.force_detection)
+        grasps, scores, unseen_flags, bad_grasps, bad_scores = select(qual_vol.copy(), pos_queries[0].squeeze().cpu(), rot_queries[0].squeeze().cpu(), width_vol,
+                                                        threshold=self.qual_th, force_detection=self.force_detection, unseen_flags=unseen_flags)
         toc = time.time() - tic
 
         bad_grasps, bad_scores = np.asarray(bad_grasps), np.asarray(bad_scores)
@@ -389,9 +406,9 @@ class VGNImplicit(object):
             #     composed_scene.add_geometry(g_mesh, node_name=f'bad_grasp_{i}')
             # # Optional: Show grasps (for debugging)
             # composed_scene.show()
-            return grasps, scores, toc, composed_scene
+            return grasps, scores, unseen_flags, toc, composed_scene
         else:
-            return grasps, scores, toc
+            return grasps, scores, unseen_flags, toc
 
 
 def bound(qual_vol, voxel_size, limit=[0.02, 0.02, 0.055]):
@@ -472,7 +489,7 @@ def process(
     return qual_vol, width_vol
 
 
-def select(qual_vol, center_vol, rot_vol, width_vol, threshold=0.50, force_detection=False):
+def select(qual_vol, center_vol, rot_vol, width_vol, threshold=0.50, force_detection=False, unseen_flags=None):
 
     bad_mask = np.where(qual_vol<threshold, 1.0, 0.0)
 
@@ -496,7 +513,7 @@ def select(qual_vol, center_vol, rot_vol, width_vol, threshold=0.50, force_detec
         bad_grasps.append(bad_grasp)
         bad_scores.append(bad_score)
     
-    grasps, scores = [], []
+    grasps, scores, unseen_vals = [], [], []
     for index in np.argwhere(mask):
         index = index.squeeze()
         ori = Rotation.from_quat(rot_vol[index])
@@ -505,14 +522,18 @@ def select(qual_vol, center_vol, rot_vol, width_vol, threshold=0.50, force_detec
         # grasp, score = select_index(qual_vol, center_vol, rot_vol, width_vol, index)
         grasps.append(grasp)
         scores.append(score)
+        if unseen_flags is not None:
+            unseen_vals.append(unseen_flags[index])
+        else:
+            unseen_vals.append(0)
     
     sorted_bad_grasps = [bad_grasps[i] for i in np.argsort(bad_scores)]
     sorted_bad_scores = [bad_scores[i] for i in np.argsort(bad_scores)]
     sorted_grasps = [grasps[i] for i in reversed(np.argsort(scores))]
     sorted_scores = [scores[i] for i in reversed(np.argsort(scores))]
-
+    sorted_unseen_vals = [unseen_vals[i] for i in reversed(np.argsort(scores))]
         
-    return sorted_grasps, sorted_scores, sorted_bad_grasps, sorted_bad_scores
+    return sorted_grasps, sorted_scores, sorted_unseen_vals, sorted_bad_grasps, sorted_bad_scores
 
 
 def select_index(qual_vol, center_vol, rot_vol, width_vol, index):

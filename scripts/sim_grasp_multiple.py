@@ -36,9 +36,13 @@ def main(args):
 
     gsr = []
     dr = []
-    for seed in args.zeeds:
+    seen_gsr = []
+    unseen_gsr = []
+    seen_cnts = []
+    unseen_cnts = []
+    for seed in args.seeds:
         set_random_seed(seed)
-        success_rate, declutter_rate = clutter_removal.run(
+        success_rate, declutter_rate, seen_success_rate, unseen_success_rate, seen_cnt, unseen_cnt = clutter_removal.run(
             grasp_plan_fn=grasp_planner,
             logdir=args.logdir,
             resolution=args.resolution,
@@ -50,7 +54,7 @@ def main(args):
             num_rounds=args.num_rounds,
             seed=seed,
             sim_gui=args.sim_gui,
-            result_path=None,
+            result_path=args.result_path,
             add_noise=args.add_noise,
             randomize_view=args.randomize_view,
             see_table=args.see_table,
@@ -58,6 +62,10 @@ def main(args):
             silence=args.silence,
             visualize=args.vis)
         gsr.append(success_rate)
+        seen_gsr.append(seen_success_rate)
+        unseen_gsr.append(unseen_success_rate)
+        seen_cnts.append(seen_cnt)
+        unseen_cnts.append(unseen_cnt)
         dr.append(declutter_rate)
     results = {
         'gsr': {
@@ -69,12 +77,36 @@ def main(args):
             'mean': np.mean(dr),
             'std': np.std(dr),
             'val': dr
-        }
+        },
+        'seen_gsr': {
+            'mean': np.mean(seen_gsr),
+            'std': np.std(seen_gsr),
+            'val': seen_gsr
+        },
+        'unseen_gsr': {
+            'mean': np.mean(unseen_gsr),
+            'std': np.std(unseen_gsr),
+            'val': unseen_gsr
+        },
+        'seen_cnts': {
+            'mean': np.mean(seen_cnts),
+            'std': np.std(seen_cnts),
+            'val': seen_cnts
+        },
+        'unseen_cnts': {
+            'mean': np.mean(unseen_cnts),
+            'std': np.std(unseen_cnts),
+            'val': unseen_cnts
+        },
     }
     print('Average results:')
     print(f'Grasp sucess rate: {np.mean(gsr):.2f} ± {np.std(gsr):.2f} %')
+    print(f'Seen grasp sucess rate: {np.mean(seen_gsr):.2f} ± {np.std(seen_gsr):.2f} %')
+    print(f'Unseen grasp sucess rate: {np.mean(unseen_gsr):.2f} ± {np.std(unseen_gsr):.2f} %')
+    print(f'Seen grasp count: {np.mean(seen_cnts):.2f} ± {np.std(seen_cnts):.2f}')
+    print(f'Unseen grasp count: {np.mean(unseen_cnts):.2f} ± {np.std(unseen_cnts):.2f}')
     print(f'Declutter rate: {np.mean(dr):.2f} ± {np.std(dr):.2f} %')
-    with open(args.result_path, 'w') as f:
+    with open(args.result_path+'.json', 'w') as f:
         json.dump(results, f, indent=2)
 
 
