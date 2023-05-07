@@ -16,12 +16,16 @@ class DGCNN(nn.Module):
             self.bn3 = nn.BatchNorm2d(128)
             self.bn4 = nn.BatchNorm2d(256)
             self.bn5 = nn.BatchNorm1d(1024)
+            self.bn6 = nn.BatchNorm1d(512)
+            self.bn7 = nn.BatchNorm1d(256)
         else:
             self.bn1 = nn.Identity()
             self.bn2 = nn.Identity()
             self.bn3 = nn.Identity()
             self.bn4 = nn.Identity()
             self.bn5 = nn.Identity()
+            self.bn6 = nn.Identity()
+            self.bn7 = nn.Identity()
 
         self.conv1 = nn.Sequential(nn.Conv2d(input_dim*2, 64, kernel_size=1, bias=False),
                                    self.bn1,
@@ -39,10 +43,10 @@ class DGCNN(nn.Module):
                                    self.bn5,
                                    nn.LeakyReLU(negative_slope=0.2))
         self.linear1 = nn.Linear(1024*2, 512, bias=False)
-        self.bn6 = nn.BatchNorm1d(512)
+        
         self.dp1 = nn.Dropout(p=0.5)
         self.linear2 = nn.Linear(512, 256)
-        self.bn7 = nn.BatchNorm1d(256)
+        
         self.dp2 = nn.Dropout(p=0.5)
         self.linear3 = nn.Linear(256, num_class)
 
