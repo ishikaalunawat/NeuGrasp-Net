@@ -39,6 +39,7 @@ def run(
     result_path=None,
     add_noise=False,
     randomize_view=False,
+    tight_view=False,
     see_table=False,
     sideview=False,
     resolution=40,
@@ -125,7 +126,7 @@ def run(
             # scan the scene: with optionally, RANDOMIZED view
             if see_table == False:
                 sim.world.remove_body(sim.world.bodies[0]) # remove table because we dont want to render it # normally table is the first body
-            tsdf, pc, timings["integration"] = sim.acquire_tsdf(n=n, N=N, resolution=resolution, randomize_view=randomize_view)
+            tsdf, pc, timings["integration"] = sim.acquire_tsdf(n=n, N=N, resolution=resolution, randomize_view=randomize_view, tight_view=tight_view)
             if see_table == False:
                 sim.place_table(height=sim.gripper.finger_depth) # Add table back            
             

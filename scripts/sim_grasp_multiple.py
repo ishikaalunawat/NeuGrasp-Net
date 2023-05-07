@@ -57,6 +57,7 @@ def main(args):
             result_path=args.result_path,
             add_noise=args.add_noise,
             randomize_view=args.randomize_view,
+            tight_view=args.tight_view,
             see_table=args.see_table,
             sideview=args.sideview,
             silence=args.silence,
@@ -140,6 +141,10 @@ if __name__ == "__main__":
         "--randomize_view",
         type=bool, default='',
         help="Whether to use a random view input tsdf/point cloud")
+    parser.add_argument(
+        "--tight_view",
+        type=bool, default='',
+        help="Whether to use a TIGHT view input tsdf/point cloud. Very partial view")
     parser.add_argument(
         "--see_table",
         type=bool, default='',
