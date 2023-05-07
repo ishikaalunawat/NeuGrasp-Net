@@ -126,48 +126,39 @@ class VGNImplicit(object):
             tsdf_vol = np.expand_dims(pc_final,0)
         
         ## Get scene render
-        while(1): # Be careful with this loop, it can run forever if there is no CUDA memory available
-            try:
-                torch.cuda.empty_cache()
-                if o3d_vis is not None:
-                    # Running simulation of the scene, grasps generated and grasp clouds
-                    state.pc.colors = o3d.utility.Vector3dVector(np.tile(np.array([0, 0, 0]), (np.asarray(state.pc.points).shape[0], 1)))
-                    if first_call:
-                        o3d_vis.add_geometry(state.pc, reset_bounding_box=True) # HACK TO SET O3D CAMERA VIEW for seed 100!!
-                        o3d_vis.poll_events()
-                        o3d_vis.update_renderer()
-                        return [], [], [], 0.0, scene_mesh
-                    else:
-                        # Viz input point cloud
-                        o3d_vis.add_geometry(state.pc, reset_bounding_box=False) # point cloud
-                        o3d_vis.poll_events()
-                        # pc_extended = state.pc # Use only seen areas for grasp sampling
-                        # Use full rendered cloud for grasp sampling
-                        with torch.no_grad():
-                            encoded_tsdf = self.net.encode_inputs(torch.from_numpy(tsdf_vol).to(self.device))
-                        pc_extended = get_scene_surf_render(sim, size, self.resolution, self.net, encoded_tsdf, device=self.device)
-                        o3d_vis.add_geometry(pc_extended, reset_bounding_box=False) # point cloud
-                        o3d_vis.poll_events()
-                        # num_grasps_gpg = 20
-                        num_grasps_gpg = 60
-                else:
-                    o3d_vis = None
-                    # num_grasps_gpg = 40
-                    num_grasps_gpg = 60
-                    if (self.seen_pc_only == True):
-                        pc_extended = state.pc # Use only seen areas for grasp sampling
-                    else:
-                        # Use full rendered cloud for grasp sampling
-                        with torch.no_grad():
-                            encoded_tsdf = self.net.encode_inputs(torch.from_numpy(tsdf_vol).to(self.device))
-                        pc_extended = get_scene_surf_render(sim, size, self.resolution, self.net, encoded_tsdf, device=self.device)
-            except RuntimeError as e:
-                if "CUDA out of memory. " in str(e):
-                    print("CUDA out of memory. Trying again...")
-                    continue
-                else:
-                    raise
-            break
+        torch.cuda.empty_cache()
+        if o3d_vis is not None:
+            # Running simulation of the scene, grasps generated and grasp clouds
+            state.pc.colors = o3d.utility.Vector3dVector(np.tile(np.array([0, 0, 0]), (np.asarray(state.pc.points).shape[0], 1)))
+            if first_call:
+                o3d_vis.add_geometry(state.pc, reset_bounding_box=True) # HACK TO SET O3D CAMERA VIEW for seed 100!!
+                o3d_vis.poll_events()
+                o3d_vis.update_renderer()
+                return [], [], [], 0.0, scene_mesh
+            else:
+                # Viz input point cloud
+                o3d_vis.add_geometry(state.pc, reset_bounding_box=False) # point cloud
+                o3d_vis.poll_events()
+                # pc_extended = state.pc # Use only seen areas for grasp sampling
+                # Use full rendered cloud for grasp sampling
+                with torch.no_grad():
+                    encoded_tsdf = self.net.encode_inputs(torch.from_numpy(tsdf_vol).to(self.device))
+                pc_extended = get_scene_surf_render(sim, size, self.resolution, self.net, encoded_tsdf, device=self.device)
+                o3d_vis.add_geometry(pc_extended, reset_bounding_box=False) # point cloud
+                o3d_vis.poll_events()
+                # num_grasps_gpg = 20
+                num_grasps_gpg = 60
+        else:
+            o3d_vis = None
+            # num_grasps_gpg = 40
+            num_grasps_gpg = 60
+            if (self.seen_pc_only == True):
+                pc_extended = state.pc # Use only seen areas for grasp sampling
+            else:
+                # Use full rendered cloud for grasp sampling
+                with torch.no_grad():
+                    encoded_tsdf = self.net.encode_inputs(torch.from_numpy(tsdf_vol).to(self.device))
+                pc_extended = get_scene_surf_render(sim, size, self.resolution, self.net, encoded_tsdf, device=self.device)
 
         if debug_data is not None:
             # debug validation
@@ -200,6 +191,13 @@ class VGNImplicit(object):
             voxel_size = 0.005
             pc_extended_down = pc_extended.voxel_down_sample(voxel_size)
 
+            if pc_extended_down.is_empty():
+                print("[Warning]: Empty point cloud input to gpg")
+                if self.visualize:
+                    return [], [], [], 0.0, scene_mesh
+                else:
+                    return [], [], [], 0.0
+            
             sampler = GpgGraspSamplerPcl(0.05-0.0075) # Franka finger depth is actually a little less than 0.05
             safety_dist_above_table = 0.05 # table is spawned at finger_depth
             grasps, pos_queries, rot_queries, gpg_origin_points = sampler.sample_grasps(pc_extended_down, num_grasps=num_grasps_gpg, max_num_samples=180,
@@ -273,47 +271,37 @@ class VGNImplicit(object):
                 if encoded_tsdf is None:
                     with torch.no_grad():
                         encoded_tsdf = self.net.encode_inputs(torch.from_numpy(tsdf_vol).to(self.device))
-                while(1): # Be careful with this loop, it can run forever if there is no CUDA memory available
-                    try:
-                        torch.cuda.empty_cache()
-                        # split into parts to avoid CUDA memory issues
-                        n = len(grasps)
-                        remaining_grasps = n
-                        max_grasps_at_once = 30
-                        grasp_idx = 0
-                        bad_indices, grasps_pc_local, grasps_pc, grasps_viz_list = [], torch.zeros((len(grasps),render_settings['max_points'],3), device=self.device), torch.zeros((len(grasps),render_settings['max_points'],3), device=self.device), []
-                        while remaining_grasps > 1: # Because we can't use just 1 grasp
-                            if remaining_grasps > max_grasps_at_once:
-                                grasps_batch = grasps[grasp_idx:grasp_idx+max_grasps_at_once]
-                                
-                                curr_bad_indices, curr_grasps_pc_local, curr_grasps_pc, curr_grasps_viz_list = generate_neur_grasp_clouds(sim, render_settings, grasps_batch, size, encoded_tsdf, 
-                                                                                    self.net, self.device, scene_mesh, debug=False, o3d_vis=o3d_vis)
-                                bad_indices += curr_bad_indices
-                                grasps_pc_local[grasp_idx:grasp_idx+max_grasps_at_once] = curr_grasps_pc_local
-                                grasps_pc[grasp_idx:grasp_idx+max_grasps_at_once] = curr_grasps_pc
-                                grasps_viz_list += curr_grasps_viz_list
+                torch.cuda.empty_cache()
+                # split into parts to avoid CUDA memory issues
+                n = len(grasps)
+                remaining_grasps = n
+                max_grasps_at_once = 20
+                grasp_idx = 0
+                bad_indices, grasps_pc_local, grasps_pc, grasps_viz_list = [], torch.zeros((len(grasps),render_settings['max_points'],3), device=self.device), torch.zeros((len(grasps),render_settings['max_points'],3), device=self.device), []
+                while remaining_grasps > 1: # Because we can't use just 1 grasp
+                    if remaining_grasps > max_grasps_at_once:
+                        grasps_batch = grasps[grasp_idx:grasp_idx+max_grasps_at_once]
+                        
+                        curr_bad_indices, curr_grasps_pc_local, curr_grasps_pc, curr_grasps_viz_list = generate_neur_grasp_clouds(sim, render_settings, grasps_batch, size, encoded_tsdf, 
+                                                                            self.net, self.device, scene_mesh, debug=False, o3d_vis=o3d_vis)
+                        bad_indices += curr_bad_indices
+                        grasps_pc_local[grasp_idx:grasp_idx+max_grasps_at_once] = curr_grasps_pc_local
+                        grasps_pc[grasp_idx:grasp_idx+max_grasps_at_once] = curr_grasps_pc
+                        grasps_viz_list += curr_grasps_viz_list
 
-                                remaining_grasps -= max_grasps_at_once
-                                grasp_idx += max_grasps_at_once
-                            else:
-                                grasps_batch = grasps[grasp_idx:]
+                        remaining_grasps -= max_grasps_at_once
+                        grasp_idx += max_grasps_at_once
+                    else:
+                        grasps_batch = grasps[grasp_idx:]
 
-                                curr_bad_indices, curr_grasps_pc_local, curr_grasps_pc, curr_grasps_viz_list = generate_neur_grasp_clouds(sim, render_settings, grasps_batch, size, encoded_tsdf, 
-                                                                                self.net, self.device, scene_mesh, debug=False, o3d_vis=o3d_vis)
-                                bad_indices += curr_bad_indices
-                                grasps_pc_local[grasp_idx:] = curr_grasps_pc_local
-                                grasps_pc[grasp_idx:] = curr_grasps_pc
-                                grasps_viz_list += curr_grasps_viz_list
-                                
-                                remaining_grasps = 0
-                            
-                    except RuntimeError as e:
-                        if "CUDA out of memory. " in str(e):
-                            print("CUDA out of memory. Trying again...")
-                            continue
-                        else:
-                            raise
-                    break
+                        curr_bad_indices, curr_grasps_pc_local, curr_grasps_pc, curr_grasps_viz_list = generate_neur_grasp_clouds(sim, render_settings, grasps_batch, size, encoded_tsdf, 
+                                                                        self.net, self.device, scene_mesh, debug=False, o3d_vis=o3d_vis)
+                        bad_indices += curr_bad_indices
+                        grasps_pc_local[grasp_idx:] = curr_grasps_pc_local
+                        grasps_pc[grasp_idx:] = curr_grasps_pc
+                        grasps_viz_list += curr_grasps_viz_list
+                        
+                        remaining_grasps = 0
             
             # Make separate queries for each grasp
             pos_queries = pos_queries.transpose(0,1)
@@ -435,21 +423,12 @@ def predict(tsdf_vol, pos, net, device, seed=0, encoded_input=False):
 
     # forward pass
     # if seed != 100:
-    while(1): # Be careful with this loop, it can run forever if there is no CUDA memory available
-        try:
-            torch.cuda.empty_cache()
-            with torch.no_grad():
-                if encoded_input == False:
-                    qual_vol, width_vol = net(tsdf_vol, pos)
-                else:
-                    qual_vol, width_vol = net.decode(pos, batched_encoded_tsdf) # careful of the order!
-        except RuntimeError as e:
-            if "CUDA out of memory. " in str(e):
-                print("CUDA out of memory. Trying again...")
-                continue
-            else:
-                raise
-        break
+    torch.cuda.empty_cache()
+    with torch.no_grad():
+        if encoded_input == False:
+            qual_vol, width_vol = net(tsdf_vol, pos)
+        else:
+            qual_vol, width_vol = net.decode(pos, batched_encoded_tsdf) # careful of the order!
 
     # move output back to the CPU
     qual_vol = qual_vol.cpu().squeeze().numpy()
