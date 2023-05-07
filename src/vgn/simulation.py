@@ -194,7 +194,7 @@ class ClutterRemovalSim(object):
                 theta = np.random.uniform(np.pi / 12.0, 5* np.pi / 12.0) # elevation: 15 to 75 degrees
                 # theta = np.random.uniform(0.0, 5* np.pi / 12.0) # elevation: 0 to 75 degrees
                 # theta = np.random.uniform(np.pi/4, np.pi/3) # elevation: 45 to 60 degrees
-                r = np.random.uniform(2, 2.4) * self.size
+                r = np.random.uniform(1.6, 2.4) * self.size
             else:
                 theta = np.pi / 6.0
                 r = 2.0 * self.size
