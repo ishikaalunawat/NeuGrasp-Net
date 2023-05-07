@@ -173,16 +173,20 @@ def render_occ(intrinsic, extrinsics, net, encoded_tsdf, min_measured_depth, max
     ray_direction_masked = ray_vector_world[mask]
 
     # Apply surface depth refinement step (e.g. Secant method)
-    n_secant_steps = 8
-    torch.cuda.empty_cache()
-    with torch.no_grad():
-        d_pred = secant(net, encoded_tsdf, # we don't care about batch size here
-            f_low.to(device), f_high.to(device), d_low.to(device), d_high.to(device), n_secant_steps, ray0_masked.to(device),
-            ray_direction_masked.to(device), tau=torch.tensor(0.5, device=device, dtype=torch.float), scale_size=torch.tensor(size, device=device, dtype=torch.float))
-    d_pred = d_pred.cpu()
-    torch.cuda.empty_cache()
-    points_out = torch.zeros(batch_size, n_pts, 3, dtype=torch.float)#*t_nan # set default (invalid) values
-    points_out[mask] = ray0_masked + ray_direction_masked * d_pred.unsqueeze(1)
+    if mask.sum() == 0:
+        # No surface points found
+        return torch.zeros(batch_size, n_pts, 3, dtype=torch.float), mask
+    else:
+        n_secant_steps = 8
+        torch.cuda.empty_cache()
+        with torch.no_grad():
+            d_pred = secant(net, encoded_tsdf, # we don't care about batch size here
+                f_low.to(device), f_high.to(device), d_low.to(device), d_high.to(device), n_secant_steps, ray0_masked.to(device),
+                ray_direction_masked.to(device), tau=torch.tensor(0.5, device=device, dtype=torch.float), scale_size=torch.tensor(size, device=device, dtype=torch.float))
+        d_pred = d_pred.cpu()
+        torch.cuda.empty_cache()
+        points_out = torch.zeros(batch_size, n_pts, 3, dtype=torch.float)#*t_nan # set default (invalid) values
+        points_out[mask] = ray0_masked + ray_direction_masked * d_pred.unsqueeze(1)
 
     return points_out, mask
 
