@@ -309,7 +309,7 @@ class ClutterRemovalSim(object):
         # check that the fingers are in contact with some object and not fully closed
         contacts = self.world.get_contacts(gripper.body)
         res = len(contacts) > 0 and gripper.read() > gripper.open_success_thresh
-        print(f"[Label: {res}, width: {gripper.read()}]")
+        # DEBUG: print(f"[Label: {res}, width: {gripper.read()}]")
         return res
 
 class RobotiqGripper(object):
