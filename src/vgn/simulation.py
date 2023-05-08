@@ -12,7 +12,7 @@ from vgn.utils.misc import apply_noise, apply_translational_noise
 
 
 class ClutterRemovalSim(object):
-    def __init__(self, scene, object_set, gui=True, seed=None, add_noise=False, sideview=False, save_dir=None, save_freq=8, data_root=None):
+    def __init__(self, scene, object_set, gui=True, seed=None, add_noise=False, sideview=False, save_dir=None, save_freq=8, data_root=None, gripper_type='franka'):
         assert scene in ["pile", "packed"]
 
         self.urdf_root = Path("data/urdfs")
@@ -35,7 +35,11 @@ class ClutterRemovalSim(object):
 
         self.rng = np.random.RandomState(seed) if seed else np.random
         self.world = btsim.BtWorld(self.gui, save_dir, save_freq)
-        self.gripper = Gripper(self.world)
+        if gripper_type == 'franka':
+            self.gripper = Gripper(self.world, data_root)
+        else:
+            # robotiq 2f 85
+            self.gripper = RobotiqGripper(self.world, data_root)
         self.size = 6 * self.gripper.finger_depth
         intrinsic = CameraIntrinsic(640, 480, 540.0, 540.0, 320.0, 240.0)
         self.camera = self.world.add_camera(intrinsic, 0.1, 2.0)
@@ -307,19 +311,143 @@ class ClutterRemovalSim(object):
     def check_success(self, gripper):
         # check that the fingers are in contact with some object and not fully closed
         contacts = self.world.get_contacts(gripper.body)
-        res = len(contacts) > 0 and gripper.read() > 0.1 * gripper.max_opening_width
+        res = len(contacts) > 0 and gripper.read() > gripper.open_success_thresh
+        # DEBUG: print(f"[Label: {res}, width: {gripper.read()}]")
         return res
 
+class RobotiqGripper(object):
+    """Simulated Robotiq 2F 85 gripper."""
+
+    def __init__(self, world, data_root=None):
+        self.world = world
+        if data_root is not None:
+            self.urdf_path = Path(data_root) / Path("data/urdfs/robotiq_85/pal_robotiq_85_gripper.urdf")
+        else:
+            self.urdf_path = Path("data/urdfs/robotiq_85/pal_robotiq_85_gripper.urdf")
+        self.main_joint_name = "gripper_finger_joint"
+        self.mimic_joints = {'gripper_right_outer_knuckle_joint': 1,
+                                'gripper_left_inner_knuckle_joint': 1,
+                                'gripper_right_inner_knuckle_joint': 1,
+                                'gripper_left_inner_finger_joint': -1,
+                                'gripper_right_inner_finger_joint': -1}
+        
+        self.max_opening_width = 0.085
+        self.closed_joint_limit = 0.8
+        self.open_joint_limit = 0.0
+        self.finger_depth = 0.05
+        self.open_success_thresh = 0.0001 # Very small because we are not using the 'true' width of the robotiq gripper
+        self.T_body_tcp = Transform(Rotation.identity(), [0.0, 0.0, 0.11+0.02754]) # from URDF link to TCP/grasp frame
+        self.T_tcp_body = self.T_body_tcp.inverse()
+
+    def reset(self, T_world_tcp):
+        T_world_body = T_world_tcp * self.T_tcp_body
+        self.body = self.world.load_urdf(self.urdf_path, T_world_body)
+        self.body.set_pose(T_world_body)  # sets the position of the COM, not URDF link
+        self.constraint = self.world.add_constraint(
+            self.body,
+            None,
+            None,
+            None,
+            pybullet.JOINT_FIXED,
+            [0.0, 0.0, 0.0],
+            Transform.identity(),
+            T_world_body,
+        )
+        self.update_tcp_constraint(T_world_tcp)
+        # setup constraints for the robotiq to close as expected and to keep fingers centered
+        self.joint = self.body.joints[self.main_joint_name] # we move this joint and other joints should mimic it
+        self.joint.set_position(self.open_joint_limit, kinematics=True)
+        for joint_name, multiplier in self.mimic_joints.items():
+            self.body.joints[joint_name].set_position(self.open_joint_limit * multiplier, kinematics=True)
+
+        # Tried using constraints but it doesn't work....
+        # def __setup_mimic_joints__(self):
+        #     self.mimic_parent_index = self.body.joints[self.mimic_parent_name].joint_index
+
+        #     for joint_name, multiplier in self.mimic_children_names.items():
+        #         mimic_child_joint_index = self.body.joints[joint_name].joint_index
+        #         c = self.world.p.createConstraint(self.body.uid, self.mimic_parent_index,
+        #                                self.body.uid, mimic_child_joint_index,
+        #                                jointType=pybullet.JOINT_GEAR,
+        #                                jointAxis=[0, 1, 0], # CHECK
+        #                                parentFramePosition=[0, 0, 0],
+        #                                childFramePosition=[0, 0, 0])
+        #         self.world.p.changeConstraint(c, gearRatio=-multiplier, maxForce=100, erp=0.1)  # Note: the mysterious `erp` is of EXTREME importance
+
+        # # def move_gripper(self, open_length):
+        # #     # open_length = np.clip(open_length, *self.gripper_range)
+        # #     # open_angle = 0.715 - math.asin((open_length - 0.010) / 0.1143)  # angle calculation # TODO: Check this and use true width
+        # #     # Control the mimic gripper joint(s)
+        # #     p.setJointMotorControl2(self.id, self.mimic_parent_id, p.POSITION_CONTROL, targetPosition=open_angle,
+        # #                             force=self.joints[self.mimic_parent_id].maxForce, maxVelocity=self.joints[self.mimic_parent_id].maxVelocity)
+
+    def update_tcp_constraint(self, T_world_tcp):
+        T_world_body = T_world_tcp * self.T_tcp_body
+        self.constraint.change(
+            jointChildPivot=T_world_body.translation,
+            jointChildFrameOrientation=T_world_body.rotation.as_quat(),
+            maxForce=300,
+        )
+
+    def set_tcp(self, T_world_tcp):
+        T_word_body = T_world_tcp * self.T_tcp_body
+        self.body.set_pose(T_word_body)
+        self.update_tcp_constraint(T_world_tcp)
+
+    def move_tcp_xyz(self, target, eef_step=0.002, vel=0.10, abort_on_contact=True):
+        T_world_body = self.body.get_pose()
+        T_world_tcp = T_world_body * self.T_body_tcp
+
+        diff = target.translation - T_world_tcp.translation
+        n_steps = int(np.linalg.norm(diff) / eef_step)
+        dist_step = diff / n_steps
+        dur_step = np.linalg.norm(dist_step) / vel
+
+        for _ in range(n_steps):
+            T_world_tcp.translation += dist_step
+            self.update_tcp_constraint(T_world_tcp)
+            for _ in range(int(dur_step / self.world.dt)):
+                self.world.step()
+            if abort_on_contact and self.detect_contact():
+                return
+
+    def detect_contact(self, threshold=5):
+        if self.world.get_contacts(self.body):
+            return True
+        else:
+            return False
+
+    def move(self, width):
+        if width > self.max_opening_width:
+            width = self.max_opening_width
+        norm_move = width/self.max_opening_width # normalize to [0,1]
+        pos_action = self.closed_joint_limit - norm_move * (self.closed_joint_limit - self.open_joint_limit)
+        self.joint.set_position(pos_action)
+        # Also set the mimic joints
+        for joint_name, multiplier in self.mimic_joints.items():
+            self.body.joints[joint_name].set_position(pos_action * multiplier)
+
+        for _ in range(int(0.5 / self.world.dt)):
+            self.world.step()
+
+    def read(self):
+        width = self.max_opening_width * (1 - self.joint.get_position()/self.closed_joint_limit)
+        return width
+    
 
 class Gripper(object):
     """Simulated Panda hand."""
 
-    def __init__(self, world):
+    def __init__(self, world, data_root=None):
         self.world = world
-        self.urdf_path = Path("data/urdfs/panda/hand.urdf")
+        if data_root is not None:
+            self.urdf_path = Path(data_root) / Path("data/urdfs/panda/hand.urdf")
+        else:
+            self.urdf_path = Path("data/urdfs/panda/hand.urdf")
 
         self.max_opening_width = 0.08
         self.finger_depth = 0.05
+        self.open_success_thresh = 0.1 * self.max_opening_width
         self.T_body_tcp = Transform(Rotation.identity(), [0.0, 0.0, 0.022])
         self.T_tcp_body = self.T_body_tcp.inverse()
 

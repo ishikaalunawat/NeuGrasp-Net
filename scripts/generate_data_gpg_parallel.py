@@ -29,7 +29,7 @@ def main(args, rank):
     np.random.seed()
     seed = np.random.randint(0, 1000) + rank
     np.random.seed(seed)
-    sim = ClutterRemovalSim(args.scene, args.object_set, gui=args.sim_gui)
+    sim = ClutterRemovalSim(args.scene, args.object_set, gui=args.sim_gui, gripper_type=args.gripper)
     finger_depth = sim.gripper.finger_depth
     scenes_per_worker = args.num_scenes // args.num_proc
     pbar = tqdm(total=scenes_per_worker, disable=rank != 0)
@@ -88,7 +88,7 @@ def main(args, rank):
             continue
 
         # sample grasps with GPG:
-        sampler = GpgGraspSamplerPcl(finger_depth-0.0075) # Franka finger depth is actually a little less than 0.05
+        sampler = GpgGraspSamplerPcl(gripper_type=args.gripper) # Franka finger depth is actually a little less than 0.05
         safety_dist_above_table = finger_depth # table is spawned at finger_depth
         grasps, _, _ = sampler.sample_grasps(pc, num_grasps=GRASPS_PER_SCENE_GPG, max_num_samples=180,
                                             safety_dis_above_table=safety_dist_above_table, show_final_grasps=False)
@@ -118,7 +118,7 @@ def generate_from_existing_scene(mesh_pose_list_path, args):
     GRASPS_PER_SCENE_GPG = args.grasps_per_scene_gpg
 
     # Re-create the saved simulation
-    sim = ClutterRemovalSim('pile', 'pile/train', gui=args.sim_gui) # parameters 'pile' and 'pile/train' are not used
+    sim = ClutterRemovalSim('pile', 'pile/train', gui=args.sim_gui, gripper_type=args.gripper) # parameters 'pile' and 'pile/train' are not used
     mesh_pose_list = np.load(mesh_pose_list_path, allow_pickle=True)['pc']
     scene_id = os.path.basename(mesh_pose_list_path)[:-4] # scene id without .npz extension
     sim.setup_sim_scene_from_mesh_pose_list(mesh_pose_list)
@@ -161,7 +161,7 @@ def generate_from_existing_scene(mesh_pose_list_path, args):
     grasps = []
     if GRASPS_PER_SCENE_GPG > 0:
         # sample grasps with GPG:
-        sampler = GpgGraspSamplerPcl(sim.gripper.finger_depth-0.0075) # Franka finger depth is actually a little less than 0.05
+        sampler = GpgGraspSamplerPcl(gripper_type=args.gripper) # Franka finger depth is actually a little less than 0.05
         safety_dist_above_table = sim.gripper.finger_depth # table is spawned at finger_depth
         grasps, _, _ = sampler.sample_grasps(pc, num_grasps=GRASPS_PER_SCENE_GPG, max_num_samples=180,
                                             safety_dis_above_table=safety_dist_above_table, show_final_grasps=False)
@@ -315,6 +315,7 @@ if __name__ == "__main__":
     parser.add_argument("--previous_root", type=Path, default="")
     parser.add_argument("--scene", type=str, choices=["pile", "packed"], default="pile")
     parser.add_argument("--object_set", type=str, default="pile/train")
+    parser.add_argument("--gripper", type=str, default='franka')
     parser.add_argument("--num_scenes", type=int, default=33313)
     parser.add_argument("--grasps_per_scene", type=int, default=60)
     parser.add_argument("--grasps_per_scene_gpg", type=int, default=60)
