@@ -23,26 +23,26 @@
     </collision>
   </link>
   <!-- Grasping frame X -->
-  <joint name="gripper_grasping_frame_joint" type="fixed">
+  <!-- <joint name="gripper_grasping_frame_joint" type="fixed">
     <parent link="gripper_base_link"/>
     <child link="gripper_grasping_frame"/>
     <origin rpy="0 -1.5708 0" xyz="0 0 0.11"/>
   </joint>
-  <link name="gripper_grasping_frame"/>
+  <link name="gripper_grasping_frame"/> -->
   <!-- Grasping frame Y -->
-  <joint name="gripper_grasping_frame_Y_joint" type="fixed">
+  <!-- <joint name="gripper_grasping_frame_Y_joint" type="fixed">
     <parent link="gripper_base_link"/>
     <child link="gripper_grasping_frame_Y"/>
     <origin rpy="1.5708 0 0" xyz="0 0 0.11"/>
   </joint>
-  <link name="gripper_grasping_frame_Y"/>
+  <link name="gripper_grasping_frame_Y"/> -->
   <!-- Grasping frame Z -->
-  <joint name="gripper_grasping_frame_Z_joint" type="fixed">
+  <!-- <joint name="gripper_grasping_frame_Z_joint" type="fixed">
     <parent link="gripper_base_link"/>
     <child link="gripper_grasping_frame_Z"/>
     <origin rpy="0 0 0" xyz="0 0 0.11"/>
   </joint>
-  <link name="gripper_grasping_frame_Z"/>
+  <link name="gripper_grasping_frame_Z"/> -->
   <link name="gripper_coupler_link">
     <visual>
       <origin rpy="3.1416 0 0" xyz="0 0 0.0"/>
@@ -132,6 +132,13 @@
     </collision>
   </link>
   <link name="gripper_left_inner_finger_pad">
+    <contact>
+      <friction_anchor/>
+      <stiffness value="30000.0"/>
+      <damping value="1000.0"/>
+      <spinning_friction value="0.1"/>
+      <lateral_friction value="1.0"/>
+    </contact>
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
@@ -245,6 +252,13 @@
     </collision>
   </link>
   <link name="gripper_right_inner_finger_pad">
+    <contact>
+      <friction_anchor/>
+      <stiffness value="30000.0"/>
+      <damping value="1000.0"/>
+      <spinning_friction value="0.1"/>
+      <lateral_friction value="1.0"/>
+    </contact>
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
@@ -301,7 +315,7 @@
     <parent link="gripper_base_link"/>
     <child link="gripper_left_outer_knuckle"/>
     <axis xyz="1 0 0"/>
-    <limit effort="1000.0" lower="0" upper="0.8" velocity="2"/>
+    <limit effort="100.000" lower="0" upper="0.8" velocity="2"/>
     <!-- <dynamics damping="0.03"/> -->
   </joint>
   <joint name="gripper_left_outer_finger_joint" type="fixed">
@@ -316,7 +330,7 @@
     <parent link="gripper_base_link"/>
     <child link="gripper_left_inner_knuckle"/>
     <axis xyz="1 0 0"/>
-    <limit effort="1000.0" lower="0" upper="0.8757" velocity="2"/>
+    <limit effort="100.000" lower="0" upper="0.8757" velocity="2"/>
     <mimic joint="gripper_finger_joint" multiplier="1" offset="0"/>
   </joint>
   <joint name="gripper_left_inner_finger_joint" type="revolute">
@@ -324,17 +338,10 @@
     <parent link="gripper_left_outer_finger"/>
     <child link="gripper_left_inner_finger"/>
     <axis xyz="1 0 0"/>
-    <limit effort="1000.0" lower="-0.8757" upper="0" velocity="2"/>
+    <limit effort="100.000" lower="-0.8757" upper="0" velocity="2"/>
     <mimic joint="gripper_finger_joint" multiplier="-1" offset="0"/>
   </joint>
   <joint name="gripper_left_inner_finger_pad_joint" type="fixed">
-    <contact>
-      <friction_anchor/>
-      <stiffness value="30000.0"/>
-      <damping value="1000.0"/>
-      <spinning_friction value="0.1"/>
-      <lateral_friction value="1.0"/>
-    </contact>
     <origin rpy="0 0 0" xyz="0 -0.0220203446692936 0.03242"/>
     <parent link="gripper_left_inner_finger"/>
     <child link="gripper_left_inner_finger_pad"/>
@@ -345,7 +352,7 @@
     <parent link="gripper_base_link"/>
     <child link="gripper_right_outer_knuckle"/>
     <axis xyz="1 0 0"/>
-    <limit effort="1000.0" lower="0" upper="0.81" velocity="2"/>
+    <limit effort="100.000" lower="0" upper="0.81" velocity="2"/>
     <mimic joint="gripper_finger_joint" multiplier="1" offset="0"/>
   </joint>
   <joint name="gripper_right_outer_finger_joint" type="fixed">
@@ -360,7 +367,7 @@
     <parent link="gripper_base_link"/>
     <child link="gripper_right_inner_knuckle"/>
     <axis xyz="1 0 0"/>
-    <limit effort="1000.0" lower="0" upper="0.8757" velocity="2"/>
+    <limit effort="100.000" lower="0" upper="0.8757" velocity="2"/>
     <mimic joint="gripper_finger_joint" multiplier="1" offset="0"/>
   </joint>
   <joint name="gripper_right_inner_finger_joint" type="revolute">
@@ -368,17 +375,10 @@
     <parent link="gripper_right_outer_finger"/>
     <child link="gripper_right_inner_finger"/>
     <axis xyz="1 0 0"/>
-    <limit effort="1000.0" lower="-0.8757" upper="0" velocity="2"/>
+    <limit effort="100.000" lower="-0.8757" upper="0" velocity="2"/>
     <mimic joint="gripper_finger_joint" multiplier="-1" offset="0"/>
   </joint>
   <joint name="gripper_right_inner_finger_pad_joint" type="fixed">
-    <contact>
-      <friction_anchor/>
-      <stiffness value="30000.0"/>
-      <damping value="1000.0"/>
-      <spinning_friction value="0.1"/>
-      <lateral_friction value="1.0"/>
-    </contact>
     <origin rpy="0 0 0" xyz="0 -0.0220203446692936 0.03242"/>
     <parent link="gripper_right_inner_finger"/>
     <child link="gripper_right_inner_finger_pad"/>

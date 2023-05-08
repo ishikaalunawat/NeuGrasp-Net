@@ -108,7 +108,7 @@ class GpgGraspSamplerPcl():
         }
         if gripper_type != 'franka':
             # robotiq 2f-85
-            self.params['gripper_hand_depth'] = 0.03425 # 0.04425
+            self.params['gripper_hand_depth'] = 0.04025 # 0.03425 # 0.04425
             self.params['gripper_hand_outer_diameter'] = 0.12
             self.params['gripper_max_width'] = 0.08
             self.params['gripper_hand_height'] = 0.030

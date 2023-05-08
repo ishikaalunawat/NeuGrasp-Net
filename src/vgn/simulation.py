@@ -308,7 +308,8 @@ class ClutterRemovalSim(object):
     def check_success(self, gripper):
         # check that the fingers are in contact with some object and not fully closed
         contacts = self.world.get_contacts(gripper.body)
-        res = len(contacts) > 0 and gripper.read() > 0.1 * gripper.max_opening_width
+        res = len(contacts) > 0 and gripper.read() > gripper.open_success_thresh
+        print(f"[Label: {res}, width: {gripper.read()}]")
         return res
 
 class RobotiqGripper(object):
@@ -331,6 +332,7 @@ class RobotiqGripper(object):
         self.closed_joint_limit = 0.8
         self.open_joint_limit = 0.0
         self.finger_depth = 0.05
+        self.open_success_thresh = 0.0001 # Very small because we are not using the 'true' width of the robotiq gripper
         self.T_body_tcp = Transform(Rotation.identity(), [0.0, 0.0, 0.11+0.02754]) # from URDF link to TCP/grasp frame
         self.T_tcp_body = self.T_body_tcp.inverse()
 
@@ -442,6 +444,7 @@ class Gripper(object):
 
         self.max_opening_width = 0.08
         self.finger_depth = 0.05
+        self.open_success_thresh = 0.1 * self.max_opening_width
         self.T_body_tcp = Transform(Rotation.identity(), [0.0, 0.0, 0.022])
         self.T_tcp_body = self.T_body_tcp.inverse()
 
