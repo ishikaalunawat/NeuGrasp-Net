@@ -62,7 +62,7 @@ class GpgGraspSamplerPcl():
 
     __metaclass__ = ABCMeta
 
-    def __init__(self, gripper_hand_depth=0.0425, debug_vis=False):
+    def __init__(self, gripper_hand_depth=None, debug_vis=False, gripper_type='franka'):
         self.params = {
             # 'num_rball_points': 27,  # FIXME: the same as meshpy..surface_normal()
             'num_dy': 10,  # number
@@ -83,8 +83,16 @@ class GpgGraspSamplerPcl():
             "gripper_hand_depth": 0.0425, # 0.125,
             "gripper_init_bite": 0.005
 
-            # Robotiq 2F-85
+            # # Robotiq 2F-85
+            # "gripper_max_width": 0.085,
             # "gripper_min_width": 0.0,
+            # "gripper_finger_width": 0.02, # Approx
+            # "gripper_hand_height": 0.030,
+            # "gripper_hand_outer_diameter": 0.125, # the diameter of the robot hand (= maximum aperture plus 2 * finger width)
+            # "gripper_hand_depth": 0.04425,
+            # "gripper_init_bite": 0.005
+
+            # from gpd code:
             # "gripper_force_limit": 235.0,
             # "gripper_max_width": 0.085,
             # "gripper_finger_radius": 0.01,
@@ -98,8 +106,18 @@ class GpgGraspSamplerPcl():
             # "gripper_real_hand_depth": 0.120,
             # "gripper_init_bite": 0.01
         }
-
-        self.params['gripper_hand_depth'] = gripper_hand_depth
+        if gripper_type != 'franka':
+            # robotiq 2f-85
+            self.params['gripper_hand_depth'] = 0.03425 # 0.04425
+            self.params['gripper_hand_outer_diameter'] = 0.12
+            self.params['gripper_max_width'] = 0.08
+            self.params['gripper_hand_height'] = 0.030
+            self.params['gripper_finger_width'] = 0.02
+            self.params['gripper_init_bite'] = 0.005
+        
+        if gripper_hand_depth is not None:
+            # use custom gripper hand depth
+            self.params['gripper_hand_depth'] = gripper_hand_depth
         self.params['debug_vis'] = debug_vis
 
     def sample_grasps(self, point_cloud, num_grasps=20, max_num_samples=180, safety_dis_above_table=0.005,
