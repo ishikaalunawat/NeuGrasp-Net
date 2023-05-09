@@ -7,10 +7,10 @@ import numpy as np
 import torch.nn.functional as F
 
 class PointNet(nn.Module):
-    def __init__(self, input_dim=99, num_class=1, use_bnorm=True):
+    def __init__(self, input_dim=99, num_class=1, use_bnorm=True, feature_transform=False):
         super(PointNet, self).__init__()
 
-        self.feat = PointNetEncoder(global_feat=True, feature_transform=False, input_dim=input_dim, use_bnorm=use_bnorm)
+        self.feat = PointNetEncoder(global_feat=True, feature_transform=feature_transform, input_dim=input_dim, use_bnorm=use_bnorm)
         self.fc1 = nn.Linear(1024, 512)
         self.fc2 = nn.Linear(512, 256)
         self.fc3 = nn.Linear(256, num_class)

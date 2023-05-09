@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from torch import distributions as dist
 from vgn.ConvONets.conv_onet.models import decoder
+from .pointnet_cls import PointNet
 
 # Decoder dictionary
 decoder_dict = {
@@ -258,3 +259,48 @@ class ConvolutionalOccupancyNetworkGeometry(nn.Module):
         logits = self.decoder_tsdf(p, c, **kwargs)
         p_r = dist.Bernoulli(logits=logits)
         return p_r
+
+
+class PointNetGPD(nn.Module):
+    def __init__(self, dim=7, c_dim=3, # PointNetGPD
+                 out_dim=1,
+                 point_network='pointnet',
+                 sample_mode='bilinear', 
+                 padding=0.1,
+                 concat_feat=False):
+        super().__init__()
+        
+        self.dim = dim # input
+        self.out_dim = out_dim
+        self.concat_feat = concat_feat
+        if concat_feat:
+            c_dim *= 3
+            c_dim += 3 # since we also append local grasp pc
+        self.c_dim = c_dim
+        self.sample_mode = sample_mode
+        self.padding = padding
+
+        self.fc_g = nn.Linear(dim, c_dim) # Linear layer to encode input grasp center and orientation
+        if point_network == 'pointnet':
+            self.point_network = PointNet(input_dim=c_dim, num_class=out_dim, feature_transform=True)
+
+
+    def forward(self, grasp_query):
+        if isinstance(grasp_query, tuple):
+            pos, rotations, grasps_pc_local, _ = grasp_query
+            # zero_pc_indices = grasps_pc.sum(dim=2) == 0
+            f = torch.cat([pos,rotations], dim = 2) # <- Changed to predict only grasp quality
+            c = []
+        else:
+            raise NotImplementedError
+
+        c = grasps_pc_local
+        
+        # Linear layer to encode input grasp center and orientation
+        g = self.fc_g(f)
+        queries = torch.cat([g, c], dim=1)
+        
+        queries = queries.transpose(2, 1) # Transpose to get shape B, D, N
+        out = self.point_network(queries)
+        out = torch.sigmoid(out)
+        return out

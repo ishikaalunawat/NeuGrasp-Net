@@ -6,6 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from scipy import ndimage
 from vgn.ConvONets.conv_onet.config import get_model
+from vgn.ConvONets.conv_onet.models import PointNetGPD
 
 def get_network(name):
     models = {
@@ -28,6 +29,7 @@ def get_network(name):
         "neu_grasp_dgcnn_no_local_cloud": NeuGraspDGCNNNoLocalCloud,
         "neu_grasp_dgcnn_pn": NeuGraspDGCNNPN,
         "neu_grasp_vn_dgcnn_pn": NeuGraspVNDGCNNPN,
+        "pointnetgpd": PointNetGPD,
     }
     return models[name.lower()]()
 
