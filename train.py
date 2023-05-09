@@ -19,7 +19,7 @@ warnings.filterwarnings("ignore")
 
 
 parser = argparse.ArgumentParser(description='edge_grasper_ball')
-parser.add_argument('--dataset_dir', type=str, default='./raw_data')
+parser.add_argument('--dataset_dir', type=str, default='./raw_data_combined')
 parser.add_argument('--save_dir', type=str, default='./edge_grasp_net_pretrained_para')
 parser.add_argument('--vn_save_dir', type=str, default='./vn_edge_pretrained_para')
 parser.add_argument('--load', type=int, default=0)

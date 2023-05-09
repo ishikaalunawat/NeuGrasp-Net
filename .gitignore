@@ -1,5 +1,5 @@
 data_robot/
-raw_data/
 edge_grasp_net_pretrained_para/
-*.out
+nohup_logs/
 wandb/
+vn_edge_pretrained_para/
