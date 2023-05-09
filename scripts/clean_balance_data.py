@@ -34,17 +34,20 @@ def main(args):
     # df = read_df(root)
     positives = df[df["label"] == 1]
     negatives = df[df["label"] == 0]
-    i = np.random.choice(negatives.index, len(negatives.index) - len(positives.index), replace=False)
+    if len(positives.index) > len(negatives.index):
+        i = np.random.choice(positives.index, len(positives.index) - len(negatives.index), replace=False)
+    else:
+        i = np.random.choice(negatives.index, len(negatives.index) - len(positives.index), replace=False)
     df = df.drop(i)
     write_df(df, root)
 
     # Optional: remove unreferenced scenes.
-    # df = read_df(root)
-    # scenes = df["scene_id"].values
-    # for f in (root / "scenes").iterdir():
-    #     if f.suffix == ".npz" and f.stem not in scenes:
-    #         print("Removed", f)
-    #         f.unlink()
+    df = read_df(root)
+    scenes = df["scene_id"].unique()
+    for f in (root / "scenes").iterdir():
+        if f.suffix == ".npz" and f.stem not in scenes:
+            print("Removed", f)
+            f.unlink()
 
     # print
     df = read_df(root)
