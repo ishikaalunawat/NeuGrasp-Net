@@ -139,12 +139,14 @@ class VGNImplicit(object):
                 # Viz input point cloud
                 o3d_vis.add_geometry(state.pc, reset_bounding_box=False) # point cloud
                 o3d_vis.poll_events()
-                # pc_extended = state.pc # Use only seen areas for grasp sampling
-                # Use full rendered cloud for grasp sampling
-                with torch.no_grad():
-                    encoded_tsdf = self.net.encode_inputs(torch.from_numpy(tsdf_vol).to(self.device))
-                pc_extended = get_scene_surf_render(sim, size, self.resolution, self.net, encoded_tsdf, device=self.device)
-                o3d_vis.add_geometry(pc_extended, reset_bounding_box=False) # point cloud
+                if (self.seen_pc_only == True):
+                    pc_extended = o3d.geometry.PointCloud(state.pc) # Use only seen areas for grasp sampling
+                else:
+                    # Use full rendered cloud for grasp sampling
+                    with torch.no_grad():
+                        encoded_tsdf = self.net.encode_inputs(torch.from_numpy(tsdf_vol).to(self.device))
+                    pc_extended = get_scene_surf_render(sim, size, self.resolution, self.net, encoded_tsdf, device=self.device)
+                    o3d_vis.add_geometry(pc_extended, reset_bounding_box=False) # point cloud
                 o3d_vis.poll_events()
                 # num_grasps_gpg = 20
                 num_grasps_gpg = 60
@@ -153,7 +155,7 @@ class VGNImplicit(object):
             # num_grasps_gpg = 40
             num_grasps_gpg = 60
             if (self.seen_pc_only == True):
-                pc_extended = state.pc # Use only seen areas for grasp sampling
+                pc_extended = o3d.geometry.PointCloud(state.pc) # Use only seen areas for grasp sampling
             else:
                 # Use full rendered cloud for grasp sampling
                 with torch.no_grad():
@@ -247,6 +249,8 @@ class VGNImplicit(object):
         if 'neu' in self.model_type:
             # Also generate grasp point clouds
             render_settings = read_json(Path("/home/jauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/pile/grasp_cloud_setup.json"))
+            # render_settings = read_json(Path("data/pile/grasp_cloud_setup.json"))
+            # render_settings = read_json(Path("data/pile/grasp_cloud_setup_efficient.json"))
             gt_render = False
             if gt_render:
                 # remove table because we dont want to render it
@@ -275,7 +279,7 @@ class VGNImplicit(object):
                 # split into parts to avoid CUDA memory issues
                 n = len(grasps)
                 remaining_grasps = n
-                max_grasps_at_once = 20
+                max_grasps_at_once = 15
                 grasp_idx = 0
                 bad_indices, grasps_pc_local, grasps_pc, grasps_viz_list = [], torch.zeros((len(grasps),render_settings['max_points'],3), device=self.device), torch.zeros((len(grasps),render_settings['max_points'],3), device=self.device), []
                 while remaining_grasps > 1: # Because we can't use just 1 grasp
@@ -333,6 +337,62 @@ class VGNImplicit(object):
                         o3d_vis.update_geometry(grasp_viz_mesh)
                     o3d_vis.poll_events()
                     # o3d_vis.update_renderer()
+        elif self.model_type == 'pointnetgpd':
+            grasps_pc_local = torch.zeros((len(grasps),1000,3), device=self.device)
+            grasps_pc = grasps_pc_local.clone()
+            bad_indices = []
+
+            # loop over grasps and get local grasp point clouds
+            for ind, grasp in enumerate(grasps):
+                # grasp_pc_local = 
+                # grasp_vgn_inv_tfs[idx] = torch.from_numpy(grasp.pose.inverse().as_matrix()) # This still needs to be in the original grasp frame
+                grasp_center = grasp.pose.translation
+                # Unfortunately VGN/GIGA grasps are not in the grasp frame we want (frame similar to PointNetGPD), so we need to transform them
+                grasp_frame_rot =  grasp.pose.rotation * Rotation.from_euler('Y', np.pi/2) * Rotation.from_euler('Z', np.pi)
+                grasp_tf = Transform(grasp_frame_rot, grasp_center)
+                p_local = grasp_tf.inverse().transform_point(np.array(state.pc.points))
+                # Find local point cloud around grasp
+                # X limit (depth)
+                p_local = p_local[p_local[:,0] <  sim.gripper.finger_depth]
+                p_local = p_local[p_local[:,0] >  0]
+                # Y limit (max opening width)
+                p_local = p_local[p_local[:,1] <  sim.gripper.max_opening_width/2]
+                p_local = p_local[p_local[:,1] > -sim.gripper.max_opening_width/2]
+                # Z limit (height)
+                sim.gripper.height = 0.03
+                p_local = p_local[p_local[:,2] <  sim.gripper.height/2]
+                p_local = p_local[p_local[:,2] > -sim.gripper.height/2]
+                # Get 50 to 1000 points
+                # If more than max points, uniformly sample
+                if len(p_local) > 1000:
+                    indices = np.random.choice(np.arange(len(p_local)), 1000, replace=False)
+                    p_local = p_local[indices]
+                # If less than min points, skip this grasp
+                if len(p_local) < 50:
+                    bad_indices.append(ind)
+                else:
+                    # Convert local pointcloud back to world frame
+                    p_world = grasp_tf.transform_point(p_local)
+                    # convert to VGN frame
+                    grasp_pc_local = grasp.pose.inverse().transform_point(p_world)
+
+                    grasp_pc_local = grasp_pc_local / size # - 0.5 DONT SUBTRACT HERE!
+                    # grasp_pc = grasp_pc / size - 0.5 # Not needed
+                    grasps_pc_local[ind, :grasp_pc_local.shape[0],:] = torch.tensor(grasp_pc_local, device=self.device)
+                    # grasps_pc[ind, :grasp_pc.shape[0], :] = torch.tensor(grasp_pc, device=self.device) # Not needed
+
+            # Make separate queries for each grasp
+            pos_queries = pos_queries.transpose(0,1)
+            rot_queries = rot_queries.transpose(0,1)
+
+            qual_vol, width_vol = predict_pngpd((pos_queries.to(self.device), rot_queries.to(self.device), grasps_pc_local.to(self.device), grasps_pc.to(self.device)),
+                                self.net, self.device)
+
+            qual_vol[bad_indices] = 0.0 # set bad grasp scores to zero
+            
+            # put back into original shape so that we can use the same code as before
+            pos_queries = pos_queries.transpose(0,1)
+            rot_queries = rot_queries.transpose(0,1)
         else:
             qual_vol, width_vol = predict(tsdf_vol, (pos_queries.to(self.device), rot_queries.to(self.device)), self.net, self.device, seed=seed)
         
@@ -434,6 +494,19 @@ def predict(tsdf_vol, pos, net, device, seed=0, encoded_input=False):
     qual_vol = qual_vol.cpu().squeeze().numpy()
     #rot = rot.cpu().squeeze().numpy()
     width_vol = width_vol.cpu().squeeze().numpy()
+    return qual_vol, width_vol
+
+def predict_pngpd(query, net, device):
+
+    # forward pass
+    with torch.no_grad():
+        qual_vol = net(query)
+
+    # move output back to the CPU
+    qual_vol = qual_vol.cpu().squeeze().numpy()
+    #rot = rot.cpu().squeeze().numpy()
+    # width_vol = width_vol.cpu().squeeze().numpy()
+    width_vol = np.zeros(qual_vol.shape)# zeros
     return qual_vol, width_vol
 
 def process(
