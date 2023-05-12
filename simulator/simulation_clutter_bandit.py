@@ -217,7 +217,7 @@ class ClutterRemovalSim(object):
             angle = self.rng.uniform(0.0, 2.0 * np.pi)
             rotation = Rotation.from_rotvec(angle * np.r_[0.0, 0.0, 1.0])
             pose = Transform(rotation, np.r_[x, y, z])
-            scale = self.rng.uniform(0.7, 0.8)
+            scale = self.rng.uniform(0.7, 0.9)
             body = self.world.load_urdf(urdf, pose, scale=self.global_scaling * scale)
             lower, upper = self.world.p.getAABB(body.uid)
             z = table_height + 0.5 * (upper[2] - lower[2]) + 0.002
@@ -384,7 +384,7 @@ class ClutterRemovalSim(object):
         if self.gripper.detect_contact():
             result = Label.FAILURE, self.gripper.max_opening_width,'pregrasp'
         else:
-            self.gripper.move_tcp_xyz(T_world_grasp, abort_on_contact=False)
+            self.gripper.move_tcp_xyz(T_world_grasp, abort_on_contact=True)
             if self.gripper.detect_contact() and not allow_contact:
                 result = Label.FAILURE, self.gripper.max_opening_width,'grasp'
             else:

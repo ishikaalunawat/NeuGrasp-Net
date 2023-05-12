@@ -24,7 +24,7 @@ warnings.filterwarnings("ignore")
 # OBJECT_COUNT_LAMBDA = 4
 # MAX_VIEWPOINT_COUNT = 4
 
-RUN_TIMES = 4
+RUN_TIMES = 5
 NUMBER_SCENE = 100
 NUMBER_VIEWS = 1
 OBJECT_COUNT_LAMBDA = 4
@@ -37,9 +37,15 @@ def main(args):
     else:
         device = torch.device('cpu')
     if args.vn:
-        grasper = VNGrasper(device=args.device, root_dir='./vn_edge_pretrained_para', load=105)
+        if args.self_trained_model:
+            grasper = VNGrasper(device=args.device, root_dir='./vn_edge_selftrained_para', load=90)
+        else:
+            grasper = VNGrasper(device=args.device, root_dir='./vn_edge_pretrained_para', load=105)
     else:
-        grasper = EdgeGrasper(device=args.device, root_dir='./edge_grasp_net_pretrained_para', load=180)
+        if args.self_trained_model:
+            grasper = EdgeGrasper(device=args.device, root_dir='./edge_grasp_net_selftrained_para', load=180)
+        else:
+            grasper = EdgeGrasper(device=args.device, root_dir='./edge_grasp_net_pretrained_para', load=180)
 
     sim = ClutterRemovalSim(args.scene, args.object_set, gui=args.sim_gui,rand=args.rand)
     # finger_depth = sim.gripper.finger_depth
@@ -83,7 +89,7 @@ def main(args):
                 trial_id += 1
                 # use one camera views
                 n = 1
-                depth_imgs, extrinsics, eye = render_images(sim, n)
+                depth_imgs, extrinsics, eye = render_images(sim, n, randomize_view=args.randomize_view, tight_view=args.tight_view)
                 # reconstrct point cloud using a subset of the images
                 tsdf = create_tsdf(sim.size, 180, depth_imgs, sim.camera.intrinsic, extrinsics)
                 pc = tsdf.get_cloud()
@@ -289,14 +295,21 @@ def main(args):
         sample_num = args.sample_number
         np.save('clutter_record_{}_{}'.format(scene_name,sample_num), np.asarray(record))
 
-def render_images(sim, n):
+def render_images(sim, n, randomize_view=False, tight_view=False):
     height, width = sim.camera.intrinsic.height, sim.camera.intrinsic.width
-    origin = Transform(Rotation.identity(), np.r_[sim.size / 2, sim.size / 2, 0.0 + 0.25])
+    origin = Transform(Rotation.identity(), np.r_[sim.size / 2, sim.size / 2, 0.0])# + 0.25])
     extrinsics = np.empty((n, 7), np.float32)
     depth_imgs = np.empty((n, height, width), np.float32)
     for i in range(n):
-        r = np.random.uniform(2, 2.5) * sim.size
-        theta = np.random.uniform(np.pi/4, np.pi/3)
+        if randomize_view:
+            if tight_view:
+                theta = 5* np.pi / 12.0 # Fixed 75 degrees
+            else:
+                theta = np.random.uniform(np.pi / 12.0, 5* np.pi / 12.0) # elevation: 15 to 75 degrees
+            r = np.random.uniform(1.6, 2.4) * sim.size
+        else:
+            r = 2.0 * sim.size
+            theta = np.pi / 6.0
         phi = np.random.uniform(0.0, np.pi)
 
         extrinsic = camera_on_sphere(origin, r, theta, phi)
@@ -397,8 +410,20 @@ if __name__ == "__main__":
     parser.add_argument("--object-set", type=str, default="packed/test")
     parser.add_argument("--sample_number", type=int, default=32)
     parser.add_argument("--device", type=int, default=1)
-    parser.add_argument("--grasp_obs", type=int, default=1)
-    parser.add_argument("--sim-gui", action="store_true", default =True)
+    # parser.add_argument("--grasp_obs", type=int, default=1) # Unused
+    parser.add_argument("--sim-gui", action="store_true", default=False)
+    parser.add_argument(
+        "--randomize_view",
+        type=bool, default='',
+        help="Whether to use a random view input tsdf/point cloud")
+    parser.add_argument(
+        "--tight_view",
+        type=bool, default='',
+        help="Whether to use a TIGHT view input tsdf/point cloud. Very partial view")
+    parser.add_argument(
+        "--self_trained_model",
+        type=bool, default='',
+        help="Use our own trained model")
     parser.add_argument("--rand", action="store_true", default = True)
     parser.add_argument("--width", action="store_true", default=False)
     parser.add_argument("--baseline", action="store_true", default=False)
@@ -408,6 +433,6 @@ if __name__ == "__main__":
     parser.add_argument("--draw_all", action="store_true", default=False)
     parser.add_argument("--draw_failure", action="store_true", default=False)
     parser.add_argument("--hybrid", action="store_true", default=False)
-    parser.add_argument("--vn", action="store_true", default=False)
+    parser.add_argument("--vn", action="store_true", default=True)
     args = parser.parse_args()
     main(args)
