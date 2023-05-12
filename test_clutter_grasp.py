@@ -60,6 +60,8 @@ def main(args):
     # # sim.show_object()
     # memory = ReplayMemory(capacity=1000)
     record = []
+    gsr = []
+    dr = []
     for RUN in range(RUN_TIMES):
         np.random.seed(RUN + 1)
         torch.set_num_threads(RUN + 1)
@@ -290,10 +292,33 @@ def main(args):
 
         log = [success_rate, declutter_rate]
         record.append(log)
-        #print(record)
+        print(record)
         scene_name = str(args.scene)
         sample_num = args.sample_number
         np.save('clutter_record_{}_{}'.format(scene_name,sample_num), np.asarray(record))
+        gsr.append(success_rate)
+        dr.append(declutter_rate)
+    
+    # Save to file
+    results = {
+        'gsr': {
+            'mean': np.mean(gsr),
+            'std': np.std(gsr),
+            'val': gsr
+        },
+        'dr': {
+            'mean': np.mean(dr),
+            'std': np.std(dr),
+            'val': dr
+        },
+    }
+    print('Average results:')
+    print(f'Grasp sucess rate: {np.mean(gsr):.2f} ± {np.std(gsr):.2f} %')
+    print(f'Declutter rate: {np.mean(dr):.2f} ± {np.std(dr):.2f} %')
+    with open(args.result_path+'.json', 'w') as f:
+        json.dump(results, f, indent=2)
+
+
 
 def render_images(sim, n, randomize_view=False, tight_view=False):
     height, width = sim.camera.intrinsic.height, sim.camera.intrinsic.width
@@ -407,7 +432,7 @@ if __name__ == "__main__":
     # parser.add_argument("root", type=Path, default=Path("/data_robot/raw/foo"))
     #choices = ["pile", "packed", "obj", "egad"]
     parser.add_argument("--scene", type=str, choices=["pile", "packed", "obj", "egad"], default="packed")
-    parser.add_argument("--object-set", type=str, default="packed/test")
+    parser.add_argument("--object_set", type=str, default="packed/test")
     parser.add_argument("--sample_number", type=int, default=32)
     parser.add_argument("--device", type=int, default=1)
     # parser.add_argument("--grasp_obs", type=int, default=1) # Unused
@@ -434,5 +459,6 @@ if __name__ == "__main__":
     parser.add_argument("--draw_failure", action="store_true", default=False)
     parser.add_argument("--hybrid", action="store_true", default=False)
     parser.add_argument("--vn", action="store_true", default=True)
+    parser.add_argument("--result_path", type=str, default='./results')
     args = parser.parse_args()
     main(args)
