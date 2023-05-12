@@ -35,7 +35,7 @@ def main(args):
         device = torch.device('cpu')
     sim = ClutterRemovalSim(args.scene, args.object_set, gui=args.sim_gui)
     finger_depth = sim.gripper.finger_depth
-    root = Path('./raw_data_test')
+    root = Path('./raw_data_final')
     (root / "pcd").mkdir(parents=True, exist_ok=True)
     write_setup(
         root,
@@ -62,8 +62,8 @@ def main(args):
         total_objects = 0
         no_candidate_object = 0
 
-        # num_scenes = 1659 if args.scene == 'pile' else 1658
-        num_scenes = 1
+        num_scenes = 1659 if args.scene == 'pile' else 1658
+        # num_scenes = 1
 
         for scene_num in range(num_scenes):
             object_count = np.random.poisson(OBJECT_COUNT_LAMBDA) + 1
