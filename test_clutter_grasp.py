@@ -460,5 +460,5 @@ if __name__ == "__main__":
     parser.add_argument("--hybrid", action="store_true", default=False)
     parser.add_argument("--vn", action="store_true", default=True)
     parser.add_argument("--result_path", type=str, default='./results')
-    args = parser.parse_args()
+    args, _ = parser.parse_known_args()
     main(args)
