@@ -13,6 +13,7 @@ def get_network(name):
         "giga_aff": GIGAAff,
         "giga_classic": GIGA,
         "giga_classic_hr": GIGAHighRes,
+        "giga_classic_hr_deeper": GIGAHighResDeeper,
         "giga_geo": GIGAGeo,
         "giga_detach": GIGADetach,
     }
@@ -138,6 +139,32 @@ def GIGAHighRes():
         },
         'padding': 0,
         'c_dim': 32
+    }
+    return get_model(config)
+
+def GIGAHighResDeeper():
+    config = {
+        'encoder': 'voxel_simple_local',
+        'encoder_kwargs': {
+            'plane_type': ['xz', 'xy', 'yz'],
+            'plane_resolution': 64,
+            'unet': True,
+            'unet_kwargs': {
+                'depth': 5,
+                'merge_mode': 'concat',
+                'start_filts': 64
+            }
+        },
+        'decoder': 'simple_local',
+        'decoder_tsdf': True,
+        'decoder_kwargs': {
+            'dim': 3,
+            'sample_mode': 'bilinear',
+            'hidden_size': 256,
+            'concat_feat': True
+        },
+        'padding': 0,
+        'c_dim': 128
     }
     return get_model(config)
 
