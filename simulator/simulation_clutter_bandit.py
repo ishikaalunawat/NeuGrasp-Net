@@ -314,7 +314,7 @@ class ClutterRemovalSim(object):
             #time.sleep(3)
         else:
             #print('non contact')
-            self.gripper.move_tcp_xyz(T_world_grasp, abort_on_contact=False)
+            self.gripper.move_tcp_xyz(T_world_grasp, abort_on_contact=True)
             if self.gripper.detect_contact() and not allow_contact:
                 result = Label.FAILURE, self.gripper.max_opening_width, 'grasp'
                 quick_act = True

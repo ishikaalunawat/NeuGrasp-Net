@@ -335,6 +335,7 @@ def render_images(sim, n, randomize_view=False, tight_view=False):
         else:
             r = 2.0 * sim.size
             theta = np.pi / 6.0
+            # theta = np.pi / 4.0 # maybe they prefer 45 degree fixed?
         phi = np.random.uniform(0.0, np.pi)
 
         extrinsic = camera_on_sphere(origin, r, theta, phi)

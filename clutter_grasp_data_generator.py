@@ -272,13 +272,13 @@ def main(args):
 
 def render_images(sim, n):
     height, width = sim.camera.intrinsic.height, sim.camera.intrinsic.width
-    origin = Transform(Rotation.identity(), np.r_[sim.size / 2, sim.size / 2, 0.0 + 0.25])
+    origin = Transform(Rotation.identity(), np.r_[sim.size / 2, sim.size / 2, 0.0])
     extrinsics = np.empty((n, 7), np.float32)
     depth_imgs = np.empty((n, height, width), np.float32)
     for i in range(n):
         # Changed to neuGrasp
         r = np.random.uniform(1.6, 2.4) * sim.size 
-        theta = np.random.uniform(0, 5* np.pi / 12.0)
+        theta = np.random.uniform(0, 5* np.pi / 12.0) # 0 to 75 degree views
         phi = np.random.uniform(0.0, 2.0 * np.pi)
         extrinsic = camera_on_sphere(origin, r, theta, phi)
         depth_img = sim.camera.render(extrinsic)[1]

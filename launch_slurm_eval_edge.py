@@ -11,11 +11,11 @@ N_SEEDS = 1
 N_CORES = 5
 
 MEMORY_PER_CORE = 10000
-PARTITION = 'rtx2'#, 'rtx'
+PARTITION = 'dgx'#'rtx2'#, 'rtx'
 GRES = 'gpu:1' # if USE_CUDA else None  # gpu:rtx2080:1, gpu:rtx3080:1
 CONDA_ENV = 'edge_grasp'
 
-name = 'EdgeGraspNet_VN'
+name = 'edge_grasp_net_vn_fixed_view_pile2_45deg'
 launcher = Launcher(
     exp_name='eval_'+name,
     exp_file='test_clutter_grasp', # local path without .py    
@@ -24,7 +24,7 @@ launcher = Launcher(
     n_cores=N_CORES,
     memory_per_core=MEMORY_PER_CORE,
     days=0,
-    hours=12,
+    hours=6,
     minutes=59,
     seconds=0,
     partition=PARTITION,
@@ -39,7 +39,9 @@ launcher = Launcher(
 launcher.add_experiment(
     scene='pile',
     object_set='pile/test',
-    # self_trained_model=True,
+    # randomize_view=True, # Don't pass if False
+    # tight_view=True, # Don't pass if False
+    # self_trained_model=True, # Don't pass if False
     result_path='/home/jauhri/IAS_WS/potato-net/Edge-Grasp-Network/results/'+name,
     )
 
