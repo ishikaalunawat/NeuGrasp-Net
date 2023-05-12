@@ -159,6 +159,9 @@ class EdgeGrasp:
         labels_succ = batch.grasp_label
         # balance the positive and the negative
         if balance:
+            # SJ modification: skip if less than 2 data points
+            if len(labels_succ) < 1:
+                return
             # torch range include the end
             all_index = torch.range(0,len(labels_succ)-1,dtype=torch.long,device=self.device)
             positive_mask = labels_succ==1.
@@ -201,6 +204,9 @@ class EdgeGrasp:
         labels_succ = batch.grasp_label
 
         if balance:
+            # SJ modification: skip if less than 2 data points
+            if len(labels_succ) < 1:
+                return
             # torch range include the end
             all_index = torch.range(0,len(labels_succ)-1,dtype=torch.long,device=self.device)
             positive_mask = labels_succ==1.
