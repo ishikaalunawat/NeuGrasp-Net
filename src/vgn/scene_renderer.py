@@ -21,7 +21,9 @@ def render_n_images(sim, n=1, random=False, noise_type='', size=0.3):
         # theta = np.random.uniform(np.pi/6, np.pi/4) # elevation: 30 to 45 degrees
         r = np.random.uniform(2, 2.4) * size
     else:
-        theta = np.pi / 4.0 # 45 degrees from top view
+        # theta = np.pi / 4.0 # 45 degrees from top view
+        # SJ EDIT! Packed scene prefer scene renders from the top!
+        theta = np.random.uniform(np.pi / 9.0, np.pi / 4.5) # SJ EDIT!!! random 18 to 40 degrees from top view
         r = 2.0 * size
     
     phi_list = 2.0 * np.pi * np.arange(n) / n # circle around the scene
