@@ -254,15 +254,16 @@ class Decoder(nn.Module):
         x = self.conv1(x)
         x = F.relu(x)
 
-        x = F.interpolate(x, 10)
+        x = F.interpolate(x, 16) #10
         x = self.conv2(x)
         x = F.relu(x)
 
-        x = F.interpolate(x, 20)
+        x = F.interpolate(x, 32) #20
         x = self.conv3(x)
         x = F.relu(x)
 
-        x = F.interpolate(x, 40)
+        x = F.interpolate(x, 64) #40
+
         return x
 
 
