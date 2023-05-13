@@ -15,9 +15,10 @@ from vgn.utils.implicit import as_mesh
 LOW_TH = 0.5
 
 class VGNImplicit(object):
-    def __init__(self, model_path, model_type, best=False, force_detection=False, qual_th=0.9, out_th=0.5, visualize=False, resolution=64, **kwargs):
+    def __init__(self, model_path, model_type, best=True, force_detection=False, qual_th=0.9, out_th=0.5, visualize=False, resolution=64, **kwargs):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.net = load_network(model_path, self.device, model_type=model_type)
+        self.net.eval() # Set to eval mode
         self.qual_th = qual_th
         self.best = best
         self.force_detection = force_detection
