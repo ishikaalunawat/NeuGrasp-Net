@@ -1,6 +1,7 @@
 import argparse
 from pathlib import Path
 from datetime import datetime
+import wandb
 
 from ignite.contrib.handlers.tqdm_logger import ProgressBar
 from ignite.engine import Engine, Events
@@ -18,6 +19,7 @@ LOSS_KEYS = ['loss_all', 'loss_qual', 'loss_rot', 'loss_width']
 def main(args):
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
+    #device = "cpu" #TODO: CHANGE!
     kwargs = {"num_workers": 4, "pin_memory": True} if use_cuda else {}
 
     if args.savedir == '':
@@ -35,6 +37,13 @@ def main(args):
         logdir = args.logdir / description
     else:
         logdir = Path(args.savedir)
+
+    # filename = 'summary_%s.txt' % (args.dataset_raw.name)
+    # with open(filename, 'r') as f:
+    #     note = (";").join(f.readlines()[1:5]).replace('\n', '')
+
+    if args.log_wandb:
+        wandb.init(config=args, project="6dgrasp", entity="irosa-ias", id=args.net+'_'+args.dataset.name+'_'+time_stamp)#, notes=note)
 
     # create data loaders
     train_loader, val_loader = create_train_val_loaders(
@@ -58,6 +67,9 @@ def main(args):
     for k in LOSS_KEYS:
         metrics[k] = Average(lambda out, sk=k: out[3][sk])
 
+    if args.log_wandb:
+        wandb.watch(net, log_freq=100)
+
     # create ignite engines for training and validation
     trainer = create_trainer(net, optimizer, loss_fn, metrics, device)
     evaluator = create_evaluator(net, loss_fn, metrics, device)
@@ -75,6 +87,8 @@ def main(args):
 
         msg = 'Train'
         for k, v in metrics.items():
+            if args.log_wandb:
+                wandb.log({'train_'+k:v})
             msg += f' {k}: {v:.4f}'
         print(msg)
 
@@ -87,6 +101,8 @@ def main(args):
             
         msg = 'Val'
         for k, v in metrics.items():
+            if args.log_wandb:
+                wandb.log({'val_'+k:v})
             msg += f' {k}: {v:.4f}'
         print(msg)
 
@@ -244,6 +260,7 @@ if __name__ == "__main__":
     parser.add_argument("--net", default="vgn")
     parser.add_argument("--dataset", type=Path, required=True)
     parser.add_argument("--logdir", type=Path, default="data/runs")
+    parser.add_argument("--log_wandb", action="store_true")
     parser.add_argument("--description", type=str, default="")
     parser.add_argument("--savedir", type=str, default="")
     parser.add_argument("--epochs", type=int, default=10)
