@@ -121,7 +121,7 @@ if __name__ == "__main__":
     parser.add_argument("--debug", type=bool, default=False)
     parser.add_argument("--scene", type=str, choices=["pile", "packed"], default="pile")
     parser.add_argument("--object_set", type=str, default="pile/train")
-    parser.add_argument("--num_proc", type=int, default=1)
+    parser.add_argument("--num_proc", type=int, default=40)
     parser.add_argument("--render_table", type=bool, default=False, help="Also render table in depth images")
     parser.add_argument("--max_points", type=int, default=1000)
     parser.add_argument("--min_points", type=int, default=50)

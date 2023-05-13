@@ -21,8 +21,8 @@ LOSS_KEYS = ['loss_all', 'loss_qual'] # Removed OCC
 def main(args):
 
     use_cuda = torch.cuda.is_available()
-    # device = torch.device("cuda" if use_cuda else "cpu")
-    device = "cpu"
+    device = torch.device("cuda" if use_cuda else "cpu")
+    # device = "cpu"
     kwargs = {"num_workers": args.num_workers, "pin_memory": True} if use_cuda else {}
 
     # create log directory
@@ -43,10 +43,11 @@ def main(args):
     else:
         logdir = Path(args.savedir)
     
-    filename = 'summary/summary_%s.txt' % (args.dataset_raw.name)
-    with open(filename, 'r') as f:
-        note = (";").join(f.readlines()[1:5]).replace('\n', '')
+    # filename = 'summary/summary_%s.txt' % (args.dataset_raw.name)
+    # with open(filename, 'r') as f:
+    #     note = (";").join(f.readlines()[1:5]).replace('\n', '')
 
+    note = args.dataset_raw.name
     if args.log_wandb:
         wandb.init(config=args, project="6dgrasp", entity="irosa-ias", id=args.net+'_'+args.dataset.name+'_'+time_stamp, notes=note)
 

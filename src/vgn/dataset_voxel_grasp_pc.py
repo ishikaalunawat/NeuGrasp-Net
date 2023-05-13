@@ -80,7 +80,7 @@ class DatasetVoxelGraspPCOcc(torch.utils.data.Dataset):
         pos = self.df.loc[i, "x":"z"].to_numpy(np.single).reshape(1, 3)
         width = self.df.loc[i, "width"].astype(np.single)
         label = self.df.loc[i, "label"].astype(np.long)
-        voxel_grid = read_voxel_grid(self.root, scene_id) # TODO: Can I load the whole thing into memory?
+        # voxel_grid = read_voxel_grid(self.root, scene_id) # TODO: Can I load the whole thing into memory?
         if self.augment:
             voxel_grid, ori, pos = apply_aug_transform(voxel_grid, ori, pos)
         grasp_pc = self.read_grasp_pc(self.df.loc[i, "grasp_id"]) # Load grasp point cloud
@@ -97,13 +97,13 @@ class DatasetVoxelGraspPCOcc(torch.utils.data.Dataset):
             grasp_pc = np.vstack((grasp_pc, np.zeros((self.max_points_grasp_pc - grasp_pc.shape[0], 3))))
             grasp_pc_local = np.vstack((grasp_pc_local, np.zeros((self.max_points_grasp_pc - grasp_pc_local.shape[0], 3))))
         # assert label==None, f"{i}"
-        tsdf, y, rot = voxel_grid[0], (label, width), rotation # <- Changed to predict only grasp quality
-        occ_points, occ = self.read_occ(scene_id, self.num_point_occ) # TODO: Can I load the whole thing into memory?
-        occ_points = occ_points / self.size - 0.5
+        tsdf, y, rot = torch.rand(5), (label, width), rotation # Dummy value for (not required) tsdf
+        # occ_points, occ = self.read_occ(scene_id, self.num_point_occ) # TODO: Can I load the whole thing into memory?
+        # occ_points = occ_points / self.size - 0.5
 
         grasp_query = (pos, rot, grasp_pc_local, grasp_pc)
         
-        return tsdf, y, grasp_query, occ_points, occ
+        return tsdf, y, grasp_query, torch.rand(1), torch.rand(1) # occpoints, occ 
 
     def read_grasp_pc(self, grasp_id):
         grasp_pc_path = self.raw_root / 'grasp_point_clouds_world_reduced' / (str(grasp_id) + '.npz')
