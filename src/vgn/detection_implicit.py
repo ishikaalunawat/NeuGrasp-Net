@@ -109,8 +109,9 @@ class VGNImplicit(object):
 
         encoded_tsdf = None
         ## Test with point input?
-        point_input = False
-        if point_input:
+        # point_input = False
+        if 'vn' in self.model_type:
+            # Use point cloud input instead of TSDF
             lower = np.array([0.0 , 0.0 , 0.0])
             upper = np.array([size, size, size])
             bounding_box = o3d.geometry.AxisAlignedBoundingBox(lower, upper)
@@ -122,7 +123,7 @@ class VGNImplicit(object):
             pc_cropped = np.asarray(pc_cropped.points)
             pc_final = np.zeros((2048, 3), dtype=np.float32) # pad zeros to have uniform size
             pc_final[0:pc_cropped.shape[0]] = pc_cropped
-            pc_final = pc_final / size - 0.5
+            pc_final = pc_final / size - 0.5 # Norm and shift AFTER adding zeros
             tsdf_vol = np.expand_dims(pc_final,0)
         
         ## Get scene render
@@ -243,7 +244,7 @@ class VGNImplicit(object):
         pos_queries = pos_queries/size - 0.5
 
         # Variable rot_vol replaced with ==> rot
-        assert tsdf_vol.shape == (1, self.resolution, self.resolution, self.resolution)
+        # assert tsdf_vol.shape == (1, self.resolution, self.resolution, self.resolution)
 
         # Query network
         if 'neu' in self.model_type:
