@@ -10,9 +10,9 @@ nohup python scripts/sim_grasp_multiple.py --num-view 1 --object-set pile/test -
 # dataset creation
 python scripts/generate_data_parallel.py --scene pile --object-set pile/train --num-grasps 4000000 --num-proc 40 --save-scene ./data/pile/data_pile_train_random_raw_4M
 
-nohup python scripts/clean_balance_data.py ./data/pile/data_pile_train_random_raw_4M > nohup_logs/dataset4M_2.out &
+nohup python scripts/clean_balance_data.py ./data/packed/data_packed_raw > nohup_logs/dataset4M_packed_2.out &
 
-nohup python scripts/construct_dataset_parallel.py --num-proc 40 --single-view --add-noise dex ./data/pile/data_pile_train_random_raw_4M ./data/pile/data_pile_train_constructed_4M > nohup_logs/dataset4M_3.out &
+nohup python scripts/construct_dataset_parallel.py --num-proc 40 --single-view --add-noise dex ./data/packed/data_packed_raw ./data/packed/data_packed_constructed > nohup_logs/dataset4M_packed_3.out &
 
 nohup python scripts/save_occ_data_parallel.py ./data/pile/data_pile_train_random_raw_4M 100000 2 --num-proc 40 > nohup_logs/dataset4M_4.out &
 
@@ -38,4 +38,4 @@ nohup python scripts/generate_data_grasp_gpd_clouds.py --raw_root data/pile/data
 nohup time python scripts/generate_data_grasp_gpd_clouds.py --raw_root data/packed/data_packed > nohup_logs/generate_gpd_PACKED_reduced_4M.out &
 
 # Train VGN (pile)
-nohup python scripts/train_vgn.py --dataset data/pile/data_pile_train_constructed_4M_HighRes_radomized_views_GPG_only --log_wandb > nohup_logs/train_vgn_pile_4M_20ep.out &
+nohup python scripts/train_vgn.py --dataset data/pile/data_pile_train_constructed_4M_random_views_2 --log_wandb > nohup_logs/train_vgn_pile_lowres_4M_20ep.out &

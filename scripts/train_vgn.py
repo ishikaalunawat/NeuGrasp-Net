@@ -21,6 +21,7 @@ def main(args):
     device = torch.device("cuda" if use_cuda else "cpu")
     #device = "cpu" #TODO: CHANGE!
     kwargs = {"num_workers": 4, "pin_memory": True} if use_cuda else {}
+    print("Device used:", device)
 
     if args.savedir == '':
         # create log directory
