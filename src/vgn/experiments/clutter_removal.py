@@ -14,7 +14,7 @@ from vgn.utils.transform import Rotation, Transform
 from vgn.utils.implicit import get_mesh_pose_list_from_world, get_scene_from_mesh_pose_list
 
 MAX_CONSECUTIVE_FAILURES = 2
-
+MAX_SKIPS = 3
 
 State = collections.namedtuple("State", ["tsdf", "pc"])
 
@@ -33,6 +33,8 @@ def run(
     sim_gui=False,
     result_path=None,
     add_noise=False,
+    randomize_view=False,
+    tight_view=False,
     sideview=False,
     resolution=64,
     silence=False,
@@ -64,21 +66,29 @@ def run(
         logger.log_round(round_id, sim.num_objects)
         total_objs += sim.num_objects
         consecutive_failures = 1
+        skip_time = 0 # number of times we skip a round because of no grasp or no good quality grasp
         last_label = None
         trial_id = -1
 
-        while sim.num_objects > 0 and consecutive_failures < MAX_CONSECUTIVE_FAILURES:
+        while sim.num_objects > 0 and consecutive_failures < MAX_CONSECUTIVE_FAILURES and skip_time<MAX_SKIPS:
             trial_id += 1
             timings = {}
 
             # scan the scene
-            tsdf, pc, timings["integration"] = sim.acquire_tsdf(n=n, N=N, resolution=40)
+            see_table = False
+            if see_table == False:
+                sim.world.remove_body(sim.world.bodies[0]) # remove table because we dont want to render it # normally table is the first body
+            tsdf, pc, timings["integration"] = sim.acquire_tsdf(n=n, N=N, resolution=64, randomize_view=randomize_view, tight_view=tight_view)
             state = argparse.Namespace(tsdf=tsdf, pc=pc)
-            if resolution != 40:
+            if resolution != 64:
                 extra_tsdf, _, _ = sim.acquire_tsdf(n=n, N=N, resolution=resolution)
                 state.tsdf_process = extra_tsdf
+            if see_table == False:
+                sim.place_table(height=sim.gripper.finger_depth) # Add table back
 
             if pc.is_empty():
+                print("[WARNING] Empty point cloud, aborting this round")
+                total_objs -= sim.num_objects
                 break  # empty point cloud, abort this round TODO this should not happen
 
             # plan grasps
@@ -94,11 +104,14 @@ def run(
 
             if len(grasps) == 0:
                 no_grasp += 1
-                break  # no detections found, abort this round
+                skip_time += 1
+                continue  # no good grasps found, skip
 
             # execute grasp
             grasp, score = grasps[0], scores[0]
+            print("[BEST Score: %.2f]" % score)
             label, _ = sim.execute_grasp(grasp, allow_contact=True)
+            print("[RESULT: %s]" % label)
             cnt += 1
             if label != Label.FAILURE:
                 success += 1
@@ -118,7 +131,7 @@ def run(
     declutter_rate = 100.0 * success / total_objs
     print('Grasp success rate: %.2f %%, Declutter rate: %.2f %%' % (success_rate, declutter_rate))
     print(f'Average planning time: {np.mean(planning_times)}, total time: {np.mean(total_times)}')
-    #print('Consecutive failures and no detections: %d, %d' % (cons_fail, no_grasp))
+    print('Consecutive failures and no detections: %d, %d' % (cons_fail, no_grasp))
     if result_path is not None:
         with open(result_path, 'w') as f:
             f.write('%.2f%%, %.2f%%; %d, %d\n' % (success_rate, declutter_rate, cons_fail, no_grasp))

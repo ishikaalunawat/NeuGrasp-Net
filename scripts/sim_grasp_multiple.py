@@ -11,7 +11,7 @@ from vgn.utils.misc import set_random_seed
 
 def main(args):
 
-    if args.type in ['giga', 'giga_classic_hr', 'giga_aff']:
+    if args.type in ['giga', 'giga_classic_hr', 'giga_classic_hr_deeper', 'giga_aff']:
         grasp_planner = VGNImplicit(args.model,
                                     args.type,
                                     best=args.best,
@@ -33,7 +33,7 @@ def main(args):
 
     gsr = []
     dr = []
-    for seed in args.seeds:
+    for seed in args.zeeds:
         set_random_seed(seed)
         success_rate, declutter_rate = clutter_removal.run(
             grasp_plan_fn=grasp_planner,
@@ -46,8 +46,10 @@ def main(args):
             num_rounds=args.num_rounds,
             seed=seed,
             sim_gui=args.sim_gui,
-            result_path=None,
+            result_path=args.result_path,
             add_noise=args.add_noise,
+            randomize_view=args.randomize_view,
+            tight_view=args.tight_view,
             sideview=args.sideview,
             silence=args.silence,
             visualize=args.vis)
@@ -68,7 +70,7 @@ def main(args):
     print('Average results:')
     print(f'Grasp sucess rate: {np.mean(gsr):.2f} ± {np.std(gsr):.2f} %')
     print(f'Declutter rate: {np.mean(dr):.2f} ± {np.std(dr):.2f} %')
-    with open(args.result_path, 'w') as f:
+    with open(args.result_path+'.json', 'w') as f:
         json.dump(results, f, indent=2)
 
 
@@ -82,22 +84,31 @@ if __name__ == "__main__":
                         type=str,
                         choices=["pile", "packed"],
                         default="pile")
-    parser.add_argument("--object-set", type=str, default="blocks")
+    parser.add_argument("--object_set", type=str, default="blocks")
     parser.add_argument("--num-objects", type=int, default=5)
-    parser.add_argument("--num-view", type=int, default=1)
-    parser.add_argument("--num-rounds", type=int, default=100)
-    parser.add_argument("--seeds", type=int, nargs='+', default=[100, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4])
+    parser.add_argument("--num_view", type=int, default=1)
+    parser.add_argument("--num_rounds", type=int, default=100)
+    parser.add_argument("--zeeds", type=int, nargs='+', default=[0, 1, 2, 3, 4])
     parser.add_argument("--sim-gui", action="store_true")
     # parser.add_argument("--grad-refine", action="store_true")
-    parser.add_argument("--qual-th", type=float, default=0.9)
-    parser.add_argument("--eval-geo",
+    parser.add_argument("--qual_th", type=float, default=0.9)
+    parser.add_argument("--eval_geo",
                         action="store_true",
                         help='whether evaluate geometry prediction')
     parser.add_argument(
         "--best",
         action="store_true",
+        default=True,
         help="Whether to use best valid grasp (or random valid grasp)")
-    parser.add_argument("--result-path", type=str)
+    parser.add_argument(
+        "--randomize_view",
+        type=bool, default='',
+        help="Whether to use a random view input tsdf/point cloud")
+    parser.add_argument(
+        "--tight_view",
+        type=bool, default='',
+        help="Whether to use a TIGHT view input tsdf/point cloud. Very partial view")
+    parser.add_argument("--result_path", type=str)
     parser.add_argument(
         "--force",
         action="store_true",
@@ -105,7 +116,7 @@ if __name__ == "__main__":
         "When all grasps are under threshold, force the detector to select the best grasp"
     )
     parser.add_argument(
-        "--add-noise",
+        "--add_noise",
         type=str,
         default='',
         help="Whether add noise to depth observation, trans | dex | norm | ''")
@@ -119,5 +130,5 @@ if __name__ == "__main__":
                         action="store_true",
                         help="visualize and save affordance")
 
-    args = parser.parse_args()
+    args, _ = parser.parse_known_args()
     main(args)
