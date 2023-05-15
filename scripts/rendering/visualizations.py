@@ -402,7 +402,8 @@ down_surf_pc.colors = o3d.utility.Vector3dVector(np.tile(np.array([0.0, 0.2, 1])
 
 
 # sample grasps with GPG:
-
+seed = 309068705
+np.random.seed(seed)
 # downsampl & crop the cloud:
 down_surf_pc = surf_pc.voxel_down_sample(voxel_size=scene_voxel_downsample_size) # 5mm
 down_surf_pc_cropped = down_surf_pc.crop(o3d.geometry.AxisAlignedBoundingBox(np.array([0.0, 0.0, 0.0]), np.array([size, size, size])))
@@ -503,7 +504,7 @@ viz_camera_mesh.visual.face_colors = cam_colors
 # Add feat space box and make it more transparent
 box_feat_space = trimesh.creation.box(extents=[0.3, 0.3, 0.3-0.08])
 box_feat_space.visual.face_colors = [0.9, 0.9, 0.9, 0.2]
-translation = [0.15, 0.15, 0.05+0.15]
+translation = [0.15, 0.05, 0.05+0.15]
 box_feat_space.apply_translation(translation)
 viz_camera_scene = trimesh.Scene([box_feat_space, box])
 # _, extrinsics_cams = render_n_images_close(sim, n=6, random=False, noise_type='')
@@ -538,7 +539,6 @@ for cam_extrinsic in extrinsics_full:
         p_proposal_world_combined = torch.cat([p_proposal_world_combined, p_proposal_world[0, surf_mask[0]]], dim=0)
 
 # Choose a subset of the rays to show
-seed = 3090687052
 max_rays = 15
 ray_indices = np.random.randint(p_proposal_world_combined.shape[0], size=max_rays)
 # points = p_proposal_world[0].view(-1,3)
@@ -565,6 +565,7 @@ viz_camera_scene.show()
 seen_grasps_scene.camera_transform = camera_tf
 seen_grasps_scene.camera.resolution = cam_resolution
 seen_grasps_scene.add_geometry(recon_scene)
+seen_grasps_scene.add_geometry(box_feat_space)
 seen_grasps_scene.show()
 for i, extrinsic in enumerate(extrinsics_full):
     viz_camera_mesh_copy = viz_camera_mesh.copy()
