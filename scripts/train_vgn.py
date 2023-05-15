@@ -8,7 +8,7 @@ from ignite.engine import Engine, Events
 from ignite.handlers import ModelCheckpoint
 from ignite.metrics import Average, Accuracy, Precision, Recall
 import torch
-from torch.utils import tensorboard
+# from torch.utils import tensorboard
 import torch.nn.functional as F
 
 from vgn.dataset import Dataset
@@ -20,7 +20,7 @@ def main(args):
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
     #device = "cpu" #TODO: CHANGE!
-    kwargs = {"num_workers": 4, "pin_memory": True} if use_cuda else {}
+    kwargs = {"num_workers": 16, "pin_memory": True} if use_cuda else {}
     print("Device used:", device)
 
     if args.savedir == '':
@@ -78,13 +78,13 @@ def main(args):
     # log training progress to the terminal and tensorboard
     ProgressBar(persist=True, ascii=True, dynamic_ncols=True, disable=args.silence).attach(trainer)
 
-    train_writer, val_writer = create_summary_writers(net, device, logdir)
+    # train_writer, val_writer = create_summary_writers(net, device, logdir)
 
     @trainer.on(Events.EPOCH_COMPLETED)
     def log_train_results(engine):
         epoch, metrics = trainer.state.epoch, trainer.state.metrics
-        for k, v in metrics.items():
-            train_writer.add_scalar(k, v, epoch)
+        # for k, v in metrics.items():
+        #     train_writer.add_scalar(k, v, epoch)
 
         msg = 'Train'
         for k, v in metrics.items():
@@ -97,8 +97,8 @@ def main(args):
     def log_validation_results(engine):
         evaluator.run(val_loader)
         epoch, metrics = trainer.state.epoch, evaluator.state.metrics
-        for k, v in metrics.items():
-            val_writer.add_scalar(k, v, epoch)
+        # for k, v in metrics.items():
+        #     val_writer.add_scalar(k, v, epoch)
             
         msg = 'Val'
         for k, v in metrics.items():
@@ -266,10 +266,10 @@ if __name__ == "__main__":
     parser.add_argument("--savedir", type=str, default="")
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--batch-size", type=int, default=32)
-    parser.add_argument("--lr", type=float, default=3e-4)
+    parser.add_argument("--lr", type=float, default=2e-4)
     parser.add_argument("--val-split", type=float, default=0.1)
     parser.add_argument("--augment", action="store_true")
     parser.add_argument("--silence", action="store_true")
     parser.add_argument("--load-path", type=str, default='')
-    args = parser.parse_args()
+    args, _ = parser.parse_known_args()
     main(args)
