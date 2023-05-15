@@ -134,6 +134,8 @@ def main(args):
     )
 
     # run the training loop
+    # epoch_length = int(0.0001*len(train_loader))
+    # trainer.run(train_loader, max_epochs=args.epochs, epoch_length=epoch_length)
     trainer.run(train_loader, max_epochs=args.epochs)
 
 
@@ -261,7 +263,7 @@ if __name__ == "__main__":
     parser.add_argument("--net", default="vgn")
     parser.add_argument("--dataset", type=Path, required=True)
     parser.add_argument("--logdir", type=Path, default="data/runs")
-    parser.add_argument("--log_wandb", action="store_true")
+    parser.add_argument("--log_wandb", type=bool, default='')
     parser.add_argument("--description", type=str, default="")
     parser.add_argument("--savedir", type=str, default="")
     parser.add_argument("--epochs", type=int, default=10)
