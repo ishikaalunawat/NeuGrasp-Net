@@ -275,6 +275,7 @@ def create_trainer(net, optimizer, scheduler, loss_fn, metrics, device):
         net.train()
         optimizer.zero_grad()
         # forward
+        ## pc, (label, width, occ_value), (pos, rotations, grasps_pc_local, grasps_pc), pos_occ
         x, y, grasp_query, pos_occ = prepare_batch(batch, device) # <- Changed to predict only grasp quality (check inside)
         y_pred = select(net(x, grasp_query, p_tsdf=pos_occ))
         loss, loss_dict = loss_fn(y_pred, y)
