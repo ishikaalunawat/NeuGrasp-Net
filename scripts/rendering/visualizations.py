@@ -60,6 +60,8 @@ index = np.random.randint(32000) # index 20 is a good example.
 mesh_list_files = glob.glob(os.path.join(previous_root, 'mesh_pose_list', '*.npz'))
 mesh_pose_list = np.load(mesh_list_files[index], allow_pickle=True)['pc']
 scene_id = os.path.basename(mesh_list_files[index])[:-4] # scene id without .npz extension
+# "d7e7d6e296ec4abfaad79acd252ac9b3"
+
 ## Get specific scene
 # scene_id = 'f614e39ed9df4e1094d569cddc20979b'
 # mesh_list_file = os.path.join(previous_root, 'mesh_pose_list', scene_id + '.npz')
@@ -407,7 +409,7 @@ down_surf_pc_cropped = down_surf_pc.crop(o3d.geometry.AxisAlignedBoundingBox(np.
 sampler = GpgGraspSamplerPcl(sim.gripper.finger_depth-0.0075) # Franka finger depth is actually a little less than 0.05
 safety_dist_above_table = sim.gripper.finger_depth # table is spawned at finger_depth
 # We also get the 'origin point' i.e. the point from the point cloud that was sampled that resulted in each gpg grasp
-grasps, grasps_pos, grasps_rot, origin_points = sampler.sample_grasps(down_surf_pc_cropped, num_grasps=8, max_num_samples=240,
+grasps, grasps_pos, grasps_rot, origin_points = sampler.sample_grasps(down_surf_pc_cropped, num_grasps=5, max_num_samples=240,
                                     safety_dis_above_table=safety_dist_above_table, show_final_grasps=False, return_origin_point=True)
 
 
@@ -430,6 +432,7 @@ input_pc_trimesh = trimesh.points.PointCloud(seen_pc.points)
 
 pc_trimesh.colors = np.array([47, 122, 229])  # Bleu De France
 pc_trimesh.colors = np.array([221, 5, 37]) # Cadmium Red
+pc_trimesh.colors = np.array([194, 30, 86]) # Rose Red
 box = trimesh.creation.box(extents=[1.5, 0.5, 0.1])
 box.visual.face_colors = [0.9, 0.9, 0.9, 1.0]
 translation = [0.15, 0.15, -0.05+0.05]
@@ -553,6 +556,7 @@ surf_ray_points = surface_points_combined[ray_indices,:].view(-1,3)
 surf_ray_trim = trimesh.points.PointCloud(surf_ray_points.numpy())
 surf_ray_trim.colors = np.array([47, 122, 229])  # Bleu De France
 surf_ray_trim.colors = np.array([221, 5, 37]) # Cadmium Red
+surf_ray_trim.colors = np.array([194, 30, 86]) # Rose Red
 viz_camera_scene.add_geometry(ray_trim)
 viz_camera_scene.add_geometry(surf_ray_trim)
 viz_camera_scene.show()
@@ -560,11 +564,23 @@ viz_camera_scene.show()
 # Grasp on recon scene
 seen_grasps_scene.camera_transform = camera_tf
 seen_grasps_scene.camera.resolution = cam_resolution
+seen_grasps_scene.add_geometry(recon_scene)
+seen_grasps_scene.show()
 for i, extrinsic in enumerate(extrinsics_full):
     viz_camera_mesh_copy = viz_camera_mesh.copy()
     viz_camera_mesh_copy.apply_transform(extrinsic.inverse().as_matrix())
-    # seen_grasps_scene.add_geometry(viz_camera_mesh_copy, node_name=f'camera_{i}')
-seen_grasps_scene.add_geometry(recon_scene)
+    seen_grasps_scene.add_geometry(viz_camera_mesh_copy, node_name=f'camera_{i}')
+seen_grasps_scene.show()
+
+
+# Loop through grasps and color them red or green
+for i in range(len(grasps)):
+    # choose red or green at random
+    if np.random.rand() > 0.5:
+        color = np.array([0, 255, 0, 180])
+    else:
+        color = np.array([255, 0, 0, 180])
+    seen_grasps_scene.geometry[f'geometry_{i}'].visual.face_colors = color
 seen_grasps_scene.show()
 
 import pdb; pdb.set_trace()
