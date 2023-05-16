@@ -55,7 +55,7 @@ def secant(net, encoded_tsdf, f_low, f_high, d_low, d_high, n_secant_steps,
     return d_pred
 
 
-def generate_neur_grasp_clouds(sim, render_settings, grasps, size, encoded_tsdf, net, device=torch.device("cuda"), scene_mesh=None, debug=False, o3d_vis=None, viz_rays=False):
+def generate_neur_grasp_clouds(sim, render_settings, grasps, size, encoded_tsdf, net, device=torch.device("cuda"), scene_mesh=None, debug=False, o3d_vis=None):
     max_points = render_settings['max_points']
     voxel_downsample_size = render_settings['voxel_downsample_size']
     width = height = render_settings['camera_image_res']
@@ -247,15 +247,12 @@ def generate_neur_grasp_clouds(sim, render_settings, grasps, size, encoded_tsdf,
     points_out_local = torch.bmm(grasp_inv_tfs, points_out_hom.transpose(1,2))
     inval_mask = points_out_local[:,0,:] > (max_measured_dist - dist_from_gripper) # too far X
     inval_mask = inval_mask | (points_out_local[:,0,:] < -dist_from_gripper)       # too close X
-    inval_mask = inval_mask | (points_out_local[:,2,:] >  height_max_dist-0.005)         # too far Z
-    inval_mask = inval_mask | (points_out_local[:,2,:] < -height_max_dist+0.005)         # too close Z
+    inval_mask = inval_mask | (points_out_local[:,2,:] >  height_max_dist)         # too far Z
+    inval_mask = inval_mask | (points_out_local[:,2,:] < -height_max_dist)         # too close Z
 
     surf_mask = mask & ~inval_mask
     
     # Surface Rendering & filtering complete
-    if viz_rays:
-        # For visualization, we need to only return the surface points and the ray points
-        return points_out[mask], p_proposal_world_combined[mask]
     ## Now loop over grasp clouds, downsample and reject grasps with too few points
     grasps_pc_local = torch.zeros((batch_size,max_points,3))
     grasps_pc = grasps_pc_local.clone()
