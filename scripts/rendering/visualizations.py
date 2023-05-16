@@ -515,7 +515,7 @@ for i, extrinsic in enumerate(extrinsics_full):
 
 viz_camera_scene.camera_transform = camera_tf
 viz_camera_scene.camera.resolution = cam_resolution
-viz_camera_scene.show()
+viz_camera_scene.show(line_settings= {'point_size': 10})
 
 
 # Make rays emanating from cameras: Maybe two/three each?
@@ -539,7 +539,7 @@ for cam_extrinsic in extrinsics_full:
         p_proposal_world_combined = torch.cat([p_proposal_world_combined, p_proposal_world[0, surf_mask[0]]], dim=0)
 
 # Choose a subset of the rays to show
-max_rays = 15
+max_rays = 12
 ray_indices = np.random.randint(p_proposal_world_combined.shape[0], size=max_rays)
 # points = p_proposal_world[0].view(-1,3)
 # indices = np.random.randint(points.shape[0], size=max_points)
@@ -559,9 +559,11 @@ surf_ray_trim.colors = np.array([221, 5, 37]) # Cadmium Red
 surf_ray_trim.colors = np.array([194, 30, 86]) # Rose Red
 viz_camera_scene.add_geometry(ray_trim)
 viz_camera_scene.add_geometry(surf_ray_trim)
-viz_camera_scene.show()
+viz_camera_scene.show(line_settings= {'point_size': 35})
 
 # Grasp on recon scene
+recon_scene.add_geometry(box_feat_space)
+recon_scene.show()
 seen_grasps_scene.camera_transform = camera_tf
 seen_grasps_scene.camera.resolution = cam_resolution
 seen_grasps_scene.add_geometry(recon_scene)

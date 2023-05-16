@@ -111,6 +111,8 @@ def grasp2mesh(grasp, score=0.0, color='green', finger_depth=0.05):
         color = np.array([250, 0, 0, 180]).astype(np.uint8)
     elif color=='yellow':
         color = np.array([250, 250, 0, 180]).astype(np.uint8)
+    elif color=='yellow_light':
+        color = np.array([250, 250, 0, 120]).astype(np.uint8)
     else: # green
         color = np.array([0, 250, 0, 180]).astype(np.uint8)
     radius = 0.1 * finger_depth
