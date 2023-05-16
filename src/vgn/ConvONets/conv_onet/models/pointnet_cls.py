@@ -25,6 +25,7 @@ class PointNet(nn.Module):
 
     def forward(self, x):
         x = self.feat(x) # x, trans, trans_feat
+        # print(x.size())
         x = F.relu(self.bn1(self.fc1(x)))
         x = F.relu(self.bn2(self.dropout(self.fc2(x))))
         x = self.fc3(x)

@@ -150,7 +150,6 @@ class ConvolutionalOccupancyNetwork(nn.Module):
             p (tensor): points
             c (tensor): latent conditioned code c
         '''
-
         qual = self.decoder_qual(p, c, **kwargs)
         qual = torch.sigmoid(qual)
         #rot = self.decoder_rot(p, c, **kwargs)

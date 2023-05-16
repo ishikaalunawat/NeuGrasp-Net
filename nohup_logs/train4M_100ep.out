@@ -1,4 +1,0 @@
-  File "scripts/train_giga.py", line 94
-    msg += f' {k}: {v:.4f}'
-                          ^
-SyntaxError: invalid syntax

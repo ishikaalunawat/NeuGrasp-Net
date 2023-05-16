@@ -450,6 +450,7 @@ class PickedPointDecoder(nn.Module):
             pos, rotations, grasps_pc_local, grasps_pc = grasp_query
             zero_pc_indices = grasps_pc.sum(dim=2) == 0
             f = torch.cat([pos,rotations], dim = 2) # <- Changed to predict only grasp quality
+            # print(f.size())
         else:
             raise NotImplementedError
 
@@ -477,6 +478,7 @@ class PickedPointDecoder(nn.Module):
         queries = torch.cat([g, c], dim=1)
         
         queries = queries.transpose(2, 1) # Transpose to get shape B, D, N
+        # print(queries.size())
         out = self.point_network(queries)
 
         return out
