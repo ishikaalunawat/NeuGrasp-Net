@@ -145,7 +145,8 @@ def generate_neur_grasp_clouds(sim, render_settings, grasps, size, encoded_tsdf,
             from vgn.utils import visual
             grasps_scene.add_geometry(visual.grasp2mesh(grasp), node_name=f'grasp_{idx}')
             o3d_gripper_mesh = as_mesh(grasps_scene).as_open3d
-            o3d_gripper_mesh.paint_uniform_color([1.0, 0.85, 0.0]) # yellow
+            o3d_gripper_mesh.paint_uniform_color([255/255, 255/255, 102/255]) # yellow
+            # o3d_gripper_mesh.paint_uniform_color([1.0, 0.85, 0.0]) # yellow
             o3d_vis.add_geometry(o3d_gripper_mesh, reset_bounding_box=False)
             o3d_vis.poll_events()
             # o3d_vis.update_renderer()
@@ -304,9 +305,9 @@ def generate_neur_grasp_clouds(sim, render_settings, grasps, size, encoded_tsdf,
 
         if o3d_vis is not None:
             down_surf_pc.colors = o3d.utility.Vector3dVector(np.tile(np.array([0.9, 0.9, 0.0]), (np.asarray(down_surf_pc.points).shape[0], 1)))
-            o3d_vis.add_geometry(down_surf_pc, reset_bounding_box=False)
+            # o3d_vis.add_geometry(down_surf_pc, reset_bounding_box=False)
             o3d_vis.poll_events()
-            # o3d_vis.update_renderer()
+            o3d_vis.update_renderer()
 
     return bad_indices, grasps_pc_local, grasps_pc, grasps_viz_list
 

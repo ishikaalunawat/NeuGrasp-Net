@@ -11,7 +11,7 @@ from vgn.grasp import *
 from vgn.utils.transform import Transform, Rotation
 
 
-def render_n_images(sim, n=1, random=False, noise_type='', size=0.3):
+def render_n_images(sim=None, n=1, random=False, noise_type='', size=0.3):
     origin = Transform(Rotation.identity(), np.r_[size / 2, size / 2, 0.0])
     if random:
         # theta = np.random.uniform(0.0, 5* np.pi / 12.0) # elevation: 0 to 75 degrees
@@ -21,20 +21,24 @@ def render_n_images(sim, n=1, random=False, noise_type='', size=0.3):
         # theta = np.random.uniform(np.pi/6, np.pi/4) # elevation: 30 to 45 degrees
         r = np.random.uniform(2, 2.4) * size
     else:
-        theta = np.pi / 4.0 # 45 degrees from top view
+        # SJ EDIT!
+        # 15 degrees from top view
+        theta = np.pi / 12.0
+        # theta = np.pi / 4.0 # 45 degrees from top view
+
         r = 2.0 * size
     
     phi_list = 2.0 * np.pi * np.arange(n) / n # circle around the scene
     extrinsics = [camera_on_sphere(origin, r, theta, phi) for phi in phi_list]
     depth_imgs = []
 
-    for extrinsic in extrinsics:
-        # Multiple views -> for getting other sides of pc
-        depth_img = sim.camera.render(extrinsic)[1]
-        # add noise
-        depth_img = apply_noise(depth_img, noise_type)
+    # for extrinsic in extrinsics:
+    #     # Multiple views -> for getting other sides of pc
+    #     # depth_img = sim.camera.render(extrinsic)[1]
+    #     # add noise
+    #     depth_img = apply_noise(depth_img, noise_type)
         
-        depth_imgs.append(depth_img)
+    #     depth_imgs.append(depth_img)
 
     return depth_imgs, extrinsics
 
@@ -206,8 +210,8 @@ def get_scene_surf_render(sim, size, resolution, net, encoded_tsdf, device, args
     ## Render the scene using the occupancy network with the same extrinsics
 
     # Neural render camera settings
-    width = 64
-    height = 64
+    width = 48
+    height = 48
     width_fov  = np.deg2rad(60) # angular FOV (120 by default)
     height_fov = np.deg2rad(60) # angular FOV (120 by default)
     f_x = width  / (np.tan(width_fov / 2.0))
@@ -231,7 +235,8 @@ def get_scene_surf_render(sim, size, resolution, net, encoded_tsdf, device, args
     surf_pc.points = o3d.utility.Vector3dVector(surface_points_combined)
     down_surf_pc = surf_pc
     down_surf_pc = surf_pc.voxel_down_sample(voxel_size=0.005) # 5mm
-    down_surf_pc.colors = o3d.utility.Vector3dVector(np.tile(np.array([0.0, 0.2, 1]), (np.asarray(down_surf_pc.points).shape[0], 1)))
+    # np.array([194, 30, 86]) # Rose Red
+    down_surf_pc.colors = o3d.utility.Vector3dVector(np.tile(np.array([194/255, 30/255, 86/255]), (np.asarray(down_surf_pc.points).shape[0], 1)))
     # o3d.visualization.draw_geometries([down_surf_pc, pc_full])
 
     # Crop to within scene bounds

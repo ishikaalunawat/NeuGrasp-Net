@@ -147,7 +147,7 @@ class VGNImplicit(object):
                         encoded_tsdf = self.net.encode_inputs(torch.from_numpy(tsdf_vol).to(self.device))
                     pc_extended = get_scene_surf_render(sim, size, self.resolution, self.net, encoded_tsdf, device=self.device)
                     o3d_vis.add_geometry(pc_extended, reset_bounding_box=False) # point cloud
-                o3d_vis.poll_events()
+                    o3d_vis.poll_events()
                 # num_grasps_gpg = 20
                 num_grasps_gpg = 60
         else:
@@ -202,7 +202,7 @@ class VGNImplicit(object):
             
             sampler = GpgGraspSamplerPcl(0.05-0.0075) # Franka finger depth is actually a little less than 0.05
             safety_dist_above_table = 0.05 # table is spawned at finger_depth
-            grasps, pos_queries, rot_queries, gpg_origin_points = sampler.sample_grasps(pc_extended_down, num_grasps=num_grasps_gpg, max_num_samples=180,#320
+            grasps, pos_queries, rot_queries, gpg_origin_points = sampler.sample_grasps(pc_extended_down, num_grasps=num_grasps_gpg, max_num_samples=220,#320
                                                 safety_dis_above_table=safety_dist_above_table, show_final_grasps=False, verbose=False,
                                                 return_origin_point=True)
             # Optional: Find out if the point comes from a seen or unseen area
@@ -248,7 +248,19 @@ class VGNImplicit(object):
         # Query network
         if 'neu' in self.model_type:
             # Also generate grasp point clouds
-            render_settings = read_json(Path("/home/jauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/pile/grasp_cloud_setup.json"))
+            # render_settings = read_json(Path("/home/jauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/pile/grasp_cloud_setup.json"))
+            render_settings = dict({
+                    "three_cameras": True,
+                    "camera_fov": 120,
+                    "camera_image_res": 32,
+                    "n_proposal_steps": 10, # Optional settings for neural grasp renderer
+                    "n_secant_steps": 8, # Optional settings for neural grasp renderer
+                    "render_table": False,
+                    "voxel_downsample_size": 0.002,
+                    "max_points": 1023,
+                    "min_points": 50,
+                    "add_noise": False
+                    })
             # render_settings = read_json(Path("data/pile/grasp_cloud_setup.json"))
             # render_settings = read_json(Path("data/pile/grasp_cloud_setup_efficient.json"))
             gt_render = False
@@ -326,15 +338,25 @@ class VGNImplicit(object):
 
             if o3d_vis is not None:
                 # Visualize the grasp point clouds
+                only_viz_best = False
+                best_index = np.argmax(qual_vol)
                 for ind, grasp_viz_mesh in enumerate(grasps_viz_list):
-                    if qual_vol[ind] > self.qual_th:
-                        grasp_viz_mesh.paint_uniform_color([0,1,0])
-                        o3d_vis.update_geometry(grasp_viz_mesh)
+                    if only_viz_best:
+                        if ind == best_index:
+                            grasp_viz_mesh.paint_uniform_color([0,1,0])
+                            o3d_vis.update_geometry(grasp_viz_mesh)
+                        else:
+                            o3d_vis.remove_geometry(grasp_viz_mesh, reset_bounding_box=False)
                     else:
-                        # Either remove the bad grasps from viz or color them red
-                        # o3d_vis.remove_geometry(grasp_viz_mesh)
-                        grasp_viz_mesh.paint_uniform_color([1,0,0])
-                        o3d_vis.update_geometry(grasp_viz_mesh)
+                        if qual_vol[ind] > self.qual_th:
+                            # mod green 125, 202, 92
+                            grasp_viz_mesh.paint_uniform_color([125/255, 202/255, 92/255])
+                            o3d_vis.update_geometry(grasp_viz_mesh)
+                        else:
+                            # Either remove the bad grasps from viz or color them red
+                            o3d_vis.remove_geometry(grasp_viz_mesh, reset_bounding_box=False)
+                            # grasp_viz_mesh.paint_uniform_color([1,0,0])
+                            o3d_vis.update_geometry(grasp_viz_mesh)
                     o3d_vis.poll_events()
                     # o3d_vis.update_renderer()
         elif self.model_type == 'pointnetgpd':
