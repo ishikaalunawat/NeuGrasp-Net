@@ -14,7 +14,7 @@ from vgn.utils.transform import Rotation, Transform
 from vgn.utils.implicit import get_mesh_pose_list_from_world, get_scene_from_mesh_pose_list
 
 MAX_CONSECUTIVE_FAILURES = 2
-
+MAX_SKIPS = 3
 
 State = collections.namedtuple("State", ["tsdf", "pc"])
 
@@ -30,6 +30,8 @@ def run(
     seed=1,
     sim_gui=False,
     add_noise=False,
+    randomize_view=False,
+    tight_view=False,
     sideview=False,
     resolution=40,
     silence=False,
@@ -55,28 +57,32 @@ def run(
 
     total_objs += sim.num_objects
     consecutive_failures = 1
+    skip_time = 0 # number of times we skip a round because of no grasp or no good quality grasp
     last_label = None
     trial_id = -1
 
-    while sim.num_objects > 0 and consecutive_failures < MAX_CONSECUTIVE_FAILURES:
+    while sim.num_objects > 0 and consecutive_failures < MAX_CONSECUTIVE_FAILURES and skip_time<MAX_SKIPS:
         trial_id += 1
         timings = {}
 
         # scan the scene
-        tsdf, pc, timings["integration"] = sim.acquire_tsdf(n=n, N=N, resolution=40)
+        tsdf, pc, timings["integration"] = sim.acquire_tsdf(n=n, N=N, resolution=40, randomize_view=randomize_view, tight_view=tight_view)
         state = argparse.Namespace(tsdf=tsdf, pc=pc)
         if resolution != 40:
-            extra_tsdf, _, _ = sim.acquire_tsdf(n=n, N=N, resolution=resolution)
+            extra_tsdf, _, _ = sim.acquire_tsdf(n=n, N=N, resolution=resolution, randomize_view=randomize_view, tight_view=tight_view)
             state.tsdf_process = extra_tsdf
 
         if pc.is_empty():
+            print("[WARNING] Empty point cloud, aborting this round")
+            total_objs -= sim.num_objects
             break  # empty point cloud, abort this round TODO this should not happen
 
         grasps, scores, timings["planning"] = grasp_plan_fn(state)
 
         if len(grasps) == 0:
             no_grasp += 1
-            break  # no detections found, abort this round
+            skip_time += 1
+            continue  # no good grasps found, skip
 
         # execute grasp
         grasp, score = grasps[0], scores[0]

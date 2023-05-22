@@ -142,7 +142,7 @@ class ClutterRemovalSim(object):
                 self.remove_and_wait()
             attempts += 1
 
-    def acquire_tsdf(self, n, N=None, resolution=64, randomize_view=False, tight_view=False):
+    def acquire_tsdf(self, n, N=None, resolution=40, randomize_view=False, tight_view=False):
         """Render synthetic depth images from n viewpoints and integrate into a TSDF.
 
         If N is None, the n viewpoints are equally distributed on circular trajectory.

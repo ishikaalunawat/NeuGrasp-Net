@@ -36,7 +36,7 @@ def run(
     randomize_view=False,
     tight_view=False,
     sideview=False,
-    resolution=64,
+    resolution=40,
     silence=False,
     visualize=False
 ):
@@ -78,9 +78,9 @@ def run(
             see_table = False
             if see_table == False:
                 sim.world.remove_body(sim.world.bodies[0]) # remove table because we dont want to render it # normally table is the first body
-            tsdf, pc, timings["integration"] = sim.acquire_tsdf(n=n, N=N, resolution=64, randomize_view=randomize_view, tight_view=tight_view)
+            tsdf, pc, timings["integration"] = sim.acquire_tsdf(n=n, N=N, resolution=resolution, randomize_view=randomize_view, tight_view=tight_view)
             state = argparse.Namespace(tsdf=tsdf, pc=pc)
-            if resolution != 64:
+            if resolution != 40:
                 extra_tsdf, _, _ = sim.acquire_tsdf(n=n, N=N, resolution=resolution)
                 state.tsdf_process = extra_tsdf
             if see_table == False:
