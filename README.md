@@ -127,7 +127,7 @@ As mentioned in the [issue](https://github.com/UT-Austin-RPL/GIGA/issues/3), occ
 
 ## Related Repositories
 
-1. Our code is largely based on [VGN](https://github.com/ethz-asl/vgn) and GIGA[https://github.com/UT-Austin-RPL/GIGA]
+1. Our code is largely based on [VGN](https://github.com/ethz-asl/vgn) and [GIGA](https://github.com/UT-Austin-RPL/GIGA)
 
 2. We use [ConvONets](https://github.com/autonomousvision/convolutional_occupancy_networks) and [PointNet](https://github.com/charlesq34/pointnet) as our backbone.
 
