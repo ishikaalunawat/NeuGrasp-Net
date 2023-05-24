@@ -24,7 +24,10 @@ pip install torch==1.7.1 torchvision==0.8.2 pytorch-ignite==0.4.4 torch-scatter=
 pip install -e .
 ```
 
-4. Build ConvONets dependents by running `python scripts/convonet_setup.py build_ext --inplace`.
+4. Build ConvONets dependents by running:
+```
+python scripts/convonet_setup.py build_ext --inplace
+```
 
 
 ## Data Generation
