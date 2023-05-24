@@ -118,12 +118,12 @@ Pretrained models are also in the [data.zip](<TODO>). They are in `data/models`.
 
 ### Pre-generated data
 
-As mentioned in the [issue](https://github.com/UT-Austin-RPL/GIGA/issues/3), occupancy data generation is very costly and cannot be uploaded. So, you can generate them following the instruction in this [section](#save-occupancy-data). This generation won't take too long.
+As mentioned in the [issue](https://github.com/UT-Austin-RPL/GIGA/issues/3), occupancy data generation is very costly and cannot be uploaded. So, you can generate them following the instruction in this [section](#save-occupancy-data). This generation should not take too long.
 
 | Scenario | Raw data | Processed data |
 | ----------- | ----------- | ----------- |
-| Pile | [link](https://utexas.box.com/s/w1abs6xfe8d2fo0h9k4bxsdgtnvuwprj) | [link](https://utexas.box.com/s/l3zpzlc1p6mtnu7ashiedasl2m3xrtg2) |
-| Packed | [link](https://utexas.box.com/s/roaozwxiikr27rgeauxs3gsgpwry7gk7) | [link](https://utexas.box.com/s/h48jfsqq85gt9u5lvb82s5ft6k2hqdcn) |
+| Pile | [link](<TODO>) | [link](<TODO>) |
+| Packed | [link](<TODO>) | [link](<TODO>) |
 
 ## Related Repositories
 
