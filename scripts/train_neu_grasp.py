@@ -47,7 +47,7 @@ def main(args):
     #     note = (";").join(f.readlines()[1:5]).replace('\n', '')
 
     if args.log_wandb:
-        wandb.init(config=args, project="6dgrasp", dir='/work/scratch/sj93qicy/potato-net', entity="temp", id=args.net+'_'+args.dataset.name+'_'+time_stamp)#, notes=note)
+        wandb.init(config=args, project="6dgrasp", dir='/work/scratch/temp/potato-net', entity="temp", id=args.net+'_'+args.dataset.name+'_'+time_stamp)#, notes=note)
 
     if 'pn_pn' in args.net:
         # This kind of network uses pointnet encoder and hence needs a pc as input

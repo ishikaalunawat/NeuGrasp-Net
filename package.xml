@@ -2,12 +2,12 @@
 <package format="2">
     <name>vgn</name>
     <version>0.1.0</version>
-    <description>Volumetric Grasping Network.</description>
+    <description>NeuGraspNet</description>
 
-    <maintainer email="mbreyer@ethz.ch">Michel Breyer</maintainer>
+    <maintainer email="anon@anon.anon">Anonymous</maintainer>
 
     <license>BSD</license>
-    <url>https://github.com/ethz-asl/vgn</url>
+    <url>https://github.com/temp</url>
 
     <buildtool_depend>catkin</buildtool_depend>
 

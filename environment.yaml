@@ -1,4 +1,4 @@
-name: giga
+name: neugraspnet
 channels:
   - pyg
   - pytorch
