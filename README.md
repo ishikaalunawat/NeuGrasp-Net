@@ -83,12 +83,12 @@ Please run `python scripts/save_occ_data_parallel.py -h` to print all options.
 
 
 ## Training
-### Train NeuGraspNet (PN. Without Occupancies)
+### Train NeuGraspNet (PN, Without Occupancies)
 ```bash
 python scripts/train_neu_grasp.py --net neu_grasp_pn_deeper --dataset /path/to/constructed/data --dataset_raw /path/to/raw/data  --epoch_length_frac 0.5
 ```
 
-### Train NeuGraspNert (PN. With Occupancies)
+### Train NeuGraspNet (PN, With Occupancies)
 ```bash
 python scripts/train_neu_grasp.py --net neu_grasp_pn_deeper --dataset /path/to/constructed/data --dataset_raw /path/to/raw/data --net_with_grasp_occ True --epoch_length_frac 0.5
 ```
