@@ -9,6 +9,7 @@ import wandb
 import torch
 import tqdm
 from torch.utils.data.dataloader import default_collate
+from torch.utils.data import SubsetRandomSampler
 
 from vgn.dataset_voxel_occ import DatasetVoxelOccGeo, DatasetVoxelOccGeoROI
 from vgn.networks import load_network
@@ -22,6 +23,8 @@ from vgn.ConvONets.common import compute_iou
 
 def main(args):
     use_cuda = torch.cuda.is_available()
+    # Set seed
+
     device = torch.device("cuda" if use_cuda else "cpu")
     kwargs = {"num_workers": 8, "pin_memory": True} if use_cuda else {}
     wandb.init(config=args, project="6dgrasp", entity="irosa-ias")
@@ -39,7 +42,7 @@ def main(args):
 
     # create data loaders
     test_set, test_loader = create_test_loader(
-        args.dataset, args.dataset_raw, kwargs, args.ROI
+        args.dataset, args.dataset_raw, args.num_scenes, kwargs, args.ROI
     )
 
     mean_dict = {
@@ -64,7 +67,7 @@ def main(args):
         input_type='pointcloud',
         padding=0,
     )
-    wandb.watch(net)
+    # wandb.watch(net)
 
     with torch.no_grad():
         for idx, (data, gt_mesh) in tqdm.tqdm(enumerate(test_loader), total=len(test_loader),  dynamic_ncols=True):
@@ -97,10 +100,9 @@ def main(args):
                 gt_mesh.export(save_dir / 'gt_mesh.glb')
                 pred_mesh.export(save_dir / 'pred_mesh.glb')
             
-                wandb.log({'TSDFs (IvsR)' : [wandb.Object3D(open(save_dir/'gt_mesh.glb')),
+                wandb.log({'Mesh (GT vs R)' : [wandb.Object3D(open(save_dir/'gt_mesh.glb')),
                                             wandb.Object3D(open(save_dir/'pred_mesh.glb'))]})
                 
-
             else:
                 print(f'{idx} empty mesh!')
             with open(save_dir / 'results.json', 'w') as f:
@@ -115,7 +117,7 @@ def main(args):
         json.dump({k: v for k, v in mean_dict.items()}, f, indent=4)
 
 
-def create_test_loader(root, root_raw, kwargs, ROI, num_point_occ=100000):
+def create_test_loader(root, root_raw, num_scenes, kwargs, ROI, num_point_occ=100000):
     # load the dataset
     def collate_fn(batch):
         # remove audio from the batch
@@ -130,8 +132,14 @@ def create_test_loader(root, root_raw, kwargs, ROI, num_point_occ=100000):
         dataset = DatasetVoxelOccGeoROI(root, root_raw, num_point_occ=num_point_occ)
     else:
         dataset = DatasetVoxelOccGeo(root, root_raw, num_point_occ=num_point_occ)
+
+    dataset_size = len(dataset)
+    indices = list(range(dataset_size))
+    sub_indices = np.random.choice(indices, num_scenes, replace=False)
+    sampler = SubsetRandomSampler(sub_indices)
+
     test_loader = torch.utils.data.DataLoader(
-        dataset, batch_size=1, shuffle=False, drop_last=False, collate_fn=collate_fn, **kwargs
+        dataset, batch_size=1, shuffle=False, drop_last=False, collate_fn=collate_fn, sampler=sampler, **kwargs
     )
     # it = iter(test_loader)
     # import pdb; pdb.set_trace()
@@ -173,12 +181,15 @@ if __name__ == "__main__":
     parser.add_argument("--type", type=str)
     parser.add_argument("--dataset", type=Path, required=True)
     parser.add_argument("--dataset_raw", type=Path, required=True)
-    parser.add_argument("--logdir", type=Path, default="data/eval_geo")
+    parser.add_argument("--logdir", type=Path, default="eval_geo")
     parser.add_argument("--description", type=str, default="")
     parser.add_argument("--ROI", action='store_true', help='Use ROI occ point sampling')
     parser.add_argument("--th", type=float, default=0.5, help="level set threshold")
-    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--seed", type=int, default=1)
+    parser.add_argument("--num_scenes", type=int, default=2000)
     args = parser.parse_args()
     print(args)
     set_random_seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
     main(args)

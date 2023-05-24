@@ -52,6 +52,7 @@ class Generator3D(object):
         self.refinement_step = refinement_step
         self.threshold = threshold
         self.device = device
+        # import pdb; pdb.set_trace()
         self.resolution0 = resolution0
         self.upsampling_steps = upsampling_steps
         self.with_normals = with_normals

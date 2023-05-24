@@ -14,3 +14,4 @@ urdfpy
 cython
 scikit-image
 pykdtree
+plotly

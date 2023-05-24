@@ -1,5 +1,38 @@
-
 import numpy as np
+import torch
+
+from vgn.utils.transform import Rotation, Transform
+from vgn.perception import camera_on_sphere
+
+RESOLUTION = 64
+
+def render_n_images(sim, n=1, random=False, noise_type=''):
+    origin = Transform(Rotation.identity(), np.r_[sim.size / 2, sim.size / 2, 0.0])
+    if random:
+        theta = np.random.uniform(0.0, 3* np.pi / 12.0) # elevation: 0 to 45 degrees
+        # theta = np.random.uniform(5*np.pi/12.0)
+        # 75 degree reconstruction is unrealistic, try 60
+        # theta = np.random.uniform(np.pi/3)
+        # theta = np.random.uniform(np.pi/6, np.pi/4) # elevation: 30 to 45 degrees
+        r = np.random.uniform(2, 2.4) * sim.size
+    else:
+        theta = np.pi / 4.0 # 45 degrees from top view
+        r = 2.0 * sim.size
+    
+    phi_list = 2.0 * np.pi * np.arange(n) / n # circle around the scene
+    extrinsics = [camera_on_sphere(origin, r, theta, phi) for phi in phi_list]
+    depth_imgs = []
+
+    for extrinsic in extrinsics:
+        # Multiple views -> for getting other sides of pc
+        depth_img = sim.camera.render(extrinsic)[1]
+        # add noise
+        # depth_img = apply_noise(depth_img, noise_type)
+        
+        depth_imgs.append(depth_img)
+
+    return depth_imgs, extrinsics
+
 
 class Coordinate():
 

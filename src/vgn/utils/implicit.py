@@ -46,7 +46,7 @@ def get_mesh_pose_list_from_world(world, object_set, exclude_plane=True):
         _, _, _, _, mesh_path, _, _, _ = visuals[0]
         mesh_path = mesh_path.decode('utf8')
         if mesh_path == '':
-            mesh_path = os.path.join('./data/urdfs', object_set, name + '.urdf')
+            mesh_path = os.path.join('./data/urdfs', object_set, name + '.urdf') # Changed to backup location**
         mesh_pose_list.append((mesh_path, scale, pose))
     return mesh_pose_list
 

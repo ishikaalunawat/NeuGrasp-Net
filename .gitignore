@@ -10,3 +10,8 @@ logs
 *.npy
 test/
 best_models/
+eval_geo/
+*.ipynb
+summary_*
+*.yml
+commands
