@@ -2,19 +2,14 @@
 
 Submitted to NeurIPS 2023
 
-<!-- [Project](https://sites.google.com/view/rpl-giga2021) | [arxiv](http://arxiv.org/abs/2104.01542)  -->
-
 ## Introduction
 
 NeuGraspNet, a novel method for 6DoF grasp detection that leverages recent advances in neural volumetric representations and surface rendering. Our approach learns both global (scene-level) and local (grasp-level) neural surface representations, enabling effective and fully implicit 6DoF grasp quality prediction, even in unseen parts of the scene. Further, we reinterpret grasping as a local neural surface rendering problem, allowing the model to encode the interaction between the robot's end-effector and the object's surface geometry. NeuGraspNet operates on single viewpoints and can sample grasp candidates in occluded scenes, outperforming existing implicit and semi-implicit baseline methods in the literature. We demonstrate the real-world applicability of NeuGraspNet with a mobile manipulator robot, grasping in open spaces with clutter by rendering the scene, reasoning about graspable areas of different objects, and selecting grasps likely to succeed without colliding with the environment.
 
 
-
-If you find our work useful in your research, please consider [citing](#citing).
-
 ## Installation
 
-1. Create a conda environment.
+1. Create a conda environment. (Alternatively a `environment.yaml` file is provided)
 
 2. Install packages list in [requirements.txt](requirements.txt). Then install torch related stuff using: `pip install torch==1.7.1 torchvision==0.8.2 pytorch-ignite==0.4.4 torch-scatter==2.0.6 -f https://data.pyg.org/whl/torch-1.7.0+cu11.1.html`
 <!-- # torch-scatter` following [here](https://github.com/rusty1s/pytorch_scatter), based on `pytorch` version and `cuda` version. -->
@@ -27,7 +22,6 @@ pip install -e .
 
 4. Build ConvONets dependents by running `python scripts/convonet_setup.py build_ext --inplace`.
 
-5. Download the [data](<TODO>), then unzip and place the data folder under the repo's root. Pretrained models of NeuGraspNet varianss are in `data/models`.
 
 ## Data Generation
 
@@ -107,35 +101,8 @@ python scripts/sim_grasp_multiple.py --num-view 1 --object-set (packed/test|pile
 ```
 Please run `python scripts/sim_grasp_multiple.py -h` to print a complete list of optional arguments.
 
-
-## Pre-trained models and pre-generated data
-
-### Pre-trained models
-
-Pretrained models are also in the [data.zip](<TODO>). They are in `data/models`.
-
-### Pre-generated data
-
-As mentioned in the [issue](https://github.com/UT-Austin-RPL/GIGA/issues/3), occupancy data generation is very costly and cannot be uploaded. So, you can generate them following the instruction in this [section](#save-occupancy-data). This generation should not take too long.
-
-| Scenario | Raw data | Processed data |
-| ----------- | ----------- | ----------- |
-| Pile | [link](<TODO>) | [link](<TODO>) |
-| Packed | [link](<TODO>) | [link](<TODO>) |
-
 ## Related Repositories
 
 1. Our code is largely based on [VGN](https://github.com/ethz-asl/vgn) and [GIGA](https://github.com/UT-Austin-RPL/GIGA)
 
 2. We use [ConvONets](https://github.com/autonomousvision/convolutional_occupancy_networks) and [PointNet](https://github.com/charlesq34/pointnet) as our backbone.
-
-<!-- ## Citing
-
-```
-@article{jiang2021synergies,
- author = {Jiang, Zhenyu and Zhu, Yifeng and Svetlik, Maxwell and Fang, Kuan and Zhu, Yuke},
- journal = {Robotics: science and systems},
- title = {Synergies Between Affordance and Geometry: 6-DoF Grasp Detection via Implicit Representations},
- year = {2021}
-} -->
-```
