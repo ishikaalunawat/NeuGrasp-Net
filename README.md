@@ -94,23 +94,21 @@ python scripts/train_neu_grasp.py --net neu_grasp_pn_deeper --dataset /path/to/c
 ```
 Please run `python scripts/train_neu_grasp.py -h` to print all options.
 
+
+## Visualize reconstructions:
+```bash
+python generate_visuals.py --model_path path/to/model --root path/to/constructed/data --raw_root path/to/raw/data --random -seed 1
+```
+Please run `python scripts/generate_visuals.py -h` to print a complete list of optional arguments.
+
 ## Simulated grasping
 
 ```bash
 python scripts/sim_grasp_multiple.py --num-view 1 --object-set (packed/test|pile/test) --scene (packed|pile) --num-rounds 20 --add-noise dex --force --best --model path/to/model.pt --resolution=64 --type neu_grasp_pn_deeper --result-path path/to/result --vis
 
 ```
+Please run `python scripts/sim_grasp_multiple.py -h` to print a complete list of optional arguments.
 
-This commands will run experiment with each seed specified in the arguments.
-
-Run `python scripts/sim_grasp_multiple.py -h` to print a complete list of optional arguments.
-
-
-## Visualize reconstructions and TSDFs:
-```bash
-python generate_visuals.py --model_path path/to/model --root path/to/constructed/data --raw_root path/to/raw/data --random -seed 1
-
-```
 
 ## Pre-trained models and pre-generated data
 
@@ -131,7 +129,7 @@ As mentioned in the [issue](https://github.com/UT-Austin-RPL/GIGA/issues/3), dat
 
 1. Our code is largely based on [VGN](https://github.com/ethz-asl/vgn) and GIGA[https://github.com/UT-Austin-RPL/GIGA]
 
-2. We use [ConvONets](https://github.com/autonomousvision/convolutional_occupancy_networks) and [PointNet] (https://github.com/charlesq34/pointnet) as our backbone.
+2. We use [ConvONets](https://github.com/autonomousvision/convolutional_occupancy_networks) and [PointNet](https://github.com/charlesq34/pointnet) as our backbone.
 
 <!-- ## Citing
 
