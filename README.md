@@ -15,6 +15,7 @@ NeuGraspNet, a novel method for 6DoF grasp detection that leverages recent advan
 ```bash 
 pip install torch==1.7.1 torchvision==0.8.2 pytorch-ignite==0.4.4 torch-scatter==2.0.6 -f https://data.pyg.org/whl/torch-1.7.0+cu11.1.html
 ```
+(Note: Check the latest version of torch and install torch-scatter with appropriate versions from this [link](https://pypi.org/project/torch-scatter/))
 <!-- # torch-scatter` following [here](https://github.com/rusty1s/pytorch_scatter), based on `pytorch` version and `cuda` version. -->
 
 3. Go to the root directory and install the project locally using `pip`
@@ -68,7 +69,7 @@ python generate_data_grasp_surface_clouds.py --raw_root /path/to/raw/data --num_
 
 ### 4. Save occupancy data
 
-Sampling occupancy data on the fly can be very slow and block the training, so I sample and store the occupancy data in files beforehand:
+Sampling occupancy data on the fly can be very slow and block the training, so run the following to store the occupancy data in files beforehand:
 
 ```bash
 python scripts/save_occ_data_parallel.py /path/to/raw/data 100000 2 --num-proc 40
