@@ -1,7 +1,5 @@
 # Learning Any-View 6DoF Robotic Grasping in Cluttered Scenes via Neural Surface Rendering
 
-[Snehal Jauhri](https://irosalab.com/people/snehal-jauhri/), [Ishikaa Lunawat](), [Georgia Chalvatzaki](https://irosalab.com/people/georgia-chalvatzaki/), 
-
 Submitted to NeurIPS 2023
 
 <!-- [Project](https://sites.google.com/view/rpl-giga2021) | [arxiv](http://arxiv.org/abs/2104.01542)  -->
