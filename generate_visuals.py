@@ -94,10 +94,9 @@ def main(args):
     # print(save_path)
     save_path.mkdir(parents=True, exist_ok=True)
 
-    camera_eye = np.load(args.cam_eye_path)
-    camera_eye[2, 3] += 0.015
-
     if not args.random:
+        camera_eye = np.load(args.cam_eye_path)
+        camera_eye[2, 3] += 0.015
         cam_eye = np.linalg.inv(camera_eye.squeeze())[:3, 3]
         
 
@@ -107,8 +106,7 @@ def main(args):
     # NOTE: Renamed "grasps_with_clouds_gt".csv to "grasps_with_clouds.csv"
     data = DatasetVoxelGraspPCOcc(args.root, args.raw_root, use_grasp_occ=False, num_point_occ=8000)
     # Packed scene_id's
-    scenes = ["3e096fb3f3ad407bb655a87a16c06efc", "153a5a2fd950432e8b86d9f78ceef874", "58580f1a463d439ca97c40cfd5810906",
-                "383bc7f3c6414656989429a2eac94ba6", "d3209af131b6459eba0b27ca932a9013"] if not args.random \
+    scenes = ["3e096fb3f3ad407bb655a87a16c06efc"] if not args.random \
             else data.df.sample(args.num_scenes, random_state=args.seed)["scene_id"]
     
     for scene in scenes:
@@ -132,38 +130,30 @@ def main(args):
                 
         if random:
             cam_eye = np.random.uniform(0.9, 1.3, 3)
-            # Plotting
+        # Plotting
         (save_path / f"scene_{scene}").mkdir(parents=True, exist_ok=True)
         make_save_fig((vertices, triangles), cam_eye, file_name= save_path / f"scene_{scene}/reconstruction.png")
         make_save_fig(tsdf, cam_eye, file_name= save_path / f"scene_{scene}/tsdf.png", type="voxel")
-
-
-        # # Ground Truth Mesh
-        # mesh_list_file = os.path.join(args.raw_root, 'mesh_pose_list', scene + '.npz')
-        # mesh_pose_list = np.load(mesh_list_file, allow_pickle=True)['pc']
-        # sim = ClutterRemovalSim('pile', 'pile/train', gui=False, data_root=args.data_root) # parameters scene and object_set are not used
-        # sim.setup_sim_scene_from_mesh_pose_list(mesh_pose_list, table=args.see_table, data_root=args.data_root) # Setting table to False because we don't want to render it
-        # scene_mesh = get_scene_from_mesh_pose_list(mesh_pose_list, data_root=args.data_root)
 
 
 
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--root", type=Path, default="/media/hypatia/6903154a-554e-4ca5-987c-4a24f3250e97/home/hypatia/6D-DAAD/GIGA/data/pile/data_pile_train_constructed_4M_HighRes_radomized_views_GPG_only")
-    parser.add_argument("--raw_root", type=Path, default="/media/hypatia/6903154a-554e-4ca5-987c-4a24f3250e97/home/hypatia/6D-DAAD/GIGA/data/pile/data_pile_train_random_raw_4M_radomized_views")
+    parser.add_argument("--root", type=Path, required=True)
+    parser.add_argument("--raw_root", type=Path, required=True)
     parser.add_argument("--save_path", type=Path, default="figures/")
     parser.add_argument("--net", default="neu_grasp_pn_deeper")
     parser.add_argument("--model_path", type=str, default='best_models/23-05-01-08-11-39_dataset=data_pile_train_constructed_4M_HighRes_radomized_views,augment=False,net=6d_neu_grasp_pn_deeper,batch_size=32,lr=5e-05,PN_deeper_DIMS_CONT/best_neural_grasp_neu_grasp_pn_deeper_val_acc=0.9097.pt')
     parser.add_argument("--see_table", action="store_true")
-    parser.add_argument("--data_root", type=Path, default="/media/hypatia/6903154a-554e-4ca5-987c-4a24f3250e97/home/hypatia/6D-DAAD/GIGA/")
+    parser.add_argument("--data_root", type=Path, required="True")
     parser.add_argument("--size", type=float, default=0.3)
     parser.add_argument("--num_scenes", type=int, default=5)
     parser.add_argument("--resolution", type=int, default=64)
     parser.add_argument("--random", action="store_true")
     parser.add_argument("--cuda", type=bool, default=False)
     parser.add_argument("--camera_shift", type=float, default=0.015)
-    parser.add_argument("--cam_eye_path", type=Path, default="viewpoint_f614e39ed9df4e1094d569cddc20979b.npy")
+    parser.add_argument("--cam_eye_path", type=Path, default="")
     parser.add_argument("--seed", type=int, default=7)
     args, _ = parser.parse_known_args()
     # print(args)

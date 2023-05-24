@@ -57,7 +57,7 @@ python scripts/clean_balance_data.py /path/to/raw/data
 
 a. Generate GPG Grasp candidates
 ```bash
-python generate_data_gpg_parallel.py --root path/to/new/partial/raw/data --previous_root path/to/raw/data --use_previous_scenes True --num_proc 96 --grasps_per_scene 60 --grasps_per_scene_gpg 60 --partial_pc True --save_scene True --random True
+python generate_data_gpg_parallel.py --root /path/to/new/partial/raw/data --previous_root /path/to/raw/data --use_previous_scenes True --num_proc 96 --grasps_per_scene 60 --grasps_per_scene_gpg 60 --partial_pc True --save_scene True --random True
 ```
 b. Construct dataset
 ```bash
@@ -66,7 +66,7 @@ python scripts/construct_dataset_parallel.py --num-proc 40 --single-view --add-n
 
 c. Generate grasp surface clouds
 ```bash
-python generate_data_grasp_surface_clouds.py --raw_root path/to/raw/data --num_proc 96 --save_occ_values True --add_noise True
+python generate_data_grasp_surface_clouds.py --raw_root /path/to/raw/data --num_proc 96 --save_occ_values True --add_noise True
 ```
 
 ### 4. Save occupancy data
@@ -95,7 +95,7 @@ Please run `python scripts/train_neu_grasp.py -h` to print all options.
 
 ## Visualize reconstructions:
 ```bash
-python generate_visuals.py --model_path path/to/model --root path/to/constructed/data --raw_root path/to/raw/data --random -seed 1
+python generate_visuals.py --model_path /path/to/model --root /path/to/constructed/data --raw_root /path/to/raw/data --data_root /path/to/data/root/folder --random -seed 1
 ```
 Please run `python scripts/generate_visuals.py -h` to print a complete list of optional arguments.
 
