@@ -11,7 +11,10 @@ NeuGraspNet, a novel method for 6DoF grasp detection that leverages recent advan
 
 1. Create a conda environment. (Alternatively a `environment.yaml` file is provided)
 
-2. Install packages list in [requirements.txt](requirements.txt). Then install torch related stuff using: `pip install torch==1.7.1 torchvision==0.8.2 pytorch-ignite==0.4.4 torch-scatter==2.0.6 -f https://data.pyg.org/whl/torch-1.7.0+cu11.1.html`
+2. Install packages list in [requirements.txt](requirements.txt). Then install torch related stuff using: 
+```bash 
+pip install torch==1.7.1 torchvision==0.8.2 pytorch-ignite==0.4.4 torch-scatter==2.0.6 -f https://data.pyg.org/whl/torch-1.7.0+cu11.1.html
+```
 <!-- # torch-scatter` following [here](https://github.com/rusty1s/pytorch_scatter), based on `pytorch` version and `cuda` version. -->
 
 3. Go to the root directory and install the project locally using `pip`
