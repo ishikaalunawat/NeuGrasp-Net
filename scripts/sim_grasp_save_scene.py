@@ -11,7 +11,7 @@ from vgn.utils.misc import set_random_seed
 
 
 def main(args):
-    #wandb.init(config=args, project="6dgrasp", entity="irosa-ias")
+    #wandb.init(config=args, project="6dgrasp", entity="temp")
 
     if 'giga' in args.type:
         grasp_planner = VGNImplicit(args.model,

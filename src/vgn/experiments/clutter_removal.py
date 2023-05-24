@@ -22,7 +22,7 @@ MAX_CONSECUTIVE_FAILURES = 2
 MAX_SKIPS = 3
 
 State = collections.namedtuple("State", ["tsdf", "pc"])
-# wandb.init(project="6dgrasp", entity="irosa-ias")
+# wandb.init(project="6dgrasp", entity="temp")
 
 def run(
     grasp_plan_fn,
@@ -89,9 +89,7 @@ def run(
     debug_validation = False
     if debug_validation:
         # import pdb; pdb.set_trace()
-        raw_root = Path('/home/sjauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/pile/data_pile_train_random_raw_4M_radomized_views')
-        root = Path('/home/sjauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/pile/data_pile_train_constructed_4M_HighRes_radomized_views_GPG_only')
-        df = io.read_df_with_surface_clouds(raw_root)
+        pass
     for _ in tqdm.tqdm(range(num_rounds), disable=silence):
         data_for_scene = None
         if debug_validation:

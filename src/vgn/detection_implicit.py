@@ -249,8 +249,7 @@ class VGNImplicit(object):
         # Query network
         if 'neu' in self.model_type:
             # Also generate grasp point clouds
-            render_settings = read_json(Path("/home/jauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/pile/grasp_cloud_setup.json"))
-            # render_settings = read_json(Path("data/pile/grasp_cloud_setup.json"))
+            render_settings = read_json(Path("data/pile/grasp_cloud_setup.json"))
             # render_settings = read_json(Path("data/pile/grasp_cloud_setup_efficient.json"))
             gt_render = False
             if gt_render:

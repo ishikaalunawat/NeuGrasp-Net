@@ -27,7 +27,7 @@ def main(args):
 
     device = torch.device("cuda" if use_cuda else "cpu")
     kwargs = {"num_workers": 8, "pin_memory": True} if use_cuda else {}
-    wandb.init(config=args, project="6dgrasp", entity="irosa-ias")
+    wandb.init(config=args, project="6dgrasp", entity="temp")
     # create log directory
     time_stamp = datetime.now().strftime("%y-%m-%d-%H-%M")
     description = "{}_eval_geo_dataset={},net={},th={},{}".format(

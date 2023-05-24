@@ -1,7 +1,5 @@
 # Learning Any-View 6DoF Robotic Grasping in Cluttered Scenes via Neural Surface Rendering
 
-Submitted to NeurIPS 2023
-
 ## Introduction
 
 NeuGraspNet, a novel method for 6DoF grasp detection that leverages recent advances in neural volumetric representations and surface rendering. Our approach learns both global (scene-level) and local (grasp-level) neural surface representations, enabling effective and fully implicit 6DoF grasp quality prediction, even in unseen parts of the scene. Further, we reinterpret grasping as a local neural surface rendering problem, allowing the model to encode the interaction between the robot's end-effector and the object's surface geometry. NeuGraspNet operates on single viewpoints and can sample grasp candidates in occluded scenes, outperforming existing implicit and semi-implicit baseline methods in the literature. We demonstrate the real-world applicability of NeuGraspNet with a mobile manipulator robot, grasping in open spaces with clutter by rendering the scene, reasoning about graspable areas of different objects, and selecting grasps likely to succeed without colliding with the environment.
@@ -110,6 +108,6 @@ Please run `python scripts/sim_grasp_multiple.py -h` to print a complete list of
 
 ## Related Repositories
 
-1. Our code is largely based on [VGN](https://github.com/ethz-asl/vgn) and [GIGA](https://github.com/UT-Austin-RPL/GIGA)
+1. Our code is adapted from [VGN](https://github.com/ethz-asl/vgn) and [GIGA](https://github.com/UT-Austin-RPL/GIGA)
 
 2. We use [ConvONets](https://github.com/autonomousvision/convolutional_occupancy_networks) and [PointNet](https://github.com/charlesq34/pointnet) as our backbone.

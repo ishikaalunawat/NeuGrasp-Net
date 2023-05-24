@@ -1,4 +1,0 @@
-{
-    "ros.distro": "melodic",
-    "python.formatting.provider": "black"
-}
