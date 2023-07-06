@@ -202,7 +202,7 @@ class VGNImplicit(object):
             
             sampler = GpgGraspSamplerPcl(0.05-0.0075) # Franka finger depth is actually a little less than 0.05
             safety_dist_above_table = 0.05 # table is spawned at finger_depth
-            grasps, pos_queries, rot_queries, gpg_origin_points = sampler.sample_grasps(pc_extended_down, num_grasps=num_grasps_gpg, max_num_samples=220,#320
+            grasps, pos_queries, rot_queries, gpg_origin_points = sampler.sample_grasps_parallel(pc_extended_down, num_parallel=24, num_grasps=num_grasps_gpg, max_num_samples=220,#320
                                                 safety_dis_above_table=safety_dist_above_table, show_final_grasps=False, verbose=False,
                                                 return_origin_point=True)
             # Optional: Find out if the point comes from a seen or unseen area
