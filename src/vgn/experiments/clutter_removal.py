@@ -1,4 +1,5 @@
 import collections
+import os
 import argparse
 from datetime import datetime
 import uuid
@@ -44,7 +45,9 @@ def run(
     sideview=False,
     resolution=40,
     silence=False,
-    visualize=False
+    visualize=False,
+    save_dir=None,
+    use_nvisii=False,
 ):
     """Run several rounds of simulated clutter removal experiments.
 
@@ -54,7 +57,9 @@ def run(
     """
     #sideview=False
     #n = 6
-    sim = ClutterRemovalSim(scene, object_set, gui=sim_gui, seed=seed, add_noise=add_noise, sideview=sideview)
+    if save_dir is not None:
+        os.makedirs(save_dir, exist_ok=True)
+    sim = ClutterRemovalSim(scene, object_set, gui=sim_gui, seed=seed, add_noise=add_noise, sideview=sideview, save_dir=save_dir, use_nvisii=use_nvisii)
     logger = Logger(logdir, description)
     if visualize:
         # Running viz of the scene point clouds and meshes

@@ -61,7 +61,9 @@ def main(args):
             see_table=args.see_table,
             sideview=args.sideview,
             silence=args.silence,
-            visualize=args.vis)
+            visualize=args.vis,
+            save_dir=args.save_dir,
+            use_nvisii=args.use_nvisii)
         gsr.append(success_rate)
         seen_gsr.append(seen_success_rate)
         unseen_gsr.append(unseen_success_rate)
@@ -116,17 +118,18 @@ if __name__ == "__main__":
     parser.add_argument("--model", type=Path, required=True)
     parser.add_argument("--type", type=str, required=True)
     parser.add_argument("--logdir", type=Path, default="data/experiments")
+    parser.add_argument("--save-dir", type=Path, default=None, required=False)
     parser.add_argument("--description", type=str, default="")
     parser.add_argument("--scene",
                         type=str,
                         choices=["pile", "packed"],
                         default="pile")
-    parser.add_argument("--object_set", type=str, default="blocks")
+    parser.add_argument("--object_set", type=str, default="pile/test")
     parser.add_argument("--num-objects", type=int, default=5)
     parser.add_argument("--num_view", type=int, default=1) # No need to change
     parser.add_argument("--num_rounds", type=int, default=100)
     parser.add_argument("--resolution", type=int, default=64)
-    parser.add_argument("--zeeds", type=int, nargs='+', default=[0, 1, 2, 3, 4])
+    parser.add_argument("--zeeds", type=int, nargs='+', default=[1, 2, 3, 4])
     parser.add_argument("--sim-gui", action="store_true")
     # parser.add_argument("--grad-refine", action="store_true")
     parser.add_argument("--qual_th", type=float, default=0.5)
@@ -174,6 +177,9 @@ if __name__ == "__main__":
     parser.add_argument("--vis",
                         action="store_true",
                         help="visualize and save affordance")
+    parser.add_argument("--use_nvisii",
+                        action="store_true",
+                        help="visualize in nvisii renderer")
     parser.add_argument("--save-fails",
                         action="store_true",
                         help="Save grasp failure visualizations")

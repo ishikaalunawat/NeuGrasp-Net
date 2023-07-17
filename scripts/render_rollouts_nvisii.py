@@ -20,14 +20,14 @@ opt = {
         'look_at': [0.15, 0.2, 0.1]
     },
     'light': {
-        'intensity': 80,
+        'intensity': 50,
         'scale': [1, 1, 1],
         'position': [0, -2, 3],
         'look_at': [0.15, 0.15, 0.1]
     },
     'floor': {
         'texture':
-        '/mnt/data0/zhenyu/robosuite-dev/robosuite/models/assets/textures/light-wood.png',
+        '/home/sjauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/urdfs/light-wood.png',
         'scale': [2, 2, 2],
         'position': [0.15, 0.15, 0.05],
     },
@@ -45,10 +45,13 @@ def main(args):
     renderer = NViSIIRenderer(opt)
     renderer.reset()
 
+    nx = 5
     for idx, rollout_path in tqdm(enumerate(rollout_path_list), total=len(rollout_path_list), dynamic_ncols=True):
-        mesh_pose_dict = load_pkl(rollout_path)
-        renderer.update_objects(mesh_pose_dict)
-        renderer.render(os.path.join(args.save, f'{idx:05d}.png'))
+        # render one in nx frames
+        if idx % nx == 0:
+            mesh_pose_dict = load_pkl(rollout_path)
+            renderer.update_objects(mesh_pose_dict)
+            renderer.render(os.path.join(args.save, f'{idx:05d}.png'))
     NViSIIRenderer.deinit()
 
 if __name__ == '__main__':

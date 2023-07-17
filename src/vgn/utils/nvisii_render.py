@@ -73,10 +73,13 @@ class NViSIIRenderer:
         return new_objects, removed_objects
 
     def render(self, path):
-        nvisii.render_to_file(width=self.width,
-                              height=self.height,
-                              samples_per_pixel=self.spp,
-                              file_path=path)
+        # nvisii.render_to_file(width=self.width,
+        #                       height=self.height,
+        #                       samples_per_pixel=self.spp,
+        #                       file_path=path)
+        nvisii.render(width=self.width,
+                      height=self.height,
+                      samples_per_pixel=self.spp)
 
     def set_camera(self, position, look_at, up=(0, 0, 1)):
         self.camera.get_transform().set_position(position)
@@ -102,7 +105,7 @@ class NViSIIRenderer:
 
     @staticmethod
     def init():
-        nvisii.initialize(headless=True, verbose=False)
+        nvisii.initialize(headless=False, verbose=False)
         nvisii.enable_denoiser()
 
     @staticmethod

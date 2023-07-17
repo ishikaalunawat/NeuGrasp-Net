@@ -135,6 +135,16 @@ class VGNImplicit(object):
                 o3d_vis.add_geometry(state.pc, reset_bounding_box=True) # HACK TO SET O3D CAMERA VIEW for seed 100!!
                 o3d_vis.poll_events()
                 o3d_vis.update_renderer()
+
+                # Optional:
+                # Now set saved camera view
+                ctr = o3d_vis.get_view_control()
+                parameters = o3d.io.read_pinhole_camera_parameters("scripts/rendering/ScreenCamera_2023-05-23-22-26-03.json")
+                ctr.convert_from_pinhole_camera_parameters(parameters)
+                for i in range(50):
+                    o3d_vis.poll_events()
+                    o3d_vis.update_renderer()
+
                 return [], [], [], 0.0, scene_mesh
             else:
                 # Viz input point cloud
@@ -203,7 +213,7 @@ class VGNImplicit(object):
             
             sampler = GpgGraspSamplerPcl(0.05-0.0075) # Franka finger depth is actually a little less than 0.05
             safety_dist_above_table = 0.05 # table is spawned at finger_depth
-            grasps, pos_queries, rot_queries, gpg_origin_points = sampler.sample_grasps(pc_extended_down, num_grasps=num_grasps_gpg, max_num_samples=180,#320
+            grasps, pos_queries, rot_queries, gpg_origin_points = sampler.sample_grasps_parallel(pc_extended_down, num_parallel=24, num_grasps=num_grasps_gpg, max_num_samples=180,#320
                                                 safety_dis_above_table=safety_dist_above_table, show_final_grasps=False, verbose=False,
                                                 return_origin_point=True)
             # Optional: Find out if the point comes from a seen or unseen area
@@ -249,8 +259,8 @@ class VGNImplicit(object):
         # Query network
         if 'neu' in self.model_type:
             # Also generate grasp point clouds
-            render_settings = read_json(Path("/home/jauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/pile/grasp_cloud_setup.json"))
-            # render_settings = read_json(Path("data/pile/grasp_cloud_setup.json"))
+            # render_settings = read_json(Path("/home/jauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/pile/grasp_cloud_setup.json"))
+            render_settings = read_json(Path("data/pile/grasp_cloud_setup.json"))
             # render_settings = read_json(Path("data/pile/grasp_cloud_setup_efficient.json"))
             gt_render = False
             if gt_render:
@@ -329,13 +339,14 @@ class VGNImplicit(object):
                 # Visualize the grasp point clouds
                 for ind, grasp_viz_mesh in enumerate(grasps_viz_list):
                     if qual_vol[ind] > self.qual_th:
-                        grasp_viz_mesh.paint_uniform_color([0,1,0])
+                        grasp_viz_mesh.paint_uniform_color([125/255, 202/255, 92/255])
+                        # grasp_viz_mesh.paint_uniform_color([0,1,0])
                         o3d_vis.update_geometry(grasp_viz_mesh)
                     else:
                         # Either remove the bad grasps from viz or color them red
-                        # o3d_vis.remove_geometry(grasp_viz_mesh)
-                        grasp_viz_mesh.paint_uniform_color([1,0,0])
-                        o3d_vis.update_geometry(grasp_viz_mesh)
+                        o3d_vis.remove_geometry(grasp_viz_mesh, reset_bounding_box=False)
+                        # grasp_viz_mesh.paint_uniform_color([1,0,0])
+                        # o3d_vis.update_geometry(grasp_viz_mesh)
                     o3d_vis.poll_events()
                     # o3d_vis.update_renderer()
         elif self.model_type == 'pointnetgpd':

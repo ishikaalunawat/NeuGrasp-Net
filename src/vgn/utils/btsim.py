@@ -10,6 +10,30 @@ from vgn.utils.saver import get_mesh_pose_dict_from_world
 
 assert pybullet.isNumpyEnabled(), "Pybullet needs to be built with NumPy"
 
+import nvisii
+from vgn.utils.nvisii_render import NViSIIRenderer
+
+nvisii_opt = {
+    'spp': 100,
+    'height': 480,
+    'width': 480,
+    'camera': {
+        'position': [0.15, -0.3, 0.5],
+        'look_at': [0.15, 0.2, 0.1]
+    },
+    'light': {
+        'intensity': 80,
+        'scale': [1, 1, 1],
+        'position': [0, -2, 3],
+        'look_at': [0.15, 0.15, 0.1]
+    },
+    'floor': {
+        'texture':
+        '/home/sjauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/urdfs/light-wood.png',
+        'scale': [2, 2, 2],
+        'position': [0.15, 0.15, 0.05],
+    },
+}
 
 class BtWorld(object):
     """Interface to a PyBullet physics server.
@@ -20,7 +44,7 @@ class BtWorld(object):
         sim_time: Virtual time elpased since the last simulation reset.
     """
 
-    def __init__(self, gui=True, save_dir=None, save_freq=8):
+    def __init__(self, gui=True, save_dir=None, save_freq=8, use_nvisii=False):
         connection_mode = pybullet.GUI if gui else pybullet.DIRECT
         self.p = bullet_client.BulletClient(connection_mode)
 
@@ -30,6 +54,9 @@ class BtWorld(object):
         self.save_dir = save_dir
         self.save_freq = save_freq
         self.sim_step = 0
+        self.use_nvisii = use_nvisii
+        if use_nvisii:
+            NViSIIRenderer.init()
 
         self.reset()
 
@@ -77,6 +104,10 @@ class BtWorld(object):
         self.bodies = {}
         self.sim_time = 0.0
 
+        if self.use_nvisii:
+            self.nv_renderer = NViSIIRenderer(nvisii_opt)
+            self.nv_renderer.reset()
+
     def step(self):
         self.p.stepSimulation()
         
@@ -88,6 +119,10 @@ class BtWorld(object):
                 mesh_pose_dict = get_mesh_pose_dict_from_world(self, self.p._client)
                 with open(os.path.join(self.save_dir, f'{self.sim_step:08d}.pkl'), 'wb') as f:
                     pickle.dump(mesh_pose_dict, f)
+        if self.use_nvisii:
+            mesh_pose_dict = get_mesh_pose_dict_from_world(self, self.p._client)
+            self.nv_renderer.update_objects(mesh_pose_dict)
+            self.nv_renderer.render(os.path.join(self.save_dir, f'{self.sim_step:05d}.png'))
 
         self.sim_time += self.dt
         self.sim_step += 1
