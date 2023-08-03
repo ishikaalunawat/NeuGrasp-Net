@@ -10,8 +10,8 @@ from vgn.utils.saver import get_mesh_pose_dict_from_world
 
 assert pybullet.isNumpyEnabled(), "Pybullet needs to be built with NumPy"
 
-import nvisii
-from vgn.utils.nvisii_render import NViSIIRenderer
+# import nvisii
+# from vgn.utils.nvisii_render import NViSIIRenderer
 
 nvisii_opt = {
     'spp': 100,
@@ -55,8 +55,8 @@ class BtWorld(object):
         self.save_freq = save_freq
         self.sim_step = 0
         self.use_nvisii = use_nvisii
-        if use_nvisii:
-            NViSIIRenderer.init()
+        # if use_nvisii:
+        #     NViSIIRenderer.init()
 
         self.reset()
 
@@ -110,9 +110,9 @@ class BtWorld(object):
         self.bodies = {}
         self.sim_time = 0.0
 
-        if self.use_nvisii:
-            self.nv_renderer = NViSIIRenderer(nvisii_opt)
-            self.nv_renderer.reset()
+        # if self.use_nvisii:
+        #     self.nv_renderer = NViSIIRenderer(nvisii_opt)
+        #     self.nv_renderer.reset()
 
     def step(self):
         self.p.stepSimulation()
@@ -125,10 +125,10 @@ class BtWorld(object):
                 mesh_pose_dict = get_mesh_pose_dict_from_world(self, self.p._client)
                 with open(os.path.join(self.save_dir, f'{self.sim_step:08d}.pkl'), 'wb') as f:
                     pickle.dump(mesh_pose_dict, f)
-        if self.use_nvisii:
-            mesh_pose_dict = get_mesh_pose_dict_from_world(self, self.p._client)
-            self.nv_renderer.update_objects(mesh_pose_dict)
-            self.nv_renderer.render(os.path.join(self.save_dir, f'{self.sim_step:05d}.png'))
+        # if self.use_nvisii:
+        #     mesh_pose_dict = get_mesh_pose_dict_from_world(self, self.p._client)
+        #     self.nv_renderer.update_objects(mesh_pose_dict)
+        #     self.nv_renderer.render(os.path.join(self.save_dir, f'{self.sim_step:05d}.png'))
 
         self.sim_time += self.dt
         self.sim_step += 1
