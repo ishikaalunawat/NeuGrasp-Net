@@ -68,6 +68,12 @@ class BtWorld(object):
         self.bodies[body.uid] = body
         return body
 
+    def load_obj(self, urdf_path, pose, scale=1.0,):
+        # the plane don't have mass
+        body = Body.from_obj(self.p, urdf_path, pose, scale)
+        self.bodies[body.uid] = body
+        return body
+
     def remove_body(self, body):
         self.p.removeBody(body.uid)
         del self.bodies[body.uid]
@@ -169,6 +175,50 @@ class Body(object):
             globalScaling=scale,
         )
         return cls(physics_client, body_uid, scale)
+
+    @classmethod
+    def from_obj(cls, pb, obj_filepath, pose, scale):
+        color = np.random.uniform(0.6, 1, (4,))
+        color[-1] = 1
+        obj_edge_max = 0.15 * scale  # the maximum edge size of an obj before scaling
+        obj_edge_min = 0.014 * scale  # the minimum edge size of an obj before scaling
+        obj_volume_max = 0.0006 * (scale ** 3)  # the maximum volume of an obj before scaling
+        obj_scale = scale
+        #print(str(obj_filepath))
+        while True:
+            obj_visual = pb.createVisualShape(pb.GEOM_MESH,
+                                              fileName=str(obj_filepath),
+                                              rgbaColor=color,
+                                              meshScale=[obj_scale, obj_scale, obj_scale])
+
+            obj_collision = pb.createCollisionShape(pb.GEOM_MESH,
+                                                    fileName=str(obj_filepath),
+                                                    meshScale=[obj_scale, obj_scale, obj_scale])
+
+            object_id = pb.createMultiBody(baseMass=0.15,
+                                           baseCollisionShapeIndex=obj_collision,
+                                           baseVisualShapeIndex=obj_visual,
+                                           basePosition=pose.translation,
+                                           baseOrientation=pose.rotation.as_quat())
+
+            aabb = pb.getAABB(object_id)
+            aabb = np.asarray(aabb)
+            size = aabb[1] - aabb[0]
+
+            if np.partition(size, -2)[-2] > obj_edge_max:
+                obj_scale *= 0.8
+                pb.removeBody(object_id)
+            elif size[0] * size[1] * size[2] > obj_volume_max:
+                obj_scale *= 0.85
+                pb.removeBody(object_id)
+            elif size.min() < obj_edge_min:
+                obj_scale /= 0.95
+                pb.removeBody(object_id)
+            else:
+                break
+
+        pb.changeDynamics(object_id, -1, lateralFriction=0.75, spinningFriction=0.001, rollingFriction=0.001,linearDamping=0.0)
+        return cls(pb, object_id, scale)
 
     def get_pose(self):
         pos, ori = self.p.getBasePositionAndOrientation(self.uid)

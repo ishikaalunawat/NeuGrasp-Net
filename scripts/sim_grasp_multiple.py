@@ -122,7 +122,7 @@ if __name__ == "__main__":
     parser.add_argument("--description", type=str, default="")
     parser.add_argument("--scene",
                         type=str,
-                        choices=["pile", "packed"],
+                        choices=["pile", "packed", "egad"],
                         default="pile")
     parser.add_argument("--object_set", type=str, default="pile/test")
     parser.add_argument("--num-objects", type=int, default=5)

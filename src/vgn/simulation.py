@@ -12,15 +12,18 @@ from vgn.utils.misc import apply_noise, apply_translational_noise
 
 
 class ClutterRemovalSim(object):
-    def __init__(self, scene, object_set, gui=True, seed=None, add_noise=False, sideview=False, save_dir=None, save_freq=8, data_root=None, gripper_type='franka'):
-        assert scene in ["pile", "packed"]
+    def __init__(self, scene, object_set, gui=True, seed=None, add_noise=False, sideview=False, save_dir=None, use_nvisii=False, save_freq=8, data_root=None, gripper_type='franka'):
+        assert scene in ["pile", "packed", "egad"]
 
         self.urdf_root = Path("data/urdfs")
+        self.egad_root = Path("data/egad_eval_set")
         if data_root:
             self.urdf_root = Path(data_root) / self.urdf_root
+            self.egad_root = Path(data_root) / self.egad_root
         self.scene = scene
         self.object_set = object_set
         self.discover_objects()
+        self.disscover_egad_files()
 
         self.global_scaling = {
             "blocks": 1.67,
@@ -34,7 +37,7 @@ class ClutterRemovalSim(object):
         self.sideview = sideview
 
         self.rng = np.random.RandomState(seed) if seed else np.random
-        self.world = btsim.BtWorld(self.gui, save_dir, save_freq)
+        self.world = btsim.BtWorld(self.gui, save_dir, save_freq, use_nvisii)
         if gripper_type == 'franka':
             self.gripper = Gripper(self.world, data_root)
         else:
@@ -51,6 +54,9 @@ class ClutterRemovalSim(object):
     def discover_objects(self):
         root = self.urdf_root / self.object_set
         self.object_urdfs = [f for f in root.iterdir() if f.suffix == ".urdf"]
+
+    def disscover_egad_files(self):
+        self.obj_egads = [f for f in self.egad_root.iterdir() if f.suffix=='.obj']
 
     def save_state(self):
         self._snapshot_id = self.world.save_state()
@@ -108,6 +114,9 @@ class ClutterRemovalSim(object):
             self.generate_pile_scene(object_count, table_height)
         elif self.scene == "packed":
             self.generate_packed_scene(object_count, table_height)
+        elif self.scene == 'egad':
+            self.generate_egad_obj(object_count, table_height)
+
         else:
             raise ValueError("Invalid scene argument")
 
@@ -177,6 +186,25 @@ class ClutterRemovalSim(object):
             else:
                 self.remove_and_wait()
             attempts += 1
+
+    def generate_egad_obj(self, object_count, table_height):
+        # place box
+        urdf = self.urdf_root / "setup" / "box.urdf"
+        pose = Transform(Rotation.identity(), np.r_[0.02, 0.02, table_height])
+        box = self.world.load_urdf(urdf, pose, scale=1.3)
+        # drop objects
+        urdfs = self.rng.choice(self.obj_egads, size=object_count)
+        for urdf in urdfs:
+            rotation = Rotation.random(random_state=self.rng)
+            xy = self.rng.uniform(1.0 / 3.0 * self.size, 2.0 / 3.0 * self.size, 2)
+            pose = Transform(rotation, np.r_[xy, table_height + 0.2])
+            scale = 0.85#self.rng.uniform(0.8, 0.9)
+            self.world.load_obj(urdf, pose, scale=self.global_scaling*scale)
+            self.wait_for_objects_to_rest(timeout=1.0)
+        # remove box
+        self.world.remove_body(box)
+        self.remove_and_wait()
+        return urdf, pose
 
     def acquire_tsdf(self, n, N=None, resolution=40, randomize_view=False, tight_view=False):
         """Render synthetic depth images from n viewpoints and integrate into a TSDF.
