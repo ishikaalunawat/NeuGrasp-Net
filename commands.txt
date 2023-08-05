@@ -1,0 +1,17 @@
+Data path format: root/point_clouds/scene_id.npz
+GIGA depth range: (0.0, 0.3)
+root:
+/media/hypatia/6903154a-554e-4ca5-987c-4a24f3250e97/home/hypatia/6D-DAAD/GIGA/data/pile/data_pile_train_constructed_4M_HighRes_radomized_views_no_table
+scene_id:
+58c827f23ec34543a72a4e7bc6fe362d
+Example: 
+/media/hypatia/6903154a-554e-4ca5-987c-4a24f3250e97/home/hypatia/6D-DAAD/GIGA/data/pile/data_pile_train_constructed_4M_HighRes_radomized_views_no_table/point_clouds/58c827f23ec34543a72a4e7bc6fe362d.npz
+
+# Test using inference.py
+python contact_graspnet/inference.py --np_path=58c827f23ec34543a72a4e7bc6fe362d.npz --forward_passes=5 --z_range=[0,0.3]
+python contact_graspnet/inference.py --np_path=scene.npy --forward_passes=5 --z_range=[0,0.3]
+
+# Test multiple scenes using test_scenes.py
+(Random: Errors with tensorflow being only able to process one scene if forward_passes=10 !)
+python test_scenes.py --random --num_scenes 5 --forward_passes 5
+

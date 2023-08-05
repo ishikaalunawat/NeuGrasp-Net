@@ -1,5 +1,6 @@
 import numpy as np
-import mayavi.mlab as mlab
+# import mayavi.mlab as mlab
+
 import matplotlib.pyplot as plt
 from matplotlib import cm
 
@@ -51,17 +52,19 @@ def show_image(rgb, segmap):
     """
     plt.figure()
     figManager = plt.get_current_fig_manager()
-    figManager.window.showMaximized()
+    # figManager.window.showMaximized()
     
-    plt.ion()
-    plt.show()
+    # plt.ion()
+    # plt.show()
     
     if rgb is not None:
-        plt.imshow(rgb)
+        # plt.imshow(rgb)
+        plt.imsave('figure.png')
     if segmap is not None:
         cmap = plt.get_cmap('rainbow')
         cmap.set_under(alpha=0.0)   
-        plt.imshow(segmap, cmap=cmap, alpha=0.5, vmin=0.0001)
+        # plt.imshow(segmap, cmap=cmap, alpha=0.5, vmin=0.0001)
+        plt.imsave('figure.png')
     plt.draw()
     plt.pause(0.001)
 
@@ -84,7 +87,8 @@ def visualize_grasps(full_pc, pred_grasps_cam, scores, plot_opencv_cam=False, pc
     print('Visualizing...takes time')
     cm = plt.get_cmap('rainbow')
     cm2 = plt.get_cmap('gist_rainbow')
-   
+
+    mlab.options.offscreen = True
     fig = mlab.figure('Pred Grasps')
     mlab.view(azimuth=180, elevation=180, distance=0.2)
     draw_pc_with_colors(full_pc, pc_colors)
@@ -103,7 +107,8 @@ def visualize_grasps(full_pc, pred_grasps_cam, scores, plot_opencv_cam=False, pc
             else:
                 colors3 = [cm2(0.5*score)[:3] for score in scores[k]]
                 draw_grasps(pred_grasps_cam[k], np.eye(4), colors=colors3, gripper_openings=gripper_openings_k)    
-    mlab.show()
+    # mlab.show()
+    mlab.savefig('figure1.png')
 
 def draw_pc_with_colors(pc, pc_colors=None, single_color=(0.3,0.3,0.3), mode='2dsquare', scale_factor=0.0018):
     """

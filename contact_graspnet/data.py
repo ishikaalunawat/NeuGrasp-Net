@@ -301,7 +301,7 @@ def load_available_input_data(p, K=None):
     """
     
     segmap, rgb, depth, pc_full, pc_colors = None, None, None, None, None
-
+    cam_K = None    
     if K is not None:
         if isinstance(K,str):
             cam_K = eval(K)
@@ -332,8 +332,8 @@ def load_available_input_data(p, K=None):
             if 'rgb' in keys:    
                 rgb = data['rgb']
                 rgb = np.array(cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB))
-        elif 'xyz' in keys:
-            pc_full = np.array(data['xyz']).reshape(-1,3)
+        elif 'pc' in keys: #changed to giga
+            pc_full = np.array(data['pc']).reshape(-1,3)
             if 'xyz_color' in keys:
                 pc_colors = data['xyz_color']
     elif '.png' in p:
