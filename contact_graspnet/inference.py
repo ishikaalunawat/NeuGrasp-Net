@@ -76,6 +76,8 @@ def inference(global_config, checkpoint_dir, input_paths, K=None, local_regions=
         np.savez('results/predictions_{}'.format(os.path.basename(p.replace('png','npz').replace('npy','npz'))), 
                   pred_grasps_cam=pred_grasps_cam, scores=scores, contact_pts=contact_pts)
 
+        print(pred_grasps_cam)
+
         # Visualize results          
         print("\nProcessed scene\n")
         # show_image(rgb, segmap)
