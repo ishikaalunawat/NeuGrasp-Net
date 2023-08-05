@@ -81,18 +81,25 @@ class ClutterRemovalSim(object):
             self.place_table(table_height)
 
         for mesh_path, scale, pose in mesh_pose_list:
+            body_pose = Transform.from_matrix(pose)
             if data_root is not None:
                 mesh_path = os.path.join(data_root, mesh_path)
-            if os.path.splitext(mesh_path)[1] == '.urdf':
-                urdf_path = mesh_path
+
+            if 'egad' in str(mesh_path):
+                # if it isnt a posixpath, make it one
+                if not isinstance(mesh_path, Path):
+                    mesh_path = Path(mesh_path)
+                self.world.load_obj_fixed_scale(mesh_path, body_pose, scale)
             else:
-                # path is to the _visual.obj file. Change to urdf
-                urdf_path = mesh_path[:-11] + '.urdf'
-            body_pose = Transform.from_matrix(pose)
-            body = self.world.load_urdf(urdf_path, body_pose, scale)
-            # assert len(body.links) == 1
-            # assert len(body.links[0].visuals) == 1
-            # assert len(body.links[0].visuals[0].geometry.meshes) == 1
+                if os.path.splitext(mesh_path)[1] == '.urdf':
+                    urdf_path = mesh_path            
+                else:
+                    # path is to the _visual.obj file. Change to urdf
+                    urdf_path = mesh_path[:-11] + '.urdf'
+                body = self.world.load_urdf(urdf_path, body_pose, scale)
+                # assert len(body.links) == 1
+                # assert len(body.links[0].visuals) == 1
+                # assert len(body.links[0].visuals[0].geometry.meshes) == 1
     
     def reset(self, object_count):
         self.world.reset()
@@ -198,7 +205,7 @@ class ClutterRemovalSim(object):
             rotation = Rotation.random(random_state=self.rng)
             xy = self.rng.uniform(1.0 / 3.0 * self.size, 2.0 / 3.0 * self.size, 2)
             pose = Transform(rotation, np.r_[xy, table_height + 0.2])
-            scale = 0.85#self.rng.uniform(0.8, 0.9)
+            scale = self.rng.uniform(0.8, 1.4)#self.rng.uniform(0.8, 0.9)
             self.world.load_obj(urdf, pose, scale=self.global_scaling*scale)
             self.wait_for_objects_to_rest(timeout=1.0)
         # remove box

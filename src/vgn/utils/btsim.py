@@ -71,6 +71,14 @@ class BtWorld(object):
     def load_obj(self, urdf_path, pose, scale=1.0,):
         # the plane don't have mass
         body = Body.from_obj(self.p, urdf_path, pose, scale)
+        body.name = urdf_path.name
+        self.bodies[body.uid] = body
+        return body
+
+    def load_obj_fixed_scale(self, urdf_path, pose, scale=1.0,):
+        # the plane don't have mass
+        body = Body.from_obj_fixed_scale(self.p, urdf_path, pose, scale)
+        body.name = urdf_path.name
         self.bodies[body.uid] = body
         return body
 
@@ -216,9 +224,32 @@ class Body(object):
                 pb.removeBody(object_id)
             else:
                 break
+        pb.changeDynamics(object_id, -1, lateralFriction=0.75, spinningFriction=0.001, rollingFriction=0.001,linearDamping=0.0)
+        return cls(pb, object_id, obj_scale)
+
+    @classmethod
+    def from_obj_fixed_scale(cls, pb, obj_filepath, pose, scale):
+        color = np.random.uniform(0.6, 1, (4,))
+        color[-1] = 1
+        obj_scale = scale
+        #print(str(obj_filepath))
+        obj_visual = pb.createVisualShape(pb.GEOM_MESH,
+                                            fileName=str(obj_filepath),
+                                            rgbaColor=color,
+                                            meshScale=[obj_scale, obj_scale, obj_scale])
+
+        obj_collision = pb.createCollisionShape(pb.GEOM_MESH,
+                                                fileName=str(obj_filepath),
+                                                meshScale=[obj_scale, obj_scale, obj_scale])
+
+        object_id = pb.createMultiBody(baseMass=0.15,
+                                        baseCollisionShapeIndex=obj_collision,
+                                        baseVisualShapeIndex=obj_visual,
+                                        basePosition=pose.translation,
+                                        baseOrientation=pose.rotation.as_quat())
 
         pb.changeDynamics(object_id, -1, lateralFriction=0.75, spinningFriction=0.001, rollingFriction=0.001,linearDamping=0.0)
-        return cls(pb, object_id, scale)
+        return cls(pb, object_id, obj_scale)
 
     def get_pose(self):
         pos, ori = self.p.getBasePositionAndOrientation(self.uid)

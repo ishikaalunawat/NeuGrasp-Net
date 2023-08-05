@@ -97,6 +97,11 @@ def run(
         raw_root = Path('/home/sjauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/pile/data_pile_train_random_raw_4M_radomized_views')
         root = Path('/home/sjauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/pile/data_pile_train_constructed_4M_HighRes_radomized_views_GPG_only')
         df = io.read_df_with_surface_clouds(raw_root)
+    debug_egad = False
+    if debug_egad:
+        import glob
+        previous_root = Path('/home/sjauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/pile/data_pile_train_random_raw_GPG_EGAD_Rand_Scaling')
+        mesh_list_files = glob.glob(os.path.join(previous_root, 'mesh_pose_list', '*.npz'))
     for _ in tqdm.tqdm(range(num_rounds), disable=silence):
         data_for_scene = None
         if debug_validation:
@@ -114,7 +119,12 @@ def run(
             if visualize and o3d_vis is not None:
                 o3d_vis.clear_geometries()
                 o3d_vis.poll_events()
-            sim.reset(num_objects)
+            if debug_egad:
+                index = np.random.randint(len(mesh_list_files))
+                mesh_pose_list = np.load(mesh_list_files[index], allow_pickle=True)['pc']
+                sim.setup_sim_scene_from_mesh_pose_list(mesh_pose_list, table=True)
+            else:
+                sim.reset(num_objects)
 
         round_id = logger.last_round_id() + 1
         logger.log_round(round_id, sim.num_objects)
