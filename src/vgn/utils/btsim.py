@@ -10,6 +10,30 @@ from vgn.utils.saver import get_mesh_pose_dict_from_world
 
 assert pybullet.isNumpyEnabled(), "Pybullet needs to be built with NumPy"
 
+# import nvisii
+# from vgn.utils.nvisii_render import NViSIIRenderer
+
+nvisii_opt = {
+    'spp': 100,
+    'height': 480,
+    'width': 480,
+    'camera': {
+        'position': [0.15, -0.3, 0.5],
+        'look_at': [0.15, 0.2, 0.1]
+    },
+    'light': {
+        'intensity': 80,
+        'scale': [1, 1, 1],
+        'position': [0, -2, 3],
+        'look_at': [0.15, 0.15, 0.1]
+    },
+    'floor': {
+        'texture':
+        '/home/sjauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/urdfs/light-wood.png',
+        'scale': [2, 2, 2],
+        'position': [0.15, 0.15, 0.05],
+    },
+}
 
 class BtWorld(object):
     """Interface to a PyBullet physics server.
@@ -20,7 +44,7 @@ class BtWorld(object):
         sim_time: Virtual time elpased since the last simulation reset.
     """
 
-    def __init__(self, gui=True, save_dir=None, save_freq=8):
+    def __init__(self, gui=True, save_dir=None, save_freq=8, use_nvisii=False):
         connection_mode = pybullet.GUI if gui else pybullet.DIRECT
         self.p = bullet_client.BulletClient(connection_mode)
 
@@ -30,6 +54,9 @@ class BtWorld(object):
         self.save_dir = save_dir
         self.save_freq = save_freq
         self.sim_step = 0
+        self.use_nvisii = use_nvisii
+        # if use_nvisii:
+        #     NViSIIRenderer.init()
 
         self.reset()
 
@@ -38,6 +65,20 @@ class BtWorld(object):
 
     def load_urdf(self, urdf_path, pose, scale=1.0):
         body = Body.from_urdf(self.p, urdf_path, pose, scale)
+        self.bodies[body.uid] = body
+        return body
+
+    def load_obj(self, urdf_path, pose, scale=1.0,):
+        # the plane don't have mass
+        body = Body.from_obj(self.p, urdf_path, pose, scale)
+        body.name = urdf_path.name
+        self.bodies[body.uid] = body
+        return body
+
+    def load_obj_fixed_scale(self, urdf_path, pose, scale=1.0,):
+        # the plane don't have mass
+        body = Body.from_obj_fixed_scale(self.p, urdf_path, pose, scale)
+        body.name = urdf_path.name
         self.bodies[body.uid] = body
         return body
 
@@ -77,6 +118,10 @@ class BtWorld(object):
         self.bodies = {}
         self.sim_time = 0.0
 
+        # if self.use_nvisii:
+        #     self.nv_renderer = NViSIIRenderer(nvisii_opt)
+        #     self.nv_renderer.reset()
+
     def step(self):
         self.p.stepSimulation()
         
@@ -88,6 +133,10 @@ class BtWorld(object):
                 mesh_pose_dict = get_mesh_pose_dict_from_world(self, self.p._client)
                 with open(os.path.join(self.save_dir, f'{self.sim_step:08d}.pkl'), 'wb') as f:
                     pickle.dump(mesh_pose_dict, f)
+        # if self.use_nvisii:
+        #     mesh_pose_dict = get_mesh_pose_dict_from_world(self, self.p._client)
+        #     self.nv_renderer.update_objects(mesh_pose_dict)
+        #     self.nv_renderer.render(os.path.join(self.save_dir, f'{self.sim_step:05d}.png'))
 
         self.sim_time += self.dt
         self.sim_step += 1
@@ -134,6 +183,73 @@ class Body(object):
             globalScaling=scale,
         )
         return cls(physics_client, body_uid, scale)
+
+    @classmethod
+    def from_obj(cls, pb, obj_filepath, pose, scale):
+        color = np.random.uniform(0.6, 1, (4,))
+        color[-1] = 1
+        obj_edge_max = 0.15 * scale  # the maximum edge size of an obj before scaling
+        obj_edge_min = 0.014 * scale  # the minimum edge size of an obj before scaling
+        obj_volume_max = 0.0006 * (scale ** 3)  # the maximum volume of an obj before scaling
+        obj_scale = scale
+        #print(str(obj_filepath))
+        while True:
+            obj_visual = pb.createVisualShape(pb.GEOM_MESH,
+                                              fileName=str(obj_filepath),
+                                              rgbaColor=color,
+                                              meshScale=[obj_scale, obj_scale, obj_scale])
+
+            obj_collision = pb.createCollisionShape(pb.GEOM_MESH,
+                                                    fileName=str(obj_filepath),
+                                                    meshScale=[obj_scale, obj_scale, obj_scale])
+
+            object_id = pb.createMultiBody(baseMass=0.15,
+                                           baseCollisionShapeIndex=obj_collision,
+                                           baseVisualShapeIndex=obj_visual,
+                                           basePosition=pose.translation,
+                                           baseOrientation=pose.rotation.as_quat())
+
+            aabb = pb.getAABB(object_id)
+            aabb = np.asarray(aabb)
+            size = aabb[1] - aabb[0]
+
+            if np.partition(size, -2)[-2] > obj_edge_max:
+                obj_scale *= 0.8
+                pb.removeBody(object_id)
+            elif size[0] * size[1] * size[2] > obj_volume_max:
+                obj_scale *= 0.85
+                pb.removeBody(object_id)
+            elif size.min() < obj_edge_min:
+                obj_scale /= 0.95
+                pb.removeBody(object_id)
+            else:
+                break
+        pb.changeDynamics(object_id, -1, lateralFriction=0.75, spinningFriction=0.001, rollingFriction=0.001,linearDamping=0.0)
+        return cls(pb, object_id, obj_scale)
+
+    @classmethod
+    def from_obj_fixed_scale(cls, pb, obj_filepath, pose, scale):
+        color = np.random.uniform(0.6, 1, (4,))
+        color[-1] = 1
+        obj_scale = scale
+        #print(str(obj_filepath))
+        obj_visual = pb.createVisualShape(pb.GEOM_MESH,
+                                            fileName=str(obj_filepath),
+                                            rgbaColor=color,
+                                            meshScale=[obj_scale, obj_scale, obj_scale])
+
+        obj_collision = pb.createCollisionShape(pb.GEOM_MESH,
+                                                fileName=str(obj_filepath),
+                                                meshScale=[obj_scale, obj_scale, obj_scale])
+
+        object_id = pb.createMultiBody(baseMass=0.15,
+                                        baseCollisionShapeIndex=obj_collision,
+                                        baseVisualShapeIndex=obj_visual,
+                                        basePosition=pose.translation,
+                                        baseOrientation=pose.rotation.as_quat())
+
+        pb.changeDynamics(object_id, -1, lateralFriction=0.75, spinningFriction=0.001, rollingFriction=0.001,linearDamping=0.0)
+        return cls(pb, object_id, obj_scale)
 
     def get_pose(self):
         pos, ori = self.p.getBasePositionAndOrientation(self.uid)

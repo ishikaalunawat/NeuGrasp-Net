@@ -36,7 +36,7 @@ def run(
     randomize_view=False,
     tight_view=False,
     sideview=False,
-    resolution=40,
+    resolution=64,
     silence=False,
     visualize=False
 ):
