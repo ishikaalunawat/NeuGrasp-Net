@@ -58,6 +58,7 @@ def inference(global_config, checkpoint_dir, input_paths, K=None, local_regions=
     # Process example test scenes
     for p in glob.glob(input_paths):
         print('Loading ', p)
+        tf.reset_default_graph()
 
         pc_segments = {}
         segmap, rgb, depth, cam_K, pc_full, pc_colors = load_available_input_data(p, K=K)
@@ -71,8 +72,8 @@ def inference(global_config, checkpoint_dir, input_paths, K=None, local_regions=
                                                                                     skip_border_objects=skip_border_objects, z_range=z_range)
 
         print('Generating Grasps...')
-        import pdb
-        pdb.set_trace()
+        # import pdb
+        # pdb.set_trace()
         pred_grasps_cam, scores, contact_pts, _ = grasp_estimator.predict_scene_grasps(sess, pc_full, pc_segments=pc_segments, 
                                                                                           local_regions=local_regions, filter_grasps=filter_grasps, forward_passes=forward_passes)  
 
