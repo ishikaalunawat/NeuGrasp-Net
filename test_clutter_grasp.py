@@ -38,12 +38,12 @@ def main(args):
         device = torch.device('cpu')
     if args.vn:
         if args.self_trained_model:
-            grasper = VNGrasper(device=args.device, root_dir='./vn_edge_selftrained_para', load=90)
+            grasper = VNGrasper(device=args.device, root_dir='./vn_edge_finaltrain_para', load=150)
         else:
             grasper = VNGrasper(device=args.device, root_dir='./vn_edge_pretrained_para', load=105)
     else:
         if args.self_trained_model:
-            grasper = EdgeGrasper(device=args.device, root_dir='./edge_grasp_net_selftrained_para', load=180)
+            grasper = EdgeGrasper(device=args.device, root_dir='./vn_edge_finaltrain_para', load=180)
         else:
             grasper = EdgeGrasper(device=args.device, root_dir='./edge_grasp_net_pretrained_para', load=180)
 
@@ -336,7 +336,7 @@ def render_images(sim, n, randomize_view=False, tight_view=False):
             r = 2.0 * sim.size
             theta = np.pi / 6.0
             # theta = np.pi / 4.0 # maybe they prefer 45 degree fixed?
-        phi = np.random.uniform(0.0, np.pi)
+        phi = 0.0 # np.random.uniform(0.0, np.pi)
 
         extrinsic = camera_on_sphere(origin, r, theta, phi)
 

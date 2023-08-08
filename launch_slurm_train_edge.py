@@ -11,12 +11,12 @@ N_SEEDS = 1
 N_CORES = 5
 
 MEMORY_PER_CORE = 10000
-PARTITION = 'dgx' # 'rtx2', 'rtx'
+PARTITION = 'rtx2'#, 'rtx'
 GRES = 'gpu:1' # if USE_CUDA else None  # gpu:rtx2080:1, gpu:rtx3080:1
 CONDA_ENV = 'edge_grasp'
 
 launcher = Launcher(
-    exp_name='train_EdgeGraspNet_VN',
+    exp_name='train_EdgeGraspNet_VN_final',
     exp_file='train', # local path without .py    
     # project_name='project01907',  # for hrz cluster
     n_seeds=N_SEEDS,
@@ -36,7 +36,11 @@ launcher = Launcher(
 
 # Experiment configs (In this case, they are all argparse arguments for the main python file)
 launcher.add_experiment(
-    epoch=199
+    dataset_dir='./raw_data_final',
+    vn_save_dir='./vn_edge_finaltrain_para',
+    test_interval=10,
+    save_interval=10,
+    epoch=200,
     # net="neu_grasp_pn_deeper",
     # net_with_grasp_occ=True, # Don't pass if not True
     # # logdir="/work/scratch/sj93qicy/potato-net/runs",
