@@ -21,6 +21,13 @@ from data import regularize_pc_point_count, depth2pc, load_available_input_data
 from contact_grasp_estimator import GraspEstimator
 # from visualization_utils import visualize_grasps, show_image
 
+def mask(arr2, arr0, arr1):
+    arr0 = np.ma.compressed(np.ma.masked_where(arr2>0.8,arr0))
+    arr1 = np.ma.compressed(np.ma.masked_where(arr2>0.8,arr1))
+    arr2 = np.ma.compressed(np.ma.masked_where(arr2>0.8,arr2))
+
+    return arr0, arr2, arr1
+
 def inference(global_config, checkpoint_dir, input_paths, K=None, local_regions=False, skip_border_objects=False, filter_grasps=False, segmap_id=None, z_range=[0.2,1.8], forward_passes=1):
     """
     Predict 6-DoF grasp distribution for given model and input data
@@ -56,8 +63,8 @@ def inference(global_config, checkpoint_dir, input_paths, K=None, local_regions=
     os.makedirs('results', exist_ok=True)
 
     # Process example test scenes
+    print(input_paths)
     for p in glob.glob(input_paths):
-        print('Loading ', p)
         tf.reset_default_graph()
 
         pc_segments = {}
@@ -71,13 +78,22 @@ def inference(global_config, checkpoint_dir, input_paths, K=None, local_regions=
             pc_full, pc_segments, pc_colors = grasp_estimator.extract_point_clouds(depth, cam_K, segmap=segmap, rgb=rgb,
                                                                                     skip_border_objects=skip_border_objects, z_range=z_range)
 
+        #Flipping Z-axis of PC:
+        # pc_full[:, 2] *= -1
         print('Generating Grasps...')
         # import pdb
         # pdb.set_trace()
         pred_grasps_cam, scores, contact_pts, _ = grasp_estimator.predict_scene_grasps(sess, pc_full, pc_segments=pc_segments, 
                                                                                           local_regions=local_regions, filter_grasps=filter_grasps, forward_passes=forward_passes)  
 
-        # print("PRINTTTTTT", pred_grasps_cam)
+        # Taking best 50
+        pred_grasps_cam, scores, contact_pts = pred_grasps_cam[-1], scores[-1], contact_pts[-1]
+        scores_sort = scores.argsort()[::-1]
+        pred_grasps_cam = pred_grasps_cam[scores_sort, :, :]
+        contact_pts = contact_pts[scores_sort, :]
+        scores = scores[scores_sort]
+        pred_grasps_cam, scores, contact_pts = {-1 : pred_grasps_cam[:50, :, :]}, {-1 : scores[:50]}, {-1 : contact_pts[:50, :]}
+
         # Save results
         np.savez('results/predictions_{}'.format(os.path.basename(p.replace('png','npz').replace('npy','npz'))), 
                   pred_grasps_cam=pred_grasps_cam, scores=scores, contact_pts=contact_pts)
@@ -96,7 +112,8 @@ def run_experiments(args):
     if args.random and args.num_scenes:
         scene_ids = np.random.choice(os.listdir(pc_root), args.num_scenes)
     elif args.scene_ids:
-        scene_ids = eval(str(args.scene_ids))
+        scene_ids = [scene_id + '.npz' for scene_id in args.scene_ids]
+        # scene_ids = eval(str(args.scene_ids))
 
     scenes = [pc_root + scene_id for scene_id in scene_ids]
     global_config = config_utils.load_config(args.ckpt_dir, batch_size=args.forward_passes, arg_configs=args.arg_configs)
@@ -113,7 +130,8 @@ if __name__=='__main__':
     parser.add_argument('--root', default='/media/hypatia/6903154a-554e-4ca5-987c-4a24f3250e97/home/hypatia/6D-DAAD/GIGA/data/pile/data_pile_train_constructed_4M_HighRes_radomized_views_no_table/', help='Input data: npz/npy file with keys either "depth" & camera matrix "K" or just point cloud "pc" in meters. Optionally, a 2D "segmap"')
     parser.add_argument('--random', action="store_true", help='If random, enter num_scenes, else enter scene_ids')
     parser.add_argument('--num_scenes', type=int, default=1, help='Number of scenes to test only if random is provdied')
-    parser.add_argument('--scene_ids', default=[], help='Scene ids to test only if random is not provided')
+    # parser.add_argument('--scene_ids', default=[], help='Scene ids to test only if random is not provided')
+    parser.add_argument('--scene_ids', default=[], nargs='+')
     parser.add_argument('--z_range', default=[0.,0.3], help='Z value threshold to crop the input point cloud')
     parser.add_argument('--forward_passes', type=int, default=1,  help='Run multiple parallel forward passes to mesh_utils more potential contact points.')
     parser.add_argument('--arg_configs', nargs="*", type=str, default=[], help='overwrite config parameters')

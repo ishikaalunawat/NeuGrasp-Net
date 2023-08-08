@@ -26,7 +26,7 @@ def plot_mesh(mesh, cam_trafo=np.eye(4), mesh_pose=np.eye(4)):
                          mesh.faces,
                          colormap='Blues',
                          opacity=0.5)
-
+    
 def plot_coordinates(t,r, tube_radius=0.005):
     """
     plots coordinate frame

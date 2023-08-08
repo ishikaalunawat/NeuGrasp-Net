@@ -13,5 +13,7 @@ python contact_graspnet/inference.py --np_path=scene.npy --forward_passes=5 --z_
 
 # Test multiple scenes using test_scenes.py
 (Random: Errors with tensorflow being only able to process one scene if forward_passes=10 !)
-python test_scenes.py --random --num_scenes 5 --forward_passes 5
+python contact_graspnet/test_scenes.py --random --num_scenes 1 --forward_passes 5
+
+python contact_graspnet/test_scenes.py --scene_id 165322ac8cfe43e58d3604f49cb2eef4 --forward_passes 5
 
