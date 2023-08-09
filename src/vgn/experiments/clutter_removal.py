@@ -100,7 +100,8 @@ def run(
     debug_egad = False
     if debug_egad:
         import glob
-        previous_root = Path('/home/sjauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/pile/data_pile_train_random_raw_GPG_EGAD_Rand_Scaling')
+        previous_root = Path('/home/sjauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/pile/data_pile_train_random_raw_4M_radomized_views')
+        # previous_root = Path('/home/sjauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/pile/data_pile_train_random_raw_GPG_EGAD_Rand_Scaling')
         mesh_list_files = glob.glob(os.path.join(previous_root, 'mesh_pose_list', '*.npz'))
     for _ in tqdm.tqdm(range(num_rounds), disable=silence):
         data_for_scene = None
@@ -121,7 +122,12 @@ def run(
                 o3d_vis.poll_events()
             if debug_egad:
                 index = np.random.randint(len(mesh_list_files))
-                mesh_pose_list = np.load(mesh_list_files[index], allow_pickle=True)['pc']
+                # OR pick a specific scene id
+                # mesh_list_file = os.path.join(previous_root, 'mesh_pose_list','b31f9f9fc41c403f94626870c9a3ba20.npz')
+                # mesh_list_file = os.path.join(previous_root, 'mesh_pose_list','dc43a8ed0de4413ab493da52a4fb7240.npz')
+                mesh_list_file = os.path.join(previous_root, 'mesh_pose_list','cb86942953b5454fa18e1647cf7d7753.npz')
+                mesh_pose_list = np.load(mesh_list_file, allow_pickle=True)['pc']
+                # mesh_pose_list = np.load(mesh_list_files[index], allow_pickle=True)['pc']
                 sim.setup_sim_scene_from_mesh_pose_list(mesh_pose_list, table=True)
             else:
                 sim.reset(num_objects)
