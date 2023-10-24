@@ -77,7 +77,7 @@ if __name__ == "__main__":
     parser.add_argument("--three_cameras", type=bool, default=True)
     parser.add_argument("--camera_fov", type=float, default=120.0, help="Camera image angular FOV in degrees")
     parser.add_argument("--camera_image_res", type=int, default=64)
-    parser.add_argument("--render_table", type=bool, default=False, help="Also render table in depth images")
+    parser.add_argument("--render_table", type=bool, default='', help="Also render table in depth images")
     parser.add_argument("--voxel_downsample_size", type=float, default=0.002) # 2mm
     parser.add_argument("--max_points", type=int, default=1023)
     parser.add_argument("--min_points", type=int, default=50)

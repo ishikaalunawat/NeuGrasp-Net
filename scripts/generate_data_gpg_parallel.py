@@ -66,6 +66,7 @@ def main(args, rank):
         scene_id = write_sensor_data(args.root, depth_imgs_side, extrinsics_side)
         mesh_pose_list = get_mesh_pose_list_from_world(sim.world, args.object_set)
         if args.save_scene:
+            mesh_pose_list = np.array(mesh_pose_list, dtype=object)
             write_point_cloud(args.root, scene_id, mesh_pose_list, name="mesh_pose_list")
 
         # reconstrct point cloud using a subset of the images
@@ -90,7 +91,7 @@ def main(args, rank):
         # sample grasps with GPG:
         sampler = GpgGraspSamplerPcl(gripper_type=args.gripper) # Franka finger depth is actually a little less than 0.05
         safety_dist_above_table = finger_depth # table is spawned at finger_depth
-        grasps, _, _ = sampler.sample_grasps(pc, num_grasps=GRASPS_PER_SCENE_GPG, max_num_samples=180,
+        grasps, _, _ = sampler.sample_grasps_parallel(pc, num_parallel=24, num_grasps=GRASPS_PER_SCENE_GPG, max_num_samples=180,
                                             safety_dis_above_table=safety_dist_above_table, show_final_grasps=False)
         for grasp in grasps:
             label, width = evaluate_grasp_gpg(sim, grasp) # try grasp and get true width
@@ -147,11 +148,34 @@ def generate_from_existing_scene(mesh_pose_list_path, args):
         # Downsample PC:
         pc = pc.voxel_down_sample(voxel_size=0.005)
     else:
+            
+            
+        if args.random == True:
+            # Render random scene view: depth image from random view on sphere (elevation: 0 to 75 degrees)
+            depth_imgs, extrinsics = render_random_images(sim, 1)
+        else:
+            depth_imgs, extrinsics = render_images(sim, 1)
+        
+        if args.save_scene:
+            # store the raw data    
+            # Save to data_random_raw/scenes
+            name = os.path.basename(mesh_pose_list_path) # same as scene_id
+            np.savez_compressed(os.path.join(args.save_root,name), depth_imgs=depth_imgs, extrinsics=extrinsics)
+            write_point_cloud(args.root, scene_id, mesh_pose_list, name="mesh_pose_list")
+
+
         # Get scene point cloud and normals using ground truth meshes
         scene_mesh = get_scene_from_mesh_pose_list(mesh_pose_list)
         o3d_scene_mesh = scene_mesh.as_open3d
         o3d_scene_mesh.compute_vertex_normals()
         pc = o3d_scene_mesh.sample_points_uniformly(number_of_points=1000)
+
+        # crop surface and borders from point cloud
+        lower = np.array([0.02 , 0.02 , 0.04])
+        upper = np.array([0.28, 0.28, 0.3])
+        bounding_box = o3d.geometry.AxisAlignedBoundingBox(lower, upper)
+        pc = pc.crop(bounding_box)
+
 
     # # crop surface and borders from point cloud
     # bounding_box = o3d.geometry.AxisAlignedBoundingBox(sim.lower, sim.upper)
@@ -163,7 +187,7 @@ def generate_from_existing_scene(mesh_pose_list_path, args):
         # sample grasps with GPG:
         sampler = GpgGraspSamplerPcl(gripper_type=args.gripper) # Franka finger depth is actually a little less than 0.05
         safety_dist_above_table = sim.gripper.finger_depth # table is spawned at finger_depth
-        grasps, _, _ = sampler.sample_grasps(pc, num_grasps=GRASPS_PER_SCENE_GPG, max_num_samples=180,
+        grasps, _, _ = sampler.sample_grasps_parallel(pc, num_parallel=24, num_grasps=GRASPS_PER_SCENE_GPG, max_num_samples=180,
                                             safety_dis_above_table=safety_dist_above_table, show_final_grasps=False)
         for grasp in grasps:
             label, width = evaluate_grasp_gpg(sim, grasp) # try grasp and get true width
@@ -313,7 +337,7 @@ if __name__ == "__main__":
     parser.add_argument("--root", type=Path)
     parser.add_argument("--use_previous_scenes", type=bool, default=False)
     parser.add_argument("--previous_root", type=Path, default="")
-    parser.add_argument("--scene", type=str, choices=["pile", "packed"], default="pile")
+    parser.add_argument("--scene", type=str, choices=["pile", "packed", "egad"], default="pile")
     parser.add_argument("--object_set", type=str, default="pile/train")
     parser.add_argument("--gripper", type=str, default='franka')
     parser.add_argument("--num_scenes", type=int, default=33313)
@@ -349,16 +373,16 @@ if __name__ == "__main__":
 
         print('Total jobs: %d, CPU num: %d' % (g_num_total_jobs, args.num_proc))
         from joblib import Parallel, delayed
-        results = Parallel(n_jobs=args.num_proc)(delayed(generate_from_existing_scene)(f, args) for f in mesh_list_files)
+        results = Parallel(n_jobs=args.num_proc)(delayed(generate_from_existing_scene)(f, args) for f in tqdm(mesh_list_files))
         
-        for result in results:
-            g_completed_jobs.append(result)
-            elapsed_time = time.time() - g_starting_time
-            if len(g_completed_jobs) % 1000 == 0:
-                msg = "%05d/%05d finished! " % (len(g_completed_jobs), g_num_total_jobs)
-                msg = msg + 'Elapsed time: ' + \
-                        time.strftime("%H:%M:%S", time.gmtime(elapsed_time)) + '. '
-                print(msg)
+        # for result in results:
+        #     g_completed_jobs.append(result)
+        #     elapsed_time = time.time() - g_starting_time
+        #     if len(g_completed_jobs) % 1000 == 0:
+        #         msg = "%05d/%05d finished! " % (len(g_completed_jobs), g_num_total_jobs)
+        #         msg = msg + 'Elapsed time: ' + \
+        #                 time.strftime("%H:%M:%S", time.gmtime(elapsed_time)) + '. '
+        #         print(msg)
     else:
         # Regular data generation with some samples from GPG:
 

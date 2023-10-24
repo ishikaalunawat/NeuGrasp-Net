@@ -208,8 +208,8 @@ def get_scene_surf_render(sim, size, resolution, net, encoded_tsdf, device, args
     ## Render the scene using the occupancy network with the same extrinsics
 
     # Neural render camera settings
-    width = 64
-    height = 64
+    width = 32
+    height = 32
     width_fov  = np.deg2rad(60) # angular FOV (120 by default)
     height_fov = np.deg2rad(60) # angular FOV (120 by default)
     f_x = width  / (np.tan(width_fov / 2.0))
@@ -218,22 +218,26 @@ def get_scene_surf_render(sim, size, resolution, net, encoded_tsdf, device, args
 
     min_measured_depth = size
     max_measured_depth = 2.4*size + size/2 # max distance from the origin
+    n_steps = 64
 
     # tsdf_t = torch.tensor(tsdf, device=device, dtype=torch.float32)
 
     surface_points_combined = None
     for cam_extrinsic in extrinsics_full:
-        surf_points_world, surf_mask = render_occ(intrinsic, [cam_extrinsic], net, encoded_tsdf, min_measured_depth, max_measured_depth, size=size, device=device)
+        surf_points_world, surf_mask = render_occ(intrinsic, [cam_extrinsic], net, encoded_tsdf, min_measured_depth, max_measured_depth, size=size, device=device, n_steps=n_steps)
         if surface_points_combined is None:
             surface_points_combined = surf_points_world[0, surf_mask[0]]
         else:
             surface_points_combined = torch.cat([surface_points_combined, surf_points_world[0, surf_mask[0]]], dim=0)
+        # break
     
     surf_pc = o3d.geometry.PointCloud()
     surf_pc.points = o3d.utility.Vector3dVector(surface_points_combined)
     down_surf_pc = surf_pc
     down_surf_pc = surf_pc.voxel_down_sample(voxel_size=0.005) # 5mm
-    down_surf_pc.colors = o3d.utility.Vector3dVector(np.tile(np.array([0.0, 0.2, 1]), (np.asarray(down_surf_pc.points).shape[0], 1)))
+    # np.array([194, 30, 86]) # Rose Red
+    down_surf_pc.colors = o3d.utility.Vector3dVector(np.tile(np.array([194/255, 30/255, 86/255]), (np.asarray(down_surf_pc.points).shape[0], 1)))
+    # down_surf_pc.colors = o3d.utility.Vector3dVector(np.tile(np.array([0.0, 0.2, 1]), (np.asarray(down_surf_pc.points).shape[0], 1)))
     # o3d.visualization.draw_geometries([down_surf_pc, pc_full])
 
     # Crop to within scene bounds
