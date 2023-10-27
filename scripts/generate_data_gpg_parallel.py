@@ -7,7 +7,7 @@ import numpy as np
 import open3d as o3d
 import scipy.signal as signal
 from tqdm import tqdm
-import multiprocessing as mp
+from joblib import Parallel, delayed
 
 from vgn.grasp import Grasp, Label
 from vgn.io import *
@@ -30,7 +30,6 @@ def main(args, rank):
     seed = np.random.randint(0, 1000) + rank
     np.random.seed(seed)
     sim = ClutterRemovalSim(args.scene, args.object_set, gui=args.sim_gui, gripper_type=args.gripper)
-    finger_depth = sim.gripper.finger_depth
     scenes_per_worker = args.num_scenes // args.num_proc
     pbar = tqdm(total=scenes_per_worker, disable=rank != 0)
 
@@ -54,24 +53,19 @@ def main(args, rank):
 
         # render synthetic depth images
         # n = MAX_VIEWPOINT_COUNT
-        # depth_imgs, extrinsics = render_images(sim, n)
-        depth_imgs_side, extrinsics_side = render_side_images(sim, 1, args.random)
-        
-        # Debug
+        depth_imgs, extrinsics = render_images(sim, n=1, randomize_view=args.random)
+        # Debug: Viz
         # import cv2
-        # cv2.imshow("la", depth_imgs_side[0])
+        # cv2.imshow("la", depth_imgs[0])
         # cv2.waitKey(1000)
 
         # store the raw data
-        scene_id = write_sensor_data(args.root, depth_imgs_side, extrinsics_side)
-        mesh_pose_list = get_mesh_pose_list_from_world(sim.world, args.object_set)
         if args.save_scene:
-            mesh_pose_list = np.array(mesh_pose_list, dtype=object)
-            write_point_cloud(args.root, scene_id, mesh_pose_list, name="mesh_pose_list")
-
-        # reconstrct point cloud using a subset of the images
-        # tsdf = create_tsdf(sim.size, 120, depth_imgs, sim.camera.intrinsic, extrinsics)
-        # pc = tsdf.get_cloud()
+            scene_id = write_sensor_data(args.root, depth_imgs, extrinsics)
+            mesh_pose_list = get_mesh_pose_list_from_world(sim.world, args.object_set)
+            if args.save_scene:
+                mesh_pose_list = np.array(mesh_pose_list, dtype=object)
+                write_point_cloud(args.root, scene_id, mesh_pose_list, name="mesh_pose_list")
 
         # Get scene point cloud and normals using ground truth meshes
         scene_mesh = get_scene_from_mesh_pose_list(mesh_pose_list)
@@ -79,31 +73,29 @@ def main(args, rank):
         o3d_scene_mesh.compute_vertex_normals()
         pc = o3d_scene_mesh.sample_points_uniformly(number_of_points=1000)
 
-        # # crop surface and borders from point cloud
+        # crop surface and borders from point cloud
         bounding_box = o3d.geometry.AxisAlignedBoundingBox(sim.lower, sim.upper)
         pc = pc.crop(bounding_box)
+        # Debug Viz
         # o3d.visualization.draw_geometries([pc], point_show_normal=True)
 
-        if pc.is_empty():
-            print("Point cloud empty, skipping scene")
-            continue
-
-        # sample grasps with GPG:
-        sampler = GpgGraspSamplerPcl(gripper_type=args.gripper) # Franka finger depth is actually a little less than 0.05
-        safety_dist_above_table = finger_depth # table is spawned at finger_depth
-        grasps, _, _ = sampler.sample_grasps_parallel(pc, num_parallel=24, num_grasps=GRASPS_PER_SCENE_GPG, max_num_samples=180,
-                                            safety_dis_above_table=safety_dist_above_table, show_final_grasps=False)
-        for grasp in grasps:
-            label, width = evaluate_grasp_gpg(sim, grasp) # try grasp and get true width
-            grasp.width = width
-            # store the sample
-            write_grasp(args.root, scene_id, grasp, label)
-            pbar.update()
-
+        if GRASPS_PER_SCENE_GPG > 0:
+            # sample grasps with GPG:
+            sampler = GpgGraspSamplerPcl(gripper_type=args.gripper)
+            safety_dist_above_table = sim.gripper.finger_depth # table is spawned at finger_depth
+            num_parallel = os.cpu_count() # use all available cores
+            grasps, _, _ = sampler.sample_grasps_parallel(pc, num_parallel=num_parallel, num_grasps=GRASPS_PER_SCENE_GPG, max_num_samples=180,
+                                                safety_dis_above_table=safety_dist_above_table, show_final_grasps=False)
+            for grasp in grasps:
+                label, width = evaluate_grasp_gpg(sim, grasp) # try grasp and get true width
+                grasp.width = width
+                # store the sample
+                write_grasp(args.root, scene_id, grasp, label)
+                pbar.update()
         # Optional: sample remaining grasps with regular sampling
         for _ in range(GRASPS_PER_SCENE-GRASPS_PER_SCENE_GPG):
             # sample and evaluate a grasp point
-            point, normal = sample_grasp_point(pc, finger_depth)
+            point, normal = sample_grasp_point(pc, sim.gripper.finger_depth)
             grasp, label = evaluate_grasp_point(sim, point, normal)
 
             # store the sample
@@ -123,89 +115,80 @@ def generate_from_existing_scene(mesh_pose_list_path, args):
     mesh_pose_list = np.load(mesh_pose_list_path, allow_pickle=True)['pc']
     scene_id = os.path.basename(mesh_pose_list_path)[:-4] # scene id without .npz extension
     sim.setup_sim_scene_from_mesh_pose_list(mesh_pose_list)
-
     sim.save_state()
 
-    if args.partial_pc == True:
-        sim.world.remove_body(sim.world.bodies[0]) # remove table because we dont want to render it # normally table is the first body
-        if args.random == True:
-            # Render random scene view: depth image from random view on sphere (elevation: 0 to 75 degrees)
-            depth_imgs, extrinsics = render_random_images(sim, 1)
-        else:
-            depth_imgs, extrinsics = render_images(sim, 1)
-        sim.place_table(height=sim.gripper.finger_depth) # Add table back
-        if args.save_scene:
-            # store the raw data    
-            # Save to data_random_raw/scenes
-            name = os.path.basename(mesh_pose_list_path) # same as scene_id
-            np.savez_compressed(os.path.join(args.save_root,name), depth_imgs=depth_imgs, extrinsics=extrinsics)
-            write_point_cloud(args.root, scene_id, mesh_pose_list, name="mesh_pose_list")
+    ## deprecated
+    # if args.partial_pc == True:
+    #     sim.world.remove_body(sim.world.bodies[0]) # remove table because we dont want to render it # normally table is the first body
+    #     if args.random == True:
+    #         # Render random scene view: depth image from random view on sphere (elevation: 0 to 75 degrees)
+    #         depth_imgs, extrinsics = render_random_images(sim, 1)
+    #     else:
+    #         depth_imgs, extrinsics = render_images(sim, 1)
+    #     sim.place_table(height=sim.gripper.finger_depth) # Add table back
+    #     if args.save_scene:
+    #         # store the raw data    
+    #         # Save to data_random_raw/scenes
+    #         name = os.path.basename(mesh_pose_list_path) # same as scene_id
+    #         np.savez_compressed(os.path.join(args.save_root,name), depth_imgs=depth_imgs, extrinsics=extrinsics)
+    #         write_point_cloud(args.root, scene_id, mesh_pose_list, name="mesh_pose_list")
         
-        # construct point cloud
-        tsdf = create_tsdf(sim.size, RESOLUTION, depth_imgs, sim.camera.intrinsic, extrinsics)
-        # voxels = tsdf.get_grid()
-        pc = tsdf.get_cloud()
-        # Downsample PC:
-        pc = pc.voxel_down_sample(voxel_size=0.005)
-    else:
-            
-            
-        if args.random == True:
-            # Render random scene view: depth image from random view on sphere (elevation: 0 to 75 degrees)
-            depth_imgs, extrinsics = render_random_images(sim, 1)
-        else:
-            depth_imgs, extrinsics = render_images(sim, 1)
-        
-        if args.save_scene:
-            # store the raw data    
-            # Save to data_random_raw/scenes
-            name = os.path.basename(mesh_pose_list_path) # same as scene_id
-            np.savez_compressed(os.path.join(args.save_root,name), depth_imgs=depth_imgs, extrinsics=extrinsics)
-            write_point_cloud(args.root, scene_id, mesh_pose_list, name="mesh_pose_list")
+    #     # construct point cloud
+    #     tsdf = create_tsdf(sim.size, RESOLUTION, depth_imgs, sim.camera.intrinsic, extrinsics)
+    #     # voxels = tsdf.get_grid()
+    #     pc = tsdf.get_cloud()
+    #     # Downsample PC:
+    #     pc = pc.voxel_down_sample(voxel_size=0.005)
+    # else:
+    ## deprecated
+    
+    # Render scene view: depth image from random view on sphere (elevation: 0 to 75 degrees)
+    depth_imgs, extrinsics = render_images(sim, 1, args.random)
+    
+    if args.save_scene:
+        # store the raw data    
+        # Save to data_random_raw/scenes
+        name = os.path.basename(mesh_pose_list_path) # same as scene_id
+        np.savez_compressed(os.path.join(args.save_root,name), depth_imgs=depth_imgs, extrinsics=extrinsics)
+        write_point_cloud(args.root, scene_id, mesh_pose_list, name="mesh_pose_list") # reusing write_point_cloud function!
 
+    # Get scene point cloud and normals using ground truth meshes
+    scene_mesh = get_scene_from_mesh_pose_list(mesh_pose_list)
+    o3d_scene_mesh = scene_mesh.as_open3d
+    o3d_scene_mesh.compute_vertex_normals()
+    pc = o3d_scene_mesh.sample_points_uniformly(number_of_points=1000)
 
-        # Get scene point cloud and normals using ground truth meshes
-        scene_mesh = get_scene_from_mesh_pose_list(mesh_pose_list)
-        o3d_scene_mesh = scene_mesh.as_open3d
-        o3d_scene_mesh.compute_vertex_normals()
-        pc = o3d_scene_mesh.sample_points_uniformly(number_of_points=1000)
-
-        # crop surface and borders from point cloud
-        lower = np.array([0.02 , 0.02 , 0.04])
-        upper = np.array([0.28, 0.28, 0.3])
-        bounding_box = o3d.geometry.AxisAlignedBoundingBox(lower, upper)
-        pc = pc.crop(bounding_box)
-
-
-    # # crop surface and borders from point cloud
-    # bounding_box = o3d.geometry.AxisAlignedBoundingBox(sim.lower, sim.upper)
-    # pc = pc.crop(bounding_box)
+    # crop surface and borders from point cloud
+    lower = np.array([0.02 , 0.02 , 0.04])
+    upper = np.array([0.28, 0.28, 0.3])
+    bounding_box = o3d.geometry.AxisAlignedBoundingBox(lower, upper)
+    pc = pc.crop(bounding_box)
+    # Debug Viz
     # o3d.visualization.draw_geometries([pc], point_show_normal=True)
 
     grasps = []
     if GRASPS_PER_SCENE_GPG > 0:
         # sample grasps with GPG:
-        sampler = GpgGraspSamplerPcl(gripper_type=args.gripper) # Franka finger depth is actually a little less than 0.05
+        sampler = GpgGraspSamplerPcl(gripper_type=args.gripper)
         safety_dist_above_table = sim.gripper.finger_depth # table is spawned at finger_depth
-        grasps, _, _ = sampler.sample_grasps_parallel(pc, num_parallel=24, num_grasps=GRASPS_PER_SCENE_GPG, max_num_samples=180,
+        num_parallel = os.cpu_count() # use all available cores
+        grasps, _, _ = sampler.sample_grasps_parallel(pc, num_parallel=num_parallel, num_grasps=GRASPS_PER_SCENE_GPG, max_num_samples=180,
                                             safety_dis_above_table=safety_dist_above_table, show_final_grasps=False)
         for grasp in grasps:
             label, width = evaluate_grasp_gpg(sim, grasp) # try grasp and get true width
             grasp.width = width
             # store the sample
             write_grasp(args.root, scene_id, grasp, label)
-
-    # # Optional: sample remaining grasps with regular sampling
-    # for _ in range(GRASPS_PER_SCENE-GRASPS_PER_SCENE_GPG):
-    #     # sample and evaluate a grasp point
-    #     point, normal = sample_grasp_point(pc, sim.gripper.finger_depth)
-    #     grasp, label = evaluate_grasp_point(sim, point, normal)
-
-    #     # store the sample
-    #     write_grasp(args.root, scene_id, grasp, label)
+    # Optional: sample remaining grasps with regular sampling
+    for _ in range(GRASPS_PER_SCENE-GRASPS_PER_SCENE_GPG):
+        # sample and evaluate a grasp point
+        point, normal = sample_grasp_point(pc, sim.gripper.finger_depth)
+        grasp, label = evaluate_grasp_point(sim, point, normal)
+        # store the sample
+        write_grasp(args.root, scene_id, grasp, label)
 
 
-def render_images(sim, n):
+def render_images(sim, n, randomize_view=True): # Adapted from render_images in scripts/generate_data_parallel.py
     height, width = sim.camera.intrinsic.height, sim.camera.intrinsic.width
     origin = Transform(Rotation.identity(), np.r_[sim.size / 2, sim.size / 2, 0.0])
 
@@ -213,59 +196,18 @@ def render_images(sim, n):
     depth_imgs = np.empty((n, height, width), np.float32)
 
     for i in range(n):
-        r = np.random.uniform(1.6, 2.4) * sim.size
-        theta = np.random.uniform(0.0, np.pi / 4.0)
-        phi = np.random.uniform(0.0, 2.0 * np.pi)
-
-        extrinsic = camera_on_sphere(origin, r, theta, phi)
-        depth_img = sim.camera.render(extrinsic)[1]
-
-        extrinsics[i] = extrinsic.to_list()
-        depth_imgs[i] = depth_img
-
-    return depth_imgs, extrinsics
-
-def render_side_images(sim, n=1, random=False):
-    height, width = sim.camera.intrinsic.height, sim.camera.intrinsic.width
-    origin = Transform(Rotation.identity(), np.r_[sim.size / 2, sim.size / 2, sim.size / 3])
-
-    extrinsics = np.empty((n, 7), np.float32)
-    depth_imgs = np.empty((n, height, width), np.float32)
-
-    for i in range(n):
-        if random:
+        if randomize_view:
             r = np.random.uniform(1.6, 2.4) * sim.size
-            theta = np.random.uniform(np.pi / 4.0, 5.0 * np.pi / 12.0)
-            phi = np.random.uniform(- 5.0 * np.pi / 5, - 3.0 * np.pi / 8.0)
-        else:
-            r = 2 * sim.size
-            theta = np.pi / 3.0
-            phi = - np.pi / 2.0
-
-        extrinsic = camera_on_sphere(origin, r, theta, phi)
-        depth_img = sim.camera.render(extrinsic)[1]
-
-        extrinsics[i] = extrinsic.to_list()
-        depth_imgs[i] = depth_img
-
-    return depth_imgs, extrinsics
-
-def render_random_images(sim, n): # Adapted from render_images in scripts/generate_data_parallel.py
-    height, width = sim.camera.intrinsic.height, sim.camera.intrinsic.width
-    origin = Transform(Rotation.identity(), np.r_[sim.size / 2, sim.size / 2, 0.0])
-
-    extrinsics = np.empty((n, 7), np.float32)
-    depth_imgs = np.empty((n, height, width), np.float32)
-
-    for i in range(n):
-        r = np.random.uniform(1.6, 2.4) * sim.size
-        theta = np.random.uniform(0.0, 5* np.pi / 12.0) # elevation: 0 to 75 degrees
-        phi = np.random.uniform(0.0, 2.0 * np.pi)
+            theta = np.random.uniform(0.0, 5* np.pi / 12.0) # elevation: 0 to 75 degrees
+            phi = np.random.uniform(0.0, 2.0 * np.pi)
         # # Edge grasp randomizations
         # r = np.random.uniform(2, 2.5) * sim.size
         # theta = np.random.uniform(np.pi/4, np.pi/3)
         # phi = np.random.uniform(0.0, 2.0 * np.pi)
-
+        else:
+            r = 2.0 * sim.size
+            theta = np.pi / 6.0
+            phi = 0.0
 
         extrinsic = camera_on_sphere(origin, r, theta, phi)
         depth_img = sim.camera.render(extrinsic)[1]
@@ -274,6 +216,7 @@ def render_random_images(sim, n): # Adapted from render_images in scripts/genera
         depth_imgs[i] = depth_img
 
     return depth_imgs, extrinsics
+
 
 def sample_grasp_point(point_cloud, finger_depth, eps=0.1):
     points = np.asarray(point_cloud.points)
@@ -287,7 +230,6 @@ def sample_grasp_point(point_cloud, finger_depth, eps=0.1):
     grasp_depth = np.random.uniform(-eps * finger_depth, (1.0 + eps) * finger_depth)
     point = point + normal * grasp_depth
     return point, normal
-
 
 def evaluate_grasp_point(sim, pos, normal, num_rotations=6):
     # define initial grasp frame on object surface
@@ -323,7 +265,6 @@ def evaluate_grasp_point(sim, pos, normal, num_rotations=6):
 
     return Grasp(Transform(ori, pos), width), int(np.max(outcomes))
 
-
 def evaluate_grasp_gpg(sim, grasp):
     sim.restore_state()
     grasp.width = sim.gripper.max_opening_width
@@ -332,28 +273,28 @@ def evaluate_grasp_gpg(sim, grasp):
     return int(outcome), width
 
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Generate grasping data with GPG or optionally point normal sampling")
     parser.add_argument("--root", type=Path)
-    parser.add_argument("--use_previous_scenes", type=bool, default=False)
+    parser.add_argument("--use_previous_scenes", type=bool, default='')
     parser.add_argument("--previous_root", type=Path, default="")
-    parser.add_argument("--scene", type=str, choices=["pile", "packed", "egad"], default="pile")
+    parser.add_argument("--scene", type=str, choices=["pile", "packed", "egad", "affnet"], default="pile")
     parser.add_argument("--object_set", type=str, default="pile/train")
     parser.add_argument("--gripper", type=str, default='franka')
-    parser.add_argument("--num_scenes", type=int, default=33313)
+    parser.add_argument("--num_scenes", type=int, default=33333)
     parser.add_argument("--grasps_per_scene", type=int, default=60)
     parser.add_argument("--grasps_per_scene_gpg", type=int, default=60)
     parser.add_argument("--num_proc", type=int, default=1)
-    parser.add_argument("--save_scene", type=bool, default=False)
-    parser.add_argument("--partial_pc", type=bool, default=False, help="Use partial point cloud to sample grasps")
-    parser.add_argument("--random", type=bool, default=False, help="Add distrubation to camera pose")
-    parser.add_argument("--sim_gui", type=bool, default=False)
+    parser.add_argument("--save_scene", type=bool, default=True, help="Save scene data (depth images and extrinsics)")
+    # parser.add_argument("--partial_pc", type=bool, default='', help="Use only partial point cloud to sample grasps") # deprecated
+    parser.add_argument("--random", type=bool, default=True, help="Add randomization to camera pose")
+    parser.add_argument("--sim_gui", type=bool, default='')
     args, _ = parser.parse_known_args()
 
     if args.use_previous_scenes:
         if args.previous_root is None:
             raise ValueError("Previous root directory is not specified")
-        
         # Write GPG grasp sampler parameters
         (args.root).mkdir(parents=True, exist_ok=True)
         write_json(GpgGraspSamplerPcl().params, args.root / "gpg_setup.json")
@@ -364,36 +305,16 @@ if __name__ == "__main__":
             (args.root / "mesh_pose_list").mkdir(parents=True, exist_ok=True)
         
         mesh_list_files = glob.glob(os.path.join(args.previous_root, 'mesh_pose_list', '*.npz'))
-        global g_completed_jobs
-        global g_num_total_jobs
-        global g_starting_time
         g_num_total_jobs = len(mesh_list_files)
-        g_completed_jobs = []
-        g_starting_time = time.time()
-
-        print('Total jobs: %d, CPU num: %d' % (g_num_total_jobs, args.num_proc))
-        from joblib import Parallel, delayed
-        results = Parallel(n_jobs=args.num_proc)(delayed(generate_from_existing_scene)(f, args) for f in tqdm(mesh_list_files))
+        print('Total scenes: %d, CPU num: %d' % (g_num_total_jobs, args.num_proc))
         
-        # for result in results:
-        #     g_completed_jobs.append(result)
-        #     elapsed_time = time.time() - g_starting_time
-        #     if len(g_completed_jobs) % 1000 == 0:
-        #         msg = "%05d/%05d finished! " % (len(g_completed_jobs), g_num_total_jobs)
-        #         msg = msg + 'Elapsed time: ' + \
-        #                 time.strftime("%H:%M:%S", time.gmtime(elapsed_time)) + '. '
-        #         print(msg)
-    else:
-        # Regular data generation with some samples from GPG:
-
         # Using fix from: https://github.com/UT-Austin-RPL/GIGA/issues/1
-        from joblib import Parallel, delayed
+        results = Parallel(n_jobs=args.num_proc)(delayed(generate_from_existing_scene)(f, args) for f in tqdm(mesh_list_files))
+    else:
+        # Regular data generation with some samples from GPG and some from point normal sampling:
+        print('Total scenes: %d, CPU num: %d' % (args.num_scenes, args.num_proc))
+        
+        # Using fix from: https://github.com/UT-Austin-RPL/GIGA/issues/1
         Parallel(n_jobs=args.num_proc)(delayed(main)(args, i) for i in range(args.num_proc))
-        # if args.num_proc > 1:
-        #     pool = mp.Pool(processes=args.num_proc)
-        #     for i in range(args.num_proc):
-        #         pool.apply_async(func=main, args=(args, i))
-        #     pool.close()
-        #     pool.join()
-        # else:
-        #     main(args, 0)
+
+    print('All processes finished!')
