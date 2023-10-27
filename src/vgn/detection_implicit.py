@@ -26,6 +26,22 @@ class VGNImplicit(object):
         # self.device = "cpu"
         self.net = load_network(model_path, self.device, model_type=model_type)
         self.net.eval() # Set to eval mode
+        
+        # Optional: print summary of network
+        # from torchsummary import summary
+        # print(summary(net.encoder, input_size=(1, 64, 64, 64)))
+        # get number of parameters:
+        encoder_params = sum(p.numel() for p in self.net.encoder.parameters() if p.requires_grad)    
+        decoder_params = sum(p.numel() for p in self.net.decoder_qual.parameters() if p.requires_grad)
+        decoder_params += sum(p.numel() for p in self.net.decoder_width.parameters() if p.requires_grad)
+        decoder_params += sum(p.numel() for p in self.net.decoder_tsdf.parameters() if p.requires_grad)
+        pytorch_total_params = sum(p.numel() for p in self.net.parameters())
+        print("[  NETWORK SUMMARY...  ]:")
+        print("Encoder params: ", encoder_params)
+        print("Decoder params: ", decoder_params)
+        print("Total params: ", pytorch_total_params)
+        print("[  ...NETWORK SUMMARY  ]")
+
         self.model_type = model_type
         self.qual_th = qual_th
         self.best = best

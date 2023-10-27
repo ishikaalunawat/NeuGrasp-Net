@@ -3,6 +3,8 @@ import time
 import os
 import numpy as np
 import pybullet
+import pickle as pkl
+import open3d as o3d
 
 from vgn.grasp import Label
 from vgn.perception import *
@@ -13,17 +15,23 @@ from vgn.utils.misc import apply_noise, apply_translational_noise
 
 class ClutterRemovalSim(object):
     def __init__(self, scene, object_set, gui=True, seed=None, add_noise=False, sideview=False, save_dir=None, use_nvisii=False, save_freq=8, data_root=None, gripper_type='franka'):
-        assert scene in ["pile", "packed", "egad"]
+        assert scene in ["pile", "packed", "egad", "affnet"]
 
         self.urdf_root = Path("data/urdfs")
         self.egad_root = Path("data/egad_eval_set")
+        self.affnet_root = Path("data/3DGraspAff/")
         if data_root:
             self.urdf_root = Path(data_root) / self.urdf_root
             self.egad_root = Path(data_root) / self.egad_root
+            self.affnet_root = Path(data_root) / self.affnet_root
         self.scene = scene
         self.object_set = object_set
-        self.discover_objects()
-        self.disscover_egad_files()
+        if scene == 'affnet':
+            self.discover_affnet_objs()
+        elif scene == 'egad':
+            self.discover_egad_files()
+        else:
+            self.discover_objects()
 
         self.global_scaling = {
             "blocks": 1.67,
@@ -55,7 +63,30 @@ class ClutterRemovalSim(object):
         root = self.urdf_root / self.object_set
         self.object_urdfs = [f for f in root.iterdir() if f.suffix == ".urdf"]
 
-    def disscover_egad_files(self):
+    def discover_affnet_objs(self):
+        # get affnet dataset dict
+        aff_path = os.path.join(self.affnet_root, 'filt_scaled_anntd_remapped_full_shape_'+self.object_set+'_data.pkl')
+        try:
+            with open(aff_path, 'rb') as f:
+                self.aff_dataset = pkl.load(f)
+                print("[Loaded affnet dataset dict]")
+        except Exception as exc:
+            raise ValueError('Affnet dataset dict not found') from exc
+
+        self.root_shapenet = self.affnet_root / "obj_meshes" / self.object_set / "ShapeNet"
+        self.root_partnet = self.affnet_root / "obj_meshes" / self.object_set / "PartNet"
+        # check if path exists
+        if not self.root_shapenet.exists():
+            raise ValueError("ShapeNet meshes path does not exist")
+        if not self.root_partnet.exists():
+            raise ValueError("PartNet meshes path does not exist")
+        # # store shapenet first then partnet
+        # self.obj_ids_affnet = [f for f in root_shapenet.iterdir()]
+        # self.num_objs_shapenet = len(self.obj_ids_affnet)
+        # self.obj_ids_affnet += [f for f in root_partnet.iterdir()]
+        # self.num_objs_partnet = len(self.obj_ids_affnet) - self.num_objs_shapenet
+        
+    def discover_egad_files(self):
         self.obj_egads = [f for f in self.egad_root.iterdir() if f.suffix=='.obj']
 
     def save_state(self):
@@ -90,6 +121,15 @@ class ClutterRemovalSim(object):
                 if not isinstance(mesh_path, Path):
                     mesh_path = Path(mesh_path)
                 self.world.load_obj_fixed_scale(mesh_path, body_pose, scale)
+            elif "3DGraspAff" in str(mesh_path):
+                # if it isnt a posixpath, make it one
+                if not isinstance(mesh_path, Path):
+                    mesh_path = Path(mesh_path)
+                # name has to be correct for affnet
+                name = str(mesh_path.parent)
+                # remove first 4 parts with slashes
+                name = '/'.join(name.split('/')[4:])
+                self.world.load_obj_fixed_scale(mesh_path, body_pose, scale, name)
             else:
                 if os.path.splitext(mesh_path)[1] == '.urdf':
                     urdf_path = mesh_path            
@@ -122,7 +162,9 @@ class ClutterRemovalSim(object):
         elif self.scene == "packed":
             self.generate_packed_scene(object_count, table_height)
         elif self.scene == 'egad':
-            self.generate_egad_obj(object_count, table_height)
+            self.generate_egad_obj_scene(object_count, table_height)
+        elif self.scene == 'affnet':
+            self.generate_affnet_obj_scene(object_count, table_height)
 
         else:
             raise ValueError("Invalid scene argument")
@@ -194,7 +236,7 @@ class ClutterRemovalSim(object):
                 self.remove_and_wait()
             attempts += 1
 
-    def generate_egad_obj(self, object_count, table_height):
+    def generate_egad_obj_scene(self, object_count, table_height):
         # place box
         urdf = self.urdf_root / "setup" / "box.urdf"
         pose = Transform(Rotation.identity(), np.r_[0.02, 0.02, table_height])
@@ -211,8 +253,44 @@ class ClutterRemovalSim(object):
         # remove box
         self.world.remove_body(box)
         self.remove_and_wait()
-        return urdf, pose
 
+    def generate_affnet_obj_scene(self, object_count, table_height):
+        # place box
+        urdf = self.urdf_root / "setup" / "box.urdf"
+        pose = Transform(Rotation.identity(), np.r_[0.02, 0.02, table_height])
+        box = self.world.load_urdf(urdf, pose, scale=1.3)
+        # drop objects
+        for _ in range(object_count):
+            # generate random pose
+            rotation = Rotation.random(random_state=self.rng)
+            xy = self.rng.uniform(1.0 / 3.0 * self.size, 2.0 / 3.0 * self.size, 2)
+            pose = Transform(rotation, np.r_[xy, table_height + 0.2])
+
+            # select object from affnet dataset
+            # pick a random sem class
+            sem_class = np.random.choice(self.aff_dataset['semantic_classes']) # 'Scissors'
+            # pick random shape id
+            shape_id = np.random.choice(list(self.aff_dataset['data'][sem_class].keys()))        
+            if os.path.exists(os.path.join(self.root_shapenet, shape_id)):
+                # shapenet object
+                obj_name = str("ShapeNet/"+str(shape_id)+"/models")
+                # choose scale
+                scale = 1.0 #0.2#self.rng.uniform(0.8, 1.4)
+            else:
+                # partnet object
+                partnet_id = self.aff_dataset['data'][sem_class][shape_id]['partnet_anno_id']
+                obj_name = str("PartNet/"+str(shape_id)+'/'+str(partnet_id))
+                # choose scale
+                scale = 1.0 #0.075*self.rng.uniform(0.8, 1.2)
+            # load object
+            mesh_path = os.path.join(self.affnet_root, "obj_meshes", self.object_set, obj_name, 'model_normalized.obj')
+            self.world.load_obj_fixed_scale(mesh_path, pose, scale, name=obj_name)
+            self.wait_for_objects_to_rest(timeout=1.0)
+
+        # remove box
+        self.world.remove_body(box)
+        self.remove_and_wait()
+    
     def acquire_tsdf(self, n, N=None, resolution=40, randomize_view=False, tight_view=False):
         """Render synthetic depth images from n viewpoints and integrate into a TSDF.
 

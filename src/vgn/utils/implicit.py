@@ -51,6 +51,9 @@ def get_mesh_pose_list_from_world(world, object_set, exclude_plane=True):
                 mesh_path = os.path.join('./data/egad_eval_set', name)
             else:
                 mesh_path = os.path.join('./data/urdfs', object_set, name + '.urdf')# os.path.join('./data/urdfs', object_set, name + '.urdf')
+        if object_set == 'train' or object_set == 'test': # affnet dataset!
+            name = world.bodies[uid].name
+            mesh_path = os.path.join('./data/3DGraspAff/obj_meshes', object_set, name, 'model_normalized.obj')
         mesh_pose_list.append((mesh_path, scale, pose))
     return mesh_pose_list
 
@@ -60,15 +63,17 @@ def get_scene_from_mesh_pose_list(mesh_pose_list, scene_as_mesh=True, return_lis
     mesh_list = []
     for mesh_path, scale, pose in mesh_pose_list:
         if data_root is not None:
-            mesh_path = os.path.join(data_root, mesh_path)
-        if os.path.splitext(mesh_path)[1] == '.urdf':
-            obj = URDF.load(mesh_path)
+            full_mesh_path = os.path.join(data_root, mesh_path)
+        else:
+            full_mesh_path = mesh_path
+        if os.path.splitext(full_mesh_path)[1] == '.urdf':
+            obj = URDF.load(full_mesh_path)
             assert len(obj.links) == 1
             assert len(obj.links[0].visuals) == 1
             assert len(obj.links[0].visuals[0].geometry.meshes) == 1
             mesh = obj.links[0].visuals[0].geometry.meshes[0].copy()
         else:
-            mesh = trimesh.load(mesh_path)
+            mesh = trimesh.load(full_mesh_path)
 
         mesh.apply_scale(scale)
         mesh.apply_transform(pose)
