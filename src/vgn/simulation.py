@@ -113,10 +113,10 @@ class ClutterRemovalSim(object):
 
         for mesh_path, scale, pose in mesh_pose_list:
             body_pose = Transform.from_matrix(pose)
-            if data_root is not None:
-                mesh_path = os.path.join(data_root, mesh_path)
 
             if 'egad' in str(mesh_path):
+                if data_root is not None:
+                    mesh_path = os.path.join(data_root, mesh_path)
                 # if it isnt a posixpath, make it one
                 if not isinstance(mesh_path, Path):
                     mesh_path = Path(mesh_path)
@@ -129,8 +129,12 @@ class ClutterRemovalSim(object):
                 name = str(mesh_path.parent)
                 # remove first 4 parts with slashes
                 name = '/'.join(name.split('/')[4:])
+                if data_root is not None:
+                    mesh_path = Path(os.path.join(data_root, mesh_path))
                 self.world.load_obj_fixed_scale(mesh_path, body_pose, scale, name)
             else:
+                if data_root is not None:
+                    mesh_path = os.path.join(data_root, mesh_path)
                 if os.path.splitext(mesh_path)[1] == '.urdf':
                     urdf_path = mesh_path            
                 else:
@@ -301,36 +305,38 @@ class ClutterRemovalSim(object):
         tsdf = TSDFVolume(self.size, resolution)
         high_res_tsdf = TSDFVolume(self.size, 120)
 
-        if self.sideview:
-            # origin = Transform(Rotation.identity(), np.r_[self.size / 2, self.size / 2, self.size / 3])
-            theta = np.pi / 3.0
-            r = 2.0 * self.size
-        else:
-            origin = Transform(Rotation.identity(), np.r_[self.size / 2, self.size / 2, 0])
-            if randomize_view:
-                if tight_view == True:
-                    theta = 5* np.pi / 12.0 # Fixed 75 degrees
-                else:
-                    theta = np.random.uniform(np.pi / 12.0, 5* np.pi / 12.0) # elevation: 15 to 75 degrees
-                # theta = np.random.uniform(0.0, 5* np.pi / 12.0) # elevation: 0 to 75 degrees
-                # theta = np.random.uniform(np.pi/4, np.pi/3) # elevation: 45 to 60 degrees
-                r = np.random.uniform(1.6, 2.4) * self.size
+        ## deprecated
+        # if self.sideview:
+        #     # origin = Transform(Rotation.identity(), np.r_[self.size / 2, self.size / 2, self.size / 3])
+        #     theta = np.pi / 3.0
+        #     r = 2.0 * self.size
+        # else:
+        ## deprecated
+        origin = Transform(Rotation.identity(), np.r_[self.size / 2, self.size / 2, 0])
+        if randomize_view:
+            if tight_view == True:
+                theta = 5* np.pi / 12.0 # Fixed 75 degrees
             else:
-                theta = np.pi / 6.0
-                r = 2.0 * self.size
+                theta = np.random.uniform(np.pi / 12.0, 5* np.pi / 12.0) # elevation: 15 to 75 degrees
+            # theta = np.random.uniform(0.0, 5* np.pi / 12.0) # elevation: 0 to 75 degrees
+            # theta = np.random.uniform(np.pi/4, np.pi/3) # elevation: 45 to 60 degrees
+            r = np.random.uniform(1.6, 2.4) * self.size
+        else:
+            theta = np.pi / 6.0
+            r = 2.0 * self.size
         # # randomizations of edge grasp network:
         # r = np.random.uniform(2, 2.5) * sim.size
         # theta = np.random.uniform(np.pi/4, np.pi/3)
-        # phi = np.random.uniform(0.0, 2*np.pi)
-
-        
+        # phi = np.random.uniform(0.0, 2*np.pi)      
 
         N = N if N else n
-        if self.sideview:
-            assert n == 1
-            phi_list = [- np.pi / 2.0]
-        else:
-            phi_list = 2.0 * np.pi * np.arange(n) / N
+        ## deprecated
+        # if self.sideview:
+        #     assert n == 1
+        #     phi_list = [- np.pi / 2.0]
+        # else:
+        ## deprecated
+        phi_list = 2.0 * np.pi * np.arange(n) / N
         extrinsics = [camera_on_sphere(origin, r, theta, phi) for phi in phi_list]
 
         timing = 0.0

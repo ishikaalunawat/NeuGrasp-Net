@@ -82,7 +82,7 @@ class GpgGraspSamplerPcl():
             "gripper_finger_width": 0.02, # Approx
             "gripper_hand_height": 0.030,
             "gripper_hand_outer_diameter": 0.12, # 0.218, the diameter of the robot hand (= maximum aperture plus 2 * finger width)
-            "gripper_hand_depth": 0.0425, # 0.125,
+            "gripper_hand_depth": 0.0425, # 0.125,  # Franka finger depth is actually a little less than 0.05
             "gripper_init_bite": 0.005
 
             # # Robotiq 2F-85

@@ -2,9 +2,7 @@ import os
 from pathlib import Path
 import argparse
 import numpy as np
-import open3d as o3d
-import trimesh
-import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 from vgn.io import *
 from vgn.perception import *
@@ -12,8 +10,8 @@ from vgn.grasp import Grasp
 from vgn.simulation import ClutterRemovalSim
 from vgn.utils.transform import Rotation, Transform
 from vgn.utils.implicit import get_scene_from_mesh_pose_list, as_mesh, get_occ_specific_points
-from vgn.utils.misc import apply_noise
 from vgn.grasp_renderer import generate_gt_grasp_cloud
+from vgn.assign_grasp_affordance import affrdnce_label_dict, get_affordance
 
 from joblib import Parallel, delayed
 
@@ -25,53 +23,74 @@ def generate_from_existing_grasps(grasp_data_entry, args, render_settings):
     mesh_pose_list = np.load(args.raw_root / "mesh_pose_list" / file_name, allow_pickle=True)['pc']
 
     # Re-create the saved simulation
-    sim = ClutterRemovalSim('pile', 'pile/train', gui=args.sim_gui) # parameters 'pile' and 'pile/train' are not used
-    sim.setup_sim_scene_from_mesh_pose_list(mesh_pose_list, table=args.render_table)
+    sim = ClutterRemovalSim(args.scene, args.object_set , gui=args.sim_gui, data_root=args.data_root)
+    sim.setup_sim_scene_from_mesh_pose_list(mesh_pose_list, table=args.render_table, data_root=args.data_root)
 
     # Load the grasp
     pos = grasp_data_entry["x":"z"].to_numpy(np.single)
     rotation = Rotation.from_quat(grasp_data_entry["qx":"qw"].to_numpy(np.single))
     grasp = Grasp(Transform(rotation, pos), sim.gripper.max_opening_width)
     if args.debug:
-        scene_mesh = get_scene_from_mesh_pose_list(mesh_pose_list)
+        scene_mesh = get_scene_from_mesh_pose_list(mesh_pose_list, data_root=args.data_root)
     else:
         scene_mesh = None
     result, grasp_pc_local, grasp_pc = generate_gt_grasp_cloud(sim, render_settings, grasp, scene_mesh=scene_mesh, debug=args.debug)
 
-    if args.sim_gui:
-        sim.world.p.disconnect()
 
     if result:
-        if not args.debug:
-            ## Save grasp & surface point cloud
+        if args.debug:
+            return True
+        else:
+            ## Success. Save grasp & surface point cloud & optionally occupancy and affordance values
             grasp_id = grasp_data_entry['grasp_id']
-            # save grasp to another grasps_with_clouds csv
-            append_csv(args.csv_path,
-                    grasp_id, scene_id, grasp_data_entry["qx"], grasp_data_entry["qy"], grasp_data_entry["qz"], grasp_data_entry["qw"],
-                    grasp_data_entry['x'], grasp_data_entry['y'], grasp_data_entry['z'], grasp_data_entry['width'], grasp_data_entry['label'])
+            
+            if args.save_affrdnce_values is True:
+                # check if it is a successful grasp
+                if grasp_data_entry['label'] == 1:
+                    # get affordance of the grasp (scene must contain affnet dataset objects)
+                    affrdnce_labels = get_affordance(sim, grasp, mesh_pose_list) # affdnces are 0/1 labels for each aff class
+                else:
+                    # unsuccessful grasp. Set all affordances to 0
+                    affrdnce_labels = [int(0)] * len(affrdnce_label_dict.keys())
+                # save grasp, affordance to another grasps_with_clouds csv
+                append_csv(args.csv_path,
+                        grasp_id, scene_id, grasp_data_entry["qx"], grasp_data_entry["qy"], grasp_data_entry["qz"], grasp_data_entry["qw"],
+                        grasp_data_entry['x'], grasp_data_entry['y'], grasp_data_entry['z'], grasp_data_entry['width'], grasp_data_entry['label'],
+                        *affrdnce_labels)
+                    
+            else:    
+                # save grasp to another grasps_with_clouds csv
+                append_csv(args.csv_path,
+                        grasp_id, scene_id, grasp_data_entry["qx"], grasp_data_entry["qy"], grasp_data_entry["qz"], grasp_data_entry["qw"],
+                        grasp_data_entry['x'], grasp_data_entry['y'], grasp_data_entry['z'], grasp_data_entry['width'], grasp_data_entry['label'])
+            
             # save surface point cloud
-            surface_pc_path = args.raw_root / "grasp_point_clouds_noisy" / f"{grasp_id}.npz"
+            surface_pc_path = args.raw_root / "grasp_point_clouds" / f"{grasp_id}.npz"
             np.savez_compressed(surface_pc_path, pc=grasp_pc)
             
             if args.save_occ_values:
                 # Also get occupancies of the points and save these occupancy values
-                scene, mesh_list = get_scene_from_mesh_pose_list(mesh_pose_list, return_list=True)
+                scene, mesh_list = get_scene_from_mesh_pose_list(mesh_pose_list, return_list=True, data_root=args.data_root)
                 points, occ = get_occ_specific_points(mesh_list, grasp_pc)
 
                 # save occupancy values
-                surface_pc_occ_path = args.raw_root / "occ_grasp_point_clouds_noisy" / f"{grasp_id}.npz"
+                surface_pc_occ_path = args.raw_root / "occ_grasp_point_clouds" / f"{grasp_id}.npz"
                 np.savez_compressed(surface_pc_occ_path, points=points, occ=occ)
-        
-        return True
+
+            if args.sim_gui:
+                sim.world.p.disconnect()
+
+            return True
     else:
         # Points are too few! Skipping this grasp...
         return False
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser("Generate surface point clouds for each grasp")
+    parser = argparse.ArgumentParser("Generate surface point clouds for each grasp. Assign affordance to succesful grasps")
     parser.add_argument("--raw_root", type=Path)
+    parser.add_argument("--data_root", type=Path, default="", help="Root directory for the dataset obj files")
     parser.add_argument("--debug", type=bool, default=False)
-    parser.add_argument("--scene", type=str, choices=["pile", "packed"], default="pile")
+    parser.add_argument("--scene", type=str, choices=["pile", "packed", "egad", "affnet"], default="pile")
     parser.add_argument("--object_set", type=str, default="pile/train")
     parser.add_argument("--num_proc", type=int, default=1)
     parser.add_argument("--three_cameras", type=bool, default=True)
@@ -82,7 +101,8 @@ if __name__ == "__main__":
     parser.add_argument("--max_points", type=int, default=1023)
     parser.add_argument("--min_points", type=int, default=50)
     parser.add_argument("--add_noise", type=bool, default='', help="Add dex noise to point clouds and depth images")
-    parser.add_argument("--save_occ_values", type=bool, default='', help="Also save the occupancy values of the grasp clpud")    
+    parser.add_argument("--save_affrdnce_values", type=bool, default='', help="Also save the affordances of the grasps using our 3DGraspAffNet dataset")
+    parser.add_argument("--save_occ_values", type=bool, default='', help="Also save the occupancy values of the grasp cloud")
     parser.add_argument("--sim_gui", type=bool, default=False)
     args, _ = parser.parse_known_args()
 
@@ -113,17 +133,21 @@ if __name__ == "__main__":
         df.insert(0,'grasp_id',df.index)
     if not args.debug:
         # Create a directory for storing grasp point clouds
-        os.makedirs(args.raw_root / "grasp_point_clouds_noisy", exist_ok=True)
-        if args.save_occ_values == True:
-            os.makedirs(args.raw_root / "occ_grasp_point_clouds_noisy", exist_ok=True)
-        # Crate another csv file for storing grasps that have point clouds
-        args.csv_path = args.raw_root / "grasps_gpg_balanced_with_clouds_noisy.csv"
+        os.makedirs(args.raw_root / "grasp_point_clouds", exist_ok=True)
+        if args.save_occ_values is True:
+            os.makedirs(args.raw_root / "occ_grasp_point_clouds", exist_ok=True)
+        # Create another csv file for storing grasps that have point clouds
+        args.csv_path = args.raw_root / "grasps_balanced_with_clouds.csv"
         if args.csv_path.exists():
             print("[Error]: CSV file with same name already exists. Exiting...")
             exit()
+        csv_header = ["grasp_id", "scene_id", "qx", "qy", "qz", "qw", "x", "y", "z", "width", "label"]
+        if args.save_affrdnce_values is True:
+            for affdnce_class in affrdnce_label_dict.keys():
+                csv_header.append(affdnce_class)
         create_csv(
             args.csv_path,
-            ["grasp_id", "scene_id", "qx", "qy", "qz", "qw", "x", "y", "z", "width", "label"],
+            csv_header,
         )
 
     global g_completed_jobs
@@ -140,7 +164,7 @@ if __name__ == "__main__":
         indices = [np.random.randint(len(df))]
         results = Parallel(n_jobs=args.num_proc)(delayed(generate_from_existing_grasps)(df.loc[index], args, render_settings) for index in indices)
     else:
-        results = Parallel(n_jobs=args.num_proc)(delayed(generate_from_existing_grasps)(df.loc[index], args, render_settings) for index in range(len(df)))
+        results = Parallel(n_jobs=args.num_proc)(delayed(generate_from_existing_grasps)(df.loc[index], args, render_settings) for index in tqdm(range(len(df))))
     
     for result in results:
         g_completed_jobs.append(result)

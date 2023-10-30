@@ -114,7 +114,7 @@ def generate_from_existing_scene(mesh_pose_list_path, args):
     sim = ClutterRemovalSim('pile', 'pile/train', gui=args.sim_gui, gripper_type=args.gripper) # parameters 'pile' and 'pile/train' are not used
     mesh_pose_list = np.load(mesh_pose_list_path, allow_pickle=True)['pc']
     scene_id = os.path.basename(mesh_pose_list_path)[:-4] # scene id without .npz extension
-    sim.setup_sim_scene_from_mesh_pose_list(mesh_pose_list)
+    sim.setup_sim_scene_from_mesh_pose_list(mesh_pose_list, data_root=args.data_root)
     sim.save_state()
 
     ## deprecated
@@ -279,7 +279,7 @@ if __name__ == "__main__":
     parser.add_argument("--root", type=Path)
     parser.add_argument("--use_previous_scenes", type=bool, default='')
     parser.add_argument("--previous_root", type=Path, default="")
-    parser.add_argument("--data_root", type=Path, default="")    
+    parser.add_argument("--data_root", type=Path, default="", help="Root directory for the dataset obj files")
     parser.add_argument("--scene", type=str, choices=["pile", "packed", "egad", "affnet"], default="pile")
     parser.add_argument("--object_set", type=str, default="pile/train")
     parser.add_argument("--gripper", type=str, default='franka')
