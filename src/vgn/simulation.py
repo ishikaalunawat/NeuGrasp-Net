@@ -69,7 +69,7 @@ class ClutterRemovalSim(object):
         try:
             with open(aff_path, 'rb') as f:
                 self.aff_dataset = pkl.load(f)
-                print("[Loaded affnet dataset dict]")
+                # print("[Loaded affnet dataset dict]")
         except Exception as exc:
             raise ValueError('Affnet dataset dict not found') from exc
 

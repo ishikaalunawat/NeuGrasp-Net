@@ -12,10 +12,9 @@ affrdnce_label_dict = {
 }
 
 
-def get_affordance(sim, grasp, mesh_pose_list):
+def get_affordance(sim, aff_dataset, grasp, mesh_pose_list):
     # load correspoinding pointcloud from affnet dataset
 
-    aff_dataset = sim.aff_dataset
     # # DEBUG:
     # print("Loaded dataset with {} objects".format(aff_dataset['num_objects']))
     # print("Num of semantic classes: ", len(aff_dataset["semantic_classes"]))

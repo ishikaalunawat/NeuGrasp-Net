@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 import argparse
 import numpy as np
+import pickle as pkl
 from tqdm import tqdm
 
 from vgn.io import *
@@ -9,7 +10,7 @@ from vgn.perception import *
 from vgn.grasp import Grasp
 from vgn.simulation import ClutterRemovalSim
 from vgn.utils.transform import Rotation, Transform
-from vgn.utils.implicit import get_scene_from_mesh_pose_list, as_mesh, get_occ_specific_points
+from vgn.utils.implicit import get_scene_from_mesh_pose_list, as_mesh, get_occ_specific_points, get_occ_and_sem_class_specific_points
 from vgn.grasp_renderer import generate_gt_grasp_cloud
 from vgn.assign_grasp_affordance import affrdnce_label_dict, get_affordance
 
@@ -23,7 +24,7 @@ def generate_from_existing_grasps(grasp_data_entry, args, render_settings):
     mesh_pose_list = np.load(args.raw_root / "mesh_pose_list" / file_name, allow_pickle=True)['pc']
 
     # Re-create the saved simulation
-    sim = ClutterRemovalSim(args.scene, args.object_set , gui=args.sim_gui, data_root=args.data_root)
+    sim = ClutterRemovalSim('pile', 'pile/train' , gui=args.sim_gui, data_root=args.data_root) # args 'pile' and 'pile/train' are not used here
     sim.setup_sim_scene_from_mesh_pose_list(mesh_pose_list, table=args.render_table, data_root=args.data_root)
 
     # Load the grasp
@@ -48,7 +49,7 @@ def generate_from_existing_grasps(grasp_data_entry, args, render_settings):
                 # check if it is a successful grasp
                 if grasp_data_entry['label'] == 1:
                     # get affordance of the grasp (scene must contain affnet dataset objects)
-                    affrdnce_labels = get_affordance(sim, grasp, mesh_pose_list) # affdnces are 0/1 labels for each aff class
+                    affrdnce_labels = get_affordance(sim, args.aff_dataset, grasp, mesh_pose_list) # affdnces are 0/1 labels for each aff class
                 else:
                     # unsuccessful grasp. Set all affordances to 0
                     affrdnce_labels = [int(0)] * len(affrdnce_label_dict.keys())
@@ -69,13 +70,20 @@ def generate_from_existing_grasps(grasp_data_entry, args, render_settings):
             np.savez_compressed(surface_pc_path, pc=grasp_pc)
             
             if args.save_occ_values:
-                # Also get occupancies of the points and save these occupancy values
-                scene, mesh_list = get_scene_from_mesh_pose_list(mesh_pose_list, return_list=True, data_root=args.data_root)
-                points, occ = get_occ_specific_points(mesh_list, grasp_pc)
+                # Also get occupancies of the points and save these occupancy values. Optionally also save the semantic class labels
 
-                # save occupancy values
                 surface_pc_occ_path = args.raw_root / "occ_grasp_point_clouds" / f"{grasp_id}.npz"
-                np.savez_compressed(surface_pc_occ_path, points=points, occ=occ)
+                scene, mesh_list = get_scene_from_mesh_pose_list(mesh_pose_list, return_list=True, data_root=args.data_root)
+                
+                if args.save_occ_semantics:
+                    # get semantic class labels from affnet dataset
+                    points, occ, sem = get_occ_and_sem_class_specific_points(args.aff_dataset, mesh_pose_list, mesh_list, grasp_pc)
+                    # save occupancy values and semantic class labels
+                    np.savez_compressed(surface_pc_occ_path, points=points, occ=occ, sem=sem)
+                else:
+                    points, occ = get_occ_specific_points(mesh_list, grasp_pc)
+                    # save occupancy values
+                    np.savez_compressed(surface_pc_occ_path, points=points, occ=occ)
 
             if args.sim_gui:
                 sim.world.p.disconnect()
@@ -103,6 +111,7 @@ if __name__ == "__main__":
     parser.add_argument("--add_noise", type=bool, default='', help="Add dex noise to point clouds and depth images")
     parser.add_argument("--save_affrdnce_values", type=bool, default='', help="Also save the affordances of the grasps using our 3DGraspAffNet dataset")
     parser.add_argument("--save_occ_values", type=bool, default='', help="Also save the occupancy values of the grasp cloud")
+    parser.add_argument("--save_occ_semantics", type=bool, default='', help="Also save the occupancy semantics of the grasp cloud")
     parser.add_argument("--sim_gui", type=bool, default=False)
     args, _ = parser.parse_known_args()
 
@@ -143,6 +152,12 @@ if __name__ == "__main__":
             exit()
         csv_header = ["grasp_id", "scene_id", "qx", "qy", "qz", "qw", "x", "y", "z", "width", "label"]
         if args.save_affrdnce_values is True:
+            # load the affnet dataset
+            affnet_root = Path(args.data_root) / 'data/3DGraspAff/'
+            aff_path = os.path.join(affnet_root, 'filt_scaled_anntd_remapped_full_shape_'+args.object_set+'_data.pkl')
+            with open(aff_path, 'rb') as f:
+                args.aff_dataset = pkl.load(f)
+            # add affordance labels to csv header
             for affdnce_class in affrdnce_label_dict.keys():
                 csv_header.append(affdnce_class)
         create_csv(

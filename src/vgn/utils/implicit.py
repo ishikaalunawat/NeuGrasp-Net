@@ -7,8 +7,22 @@ try:
 except:
     print('import libmesh failed!')
 
+
 n_iou_points = 100000
 n_iou_points_files = 10
+
+
+semantic_label_dict = {
+        'None': 55,
+        'Knife': 0,
+        'Bag': 1,
+        'Bottle': 2,
+        'Scissors': 3,
+        'Mug': 4,
+        'Earphone': 5,
+        'Hat': 6
+}
+
 
 ## occupancy related code
 def as_mesh(scene_or_mesh):
@@ -109,9 +123,31 @@ def get_occ_specific_points(mesh_list, points):
     
     return points, occ
     
-def get_occ_from_world(world, object_set):
+def get_occ_and_sem_class_specific_points(aff_dataset, mesh_pose_list, mesh_list, points):
+    num_point = points.shape[0]
+    occ = np.zeros(num_point).astype(bool)
+    sem = semantic_label_dict['None'] * np.ones(num_point).astype(int)
+    
+    for i, mesh in enumerate(mesh_list):
+        mesh_path = mesh_pose_list[i][0]
+        # get obj_id
+        shape_id = mesh_path.split('/')[6]
+        # check which sem class has this shapeid
+        for sem_class in aff_dataset['semantic_classes']:
+            if shape_id in aff_dataset['data'][sem_class]: # if key exists
+                break
+
+        # check occupancy
+        occi = check_mesh_contains(mesh, points)
+        occ = occ | occi
+        # set semantic class label where occupied
+        sem[occi] = semantic_label_dict[sem_class]
+    
+    return points, occ, sem
+
+def get_occ_from_world(world, object_set, data_root=None):
     mesh_pose_list = get_mesh_pose_list_from_world(world, object_set)
-    scene, mesh_list = get_scene_from_mesh_pose_list(mesh_pose_list, return_list=True)
+    scene, mesh_list = get_scene_from_mesh_pose_list(mesh_pose_list, return_list=True, data_root=data_root)
     points, occ = sample_iou_points(mesh_list, scene.bounds, n_iou_points * n_iou_points_files)
     return points, occ
 
