@@ -100,19 +100,22 @@ def get_scene_from_mesh_pose_list(mesh_pose_list, scene_as_mesh=True, return_lis
     else:
         return scene
 
-def sample_iou_points(mesh_list, bounds, num_point, padding=0.02, uniform=False, size=0.3):
+def sample_iou_points(mesh_list, bounds, num_point, padding=0.02, uniform=False, size=0.3, aff_dataset=None, mesh_pose_list=None):
     points = np.random.rand(num_point, 3).astype(np.float32)
     if uniform:
         points *= size + 2 * padding
         points -= padding
     else:
         points = points * (bounds[[1]] + 2 * padding - bounds[[0]]) + bounds[[0]] - padding
-    occ = np.zeros(num_point).astype(bool)
-    for mesh in mesh_list:
-        occi = check_mesh_contains(mesh, points)
-        occ = occ | occi
-
-    return points, occ
+    
+    if aff_dataset is not None:
+        # get occ and sem classes
+        points, occ, sem = get_occ_and_sem_class_specific_points(aff_dataset, mesh_pose_list, mesh_list, points)
+        return points, occ, sem
+    else:
+        # get occ
+        points, occ = get_occ_specific_points(mesh_list, points)
+        return points, occ
 
 def get_occ_specific_points(mesh_list, points):
     num_point = points.shape[0]

@@ -40,3 +40,6 @@ python scripts/generate_data_gpg_parallel.py --root /work/scratch/sj93qicy/potat
 
 # affdnce assignment
 python -u GIGA-6DoF/scripts/generate_data_grasp_surface_clouds.py --scene affnet --object_set train --raw_root /home/sjauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/3DGraspAff/data_affnet_train_random_raw_GPG_60 --num_proc 2 --save_occ_values True --save_affrdnce_values True --save_occ_semantics True --add_noise True --data_root /home/sjauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/
+
+# affnet occ with sematics
+python -u GIGA-6DoF/scripts/save_occ_data_parallel.py /home/sjauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/3DGraspAff/test_data_affnet_train_random_raw_GPG_60 100000 2 --num_proc 2 --save_occ_semantics True --data_root /home/sjauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/
