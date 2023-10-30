@@ -29,7 +29,7 @@ def main(args, rank):
     np.random.seed()
     seed = np.random.randint(0, 1000) + rank
     np.random.seed(seed)
-    sim = ClutterRemovalSim(args.scene, args.object_set, gui=args.sim_gui, gripper_type=args.gripper)
+    sim = ClutterRemovalSim(args.scene, args.object_set, gui=args.sim_gui, gripper_type=args.gripper, data_root=args.data_root)
     scenes_per_worker = args.num_scenes // args.num_proc
     pbar = tqdm(total=scenes_per_worker, disable=rank != 0)
 
@@ -68,7 +68,7 @@ def main(args, rank):
                 write_point_cloud(args.root, scene_id, mesh_pose_list, name="mesh_pose_list")
 
         # Get scene point cloud and normals using ground truth meshes
-        scene_mesh = get_scene_from_mesh_pose_list(mesh_pose_list)
+        scene_mesh = get_scene_from_mesh_pose_list(mesh_pose_list, data_root=args.data_root)
         o3d_scene_mesh = scene_mesh.as_open3d
         o3d_scene_mesh.compute_vertex_normals()
         pc = o3d_scene_mesh.sample_points_uniformly(number_of_points=1000)
@@ -153,7 +153,7 @@ def generate_from_existing_scene(mesh_pose_list_path, args):
         write_point_cloud(args.root, scene_id, mesh_pose_list, name="mesh_pose_list") # reusing write_point_cloud function!
 
     # Get scene point cloud and normals using ground truth meshes
-    scene_mesh = get_scene_from_mesh_pose_list(mesh_pose_list)
+    scene_mesh = get_scene_from_mesh_pose_list(mesh_pose_list, data_root=args.data_root)
     o3d_scene_mesh = scene_mesh.as_open3d
     o3d_scene_mesh.compute_vertex_normals()
     pc = o3d_scene_mesh.sample_points_uniformly(number_of_points=1000)
@@ -279,6 +279,7 @@ if __name__ == "__main__":
     parser.add_argument("--root", type=Path)
     parser.add_argument("--use_previous_scenes", type=bool, default='')
     parser.add_argument("--previous_root", type=Path, default="")
+    parser.add_argument("--data_root", type=Path, default="")    
     parser.add_argument("--scene", type=str, choices=["pile", "packed", "egad", "affnet"], default="pile")
     parser.add_argument("--object_set", type=str, default="pile/train")
     parser.add_argument("--gripper", type=str, default='franka')
