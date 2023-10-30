@@ -11,14 +11,12 @@ from joblib import Parallel, delayed
 
 from vgn.utils.implicit import get_scene_from_mesh_pose_list, sample_iou_points
 
-def sample_occ(mesh_pose_list_path, num_point, uniform, data_root=''):
-    mesh_pose_list = np.load(mesh_pose_list_path, allow_pickle=True)['pc']
+def sample_occ(mesh_pose_list, num_point, uniform, data_root=''):
     scene, mesh_list = get_scene_from_mesh_pose_list(mesh_pose_list, return_list=True, data_root=data_root)
     points, occ = sample_iou_points(mesh_list, scene.bounds, num_point, uniform=uniform)
     return points, occ
 
-def sample_occ_and_sem_class(aff_dataset, mesh_pose_list_path, num_point, uniform, data_root=''):
-    mesh_pose_list = np.load(mesh_pose_list_path, allow_pickle=True)['pc']
+def sample_occ_and_sem_class(aff_dataset, mesh_pose_list, num_point, uniform, data_root=''):
     scene, mesh_list = get_scene_from_mesh_pose_list(mesh_pose_list, return_list=True, data_root=data_root)
     points, occ, sem = sample_iou_points(mesh_list, scene.bounds, num_point, uniform=uniform, aff_dataset=aff_dataset, mesh_pose_list=mesh_pose_list)
     return points, occ, sem
@@ -31,9 +29,18 @@ def save_occ(mesh_pose_list_path, args):
         aff_path = os.path.join(affnet_root, 'filt_scaled_anntd_remapped_full_shape_'+args.object_set+'_data.pkl')
         with open(aff_path, 'rb') as f:
             aff_dataset = pkl.load(f)
-        points, occ, sem = sample_occ_and_sem_class(aff_dataset, mesh_pose_list_path, args.num_point_per_file * args.num_file, args.uniform, data_root=args.data_root)
+        
+        mesh_pose_list = np.load(mesh_pose_list_path, allow_pickle=True)['pc']
+        if len(mesh_pose_list) == 0:
+            print('No meshes in %s' % mesh_pose_list_path) 
+            return
+        points, occ, sem = sample_occ_and_sem_class(aff_dataset, mesh_pose_list, args.num_point_per_file * args.num_file, args.uniform, data_root=args.data_root)
     else:
-        points, occ = sample_occ(mesh_pose_list_path, args.num_point_per_file * args.num_file, args.uniform, data_root=args.data_root)
+        mesh_pose_list = np.load(mesh_pose_list_path, allow_pickle=True)['pc']
+        if len(mesh_pose_list) == 0:
+            print('No meshes in %s' % mesh_pose_list_path) 
+            return
+        points, occ = sample_occ(mesh_pose_list, args.num_point_per_file * args.num_file, args.uniform, data_root=args.data_root)
     points = points.astype(np.float16).reshape(args.num_file, args.num_point_per_file, 3)
     occ = occ.reshape(args.num_file, args.num_point_per_file)
     name = os.path.basename(mesh_pose_list_path)[:-4]

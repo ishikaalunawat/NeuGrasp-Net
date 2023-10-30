@@ -50,6 +50,10 @@ def main(args, rank):
         object_count = np.random.poisson(OBJECT_COUNT_LAMBDA) + 1
         sim.reset(object_count)
         sim.save_state()
+        # Check if scene has more objects than just the table
+        if len(sim.world.bodies) <= 1:
+            print('No objects in scene! Skipping...')
+            continue
 
         # render synthetic depth images
         # n = MAX_VIEWPOINT_COUNT
