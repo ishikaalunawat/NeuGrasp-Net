@@ -232,7 +232,7 @@ def prepare_batch(batch, device, net_with_occ_semantics):
     occ_value = occ_value.float().to(device)
 
     if net_with_occ_semantics:
-        sem_value = sem_value.float().to(device)
+        sem_value = sem_value.long().to(device)
         return pc, (label, aff_labels, occ_value, sem_value), (pos, rotations, grasps_pc_local, grasps_pc), pos_occ
     else:
         return pc, (label, aff_labels, occ_value), (pos, rotations, grasps_pc_local, grasps_pc), pos_occ
@@ -268,8 +268,8 @@ def loss_fn(y_pred, y):
     loss_qual = _qual_loss_fn(label_pred, label).mean()
     loss_affrdnce = _affrdnce_loss_fn(aff_preds, affs, label.bool()) # only consider loss for postitive grasp labels. No mean here since dice loss is over batch
     loss_occ = _occ_loss_fn(occ_pred, occ).mean()
-    loss_sem = (occ * _sem_loss_fn(sem_pred, sem)).mean() # only consider loss for occupied points
-    loss = loss_qual + loss_affrdnce + (2*loss_occ) + loss_sem
+    loss_sem = _sem_loss_fn(sem_pred, sem, occ.bool()) # only consider loss for occupied points. Mean within function
+    loss = loss_qual + loss_affrdnce + (2*loss_occ) + 0.5*loss_sem
     loss_dict = {'loss_qual': loss_qual,
                 'loss_affrdnce': loss_affrdnce,
                 'loss_occ': loss_occ,
@@ -288,6 +288,8 @@ def _affrdnce_loss_fn(pred, target, labels_to_consider):
 
     pred = pred[labels_to_consider]
     target = target[labels_to_consider]
+    if pred.shape[0] == 0:
+        return 0.0
 
     temp1 = -torch.mul(pred,
                     torch.mul(1-target, torch.log(1-pred+1e-6)))
@@ -316,7 +318,11 @@ def _affrdnce_loss_fn(pred, target, labels_to_consider):
 def _occ_loss_fn(pred, target):
     return F.binary_cross_entropy(pred, target, reduction="none").mean(-1)
 
-def _sem_loss_fn(pred, target):
+def _sem_loss_fn(pred, target, labels_to_consider):
+    pred = pred[labels_to_consider]
+    target = target[labels_to_consider]
+    if pred.shape[0] == 0:
+        return 0.0
     return F.cross_entropy(pred, target, reduction="none").mean(-1)
 
 

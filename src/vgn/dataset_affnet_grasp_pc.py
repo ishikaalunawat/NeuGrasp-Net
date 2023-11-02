@@ -80,10 +80,10 @@ class DatasetAffnetGraspPC(torch.utils.data.Dataset):
             grasp_pc_occ_points = grasp_pc_occ_points / self.size - 0.5
             # Make sure size is always the same. Pad zeros
             if grasp_pc_occ_points.shape[0] < self.max_points_grasp_pc:
-                grasp_pc_occ = np.hstack((grasp_pc_occ, np.zeros(self.max_points_grasp_pc - grasp_pc_occ_points.shape[0], dtype=bool)))
-                grasp_pc_occ_points = np.vstack((grasp_pc_occ_points, np.zeros((self.max_points_grasp_pc - grasp_pc_occ_points.shape[0], 3))))
                 if self.use_occ_semantics:
                     grasp_occ_sem = np.hstack((grasp_occ_sem, semantic_label_dict['None']*np.ones(self.max_points_grasp_pc - grasp_pc_occ_points.shape[0], dtype=int)))         
+                grasp_pc_occ = np.hstack((grasp_pc_occ, np.zeros(self.max_points_grasp_pc - grasp_pc_occ_points.shape[0], dtype=bool)))
+                grasp_pc_occ_points = np.vstack((grasp_pc_occ_points, np.zeros((self.max_points_grasp_pc - grasp_pc_occ_points.shape[0], 3))))
             occ_points = np.concatenate([occ_points, grasp_pc_occ_points])
             occ = np.concatenate([occ, grasp_pc_occ])
             if self.use_occ_semantics:
@@ -92,7 +92,7 @@ class DatasetAffnetGraspPC(torch.utils.data.Dataset):
         grasp_query = (pos, rot, grasp_pc_local, grasp_pc)
         
         if self.use_occ_semantics:
-            return pc, y, grasp_query, occ_points, occ, sem, aff_labels
+            return pc, y, grasp_query, occ_points, occ, sem
         else:
             return pc, y, grasp_query, occ_points, occ
 
