@@ -5,7 +5,6 @@ import numpy as np
 
 from vgn.io import *
 from vgn.perception import *
-from vgn.utils.transform import Rotation, Transform
 
 def main(args):
     root = args.root

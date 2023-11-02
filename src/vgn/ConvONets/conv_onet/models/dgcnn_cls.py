@@ -5,7 +5,7 @@ from .utils.dgcnn_util import get_graph_feature
 
 
 class DGCNN(nn.Module):
-    def __init__(self, input_dim=99, num_class=1, n_knn=20, use_bnorm=False):#, normal_channel=False):
+    def __init__(self, input_dim=99, num_class=1, n_knn=20, use_bnorm=False, multilabel=False):#, normal_channel=False):
         super(DGCNN, self).__init__()
         # self.args = args
         self.n_knn = n_knn # args.n_knn
@@ -48,7 +48,12 @@ class DGCNN(nn.Module):
         self.linear2 = nn.Linear(512, 256)
         
         self.dp2 = nn.Dropout(p=0.5)
-        self.linear3 = nn.Linear(256, num_class)
+        
+        self.multilabel = multilabel
+        if multilabel:
+            raise NotImplementedError
+        else:
+            self.linear3 = nn.Linear(256, num_class)
 
     def forward(self, x):
         batch_size = x.size(0)

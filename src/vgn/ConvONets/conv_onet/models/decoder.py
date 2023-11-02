@@ -413,7 +413,8 @@ class PickedPointDecoder(nn.Module):
                  concat_local_cloud=True,
                  sample_mode='bilinear', 
                  padding=0.1,
-                 concat_feat=True):
+                 concat_feat=True,
+                 multilabel=False):
         super().__init__()
         
         self.dim = dim # input
@@ -430,13 +431,15 @@ class PickedPointDecoder(nn.Module):
 
         self.fc_g = nn.Linear(dim, c_dim) # Linear layer to encode input grasp center and orientation
         if point_network == 'pointnet':
-            self.point_network = PointNet(input_dim=c_dim, num_class=out_dim)
+            self.point_network = PointNet(input_dim=c_dim, num_class=out_dim, multilabel=multilabel)
         elif point_network == 'pointnet_resnet':
             # TODO
             # self.point_network = PointNetResNet(input_dim=c_dim, num_class=out_dim)
             raise NotImplementedError
         elif point_network == 'dgcnn':
-            self.point_network = DGCNN(input_dim=c_dim, num_class=out_dim, n_knn=20)
+            self.point_network = DGCNN(input_dim=c_dim, num_class=out_dim, n_knn=20, multilabel=multilabel)
+        else:
+            raise NotImplementedError
 
     def sample_plane_feature(self, p, c, plane='xz'):
         xy = normalize_coordinate(p.clone(), plane=plane, padding=self.padding) # normalize to the range of (0, 1)
