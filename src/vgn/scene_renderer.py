@@ -208,8 +208,8 @@ def get_scene_surf_render(sim, size, resolution, net, encoded_tsdf, device, args
     ## Render the scene using the occupancy network with the same extrinsics
 
     # Neural render camera settings
-    width = 32
-    height = 32
+    width = 64
+    height = 64
     width_fov  = np.deg2rad(60) # angular FOV (120 by default)
     height_fov = np.deg2rad(60) # angular FOV (120 by default)
     f_x = width  / (np.tan(width_fov / 2.0))

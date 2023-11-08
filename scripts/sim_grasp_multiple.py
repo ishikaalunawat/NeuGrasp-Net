@@ -12,11 +12,13 @@ from vgn.utils.misc import set_random_seed
 def main(args):
 
     if args.type in ['giga', 'giga_hr', 'giga_hr_deeper', 'giga_aff', 'neu_grasp_pn', 'neu_grasp_pn_deeper', 'neu_grasp_pn_deeper4', 'pointnetgpd',
-                     'neu_grasp_pn_no_local_cloud', 'neu_grasp_dgcnn', 'neu_grasp_dgcnn_deeper', 'neu_grasp_vn_pn_pn_deeper']:
+                     'neu_grasp_pn_no_local_cloud', 'neu_grasp_dgcnn', 'neu_grasp_dgcnn_deeper', 'neu_grasp_vn_pn_pn_deeper',
+                     'neu_grasp_pn_affnet', 'neu_grasp_pn_affnet_sem']:
         grasp_planner = VGNImplicit(args.model,
                                     args.type,
                                     best=args.best,
                                     qual_th=args.qual_th,
+                                    aff_thresh=args.aff_thresh,
                                     force_detection=args.force,
                                     seen_pc_only=args.seen_pc_only,
                                     out_th=0.1,
@@ -53,6 +55,7 @@ def main(args):
             n=args.num_view,
             num_rounds=args.num_rounds,
             seed=seed,
+            aff_thresh=args.aff_thresh,
             sim_gui=args.sim_gui,
             result_path=args.result_path,
             add_noise=args.add_noise,
@@ -133,6 +136,7 @@ if __name__ == "__main__":
     parser.add_argument("--sim-gui", action="store_true")
     # parser.add_argument("--grad-refine", action="store_true")
     parser.add_argument("--qual_th", type=float, default=0.5)
+    parser.add_argument("--aff_thresh", type=float, default=0.5)
     parser.add_argument("--eval_geo",
                         action="store_true",
                         help='whether evaluate geometry prediction')

@@ -12,6 +12,61 @@ affrdnce_label_dict = {
 }
 
 
+affrdnce_label_color_dict = {
+    'handover': np.array([125/255, 202/255, 92/255]),
+    'cut': np.array([1.0, 0.0, 0.0]), # red
+    'stab': np.array([1.0, 0.0, 0.0]), # red
+    'lift': np.array([1.0, 1.0, 0.0]), # yellow
+    'wrap': np.array([0.0, 1.0, 0.0]), # green
+    'pour': np.array([0.0, 1.0, 1.0]), # light blue
+    'wear': np.array([0.0, 0.0, 1.0]), # dark blue
+}
+
+
+def aff_labels_to_names(aff_labels):
+    aff_names = []
+    for key, value in affrdnce_label_dict.items():
+        if value in aff_labels:
+            aff_names.append(key)
+    return aff_names
+
+def aff_labels_to_colors(aff_labels):
+    aff_colors = []
+    for key, value in affrdnce_label_dict.items():
+        if value in aff_labels:
+            aff_colors.append(affrdnce_label_color_dict[key])
+    return aff_colors
+
+def viz_color_legend():
+    # TODO: Do this in a better way
+    # import matplotlib.pyplot as plt
+    # import matplotlib.patches as mpatches
+    # import time
+    # # Create a list to hold the legend entries
+    # legend_entries = []
+    # for label, color in affrdnce_label_color_dict.items():
+    #     # Create a patch for each entry in the dictionary
+    #     legend_entries.append(mpatches.Patch(color=color, label=label))
+    # # Plot dummy
+    # plt.figure(figsize=(16, 6))
+    # plt.axis('off')
+    # # Add the legend to the plot
+    # plt.legend(handles=legend_entries, loc='center', frameon=False)
+    # # Display the plot non-blocking
+    # plt.show()
+    # time.sleep(0.01)
+
+    # get legend image from path using open3d
+    pass
+    # legend_o3d_vis = o3d.visualization.Visualizer()
+    # legend_img = o3d.io.read_image('aff_legend.png')
+    # create a geometry
+    # legend_img_geom = o3d.geometry.Image(legend_img)
+    # legend_o3d_vis.create_window()
+    # legend_o3d_vis.add_geometry(legend_img_geom)
+    # legend_o3d_vis.poll_events()
+    
+
 def get_affordance(sim, aff_dataset, grasp, mesh_pose_list):
     # load correspoinding pointcloud from affnet dataset
 

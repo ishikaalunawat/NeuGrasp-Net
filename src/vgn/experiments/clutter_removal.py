@@ -19,6 +19,8 @@ from vgn.simulation import ClutterRemovalSim
 from vgn.utils.transform import Rotation, Transform
 from vgn.utils.implicit import get_mesh_pose_list_from_world, get_scene_from_mesh_pose_list
 
+from vgn.assign_grasp_affordance import affrdnce_label_dict, aff_labels_to_names, viz_color_legend, get_affordance
+
 MAX_CONSECUTIVE_FAILURES = 2
 MAX_SKIPS = 3
 
@@ -36,6 +38,7 @@ def run(
     N=None,
     num_rounds=40,
     seed=1,
+    aff_thresh=0.5,
     sim_gui=False,
     result_path=None,
     add_noise=False,
@@ -66,6 +69,8 @@ def run(
         o3d_vis = o3d.visualization.Visualizer()
         o3d_vis.create_window()
         first_call = True
+        # For affordance, viz the affordance color legend. TODO: Do this in a better way
+        viz_color_legend()
         # import pdb; pdb.set_trace()
         # vc = o3d_vis.get_view_control()
         # cam_params = vc.convert_to_pinhole_camera_parameters()
@@ -84,6 +89,10 @@ def run(
     success = 0
     seen_success = 0
     unseen_success = 0
+    aff_tp = np.zeros(len(affrdnce_label_dict.keys())) # true positive
+    aff_fp = aff_tp.copy() # false positive
+    aff_tn = aff_tp.copy() # true negative
+    aff_fn = aff_tp.copy() # false negative
     left_objs = 0
     total_objs = 0
     cons_fail = 0
@@ -178,14 +187,14 @@ def run(
                 # Also return the scene mesh with or without grasps
                 mesh_pose_list = get_mesh_pose_list_from_world(sim.world, object_set)
                 scene_mesh = get_scene_from_mesh_pose_list(mesh_pose_list)
-                grasps, scores, unseen_flags, timings["planning"], visual_mesh = grasp_plan_fn(state, scene_mesh, sim=sim, debug_data=data_for_scene, seed=seed, o3d_vis=o3d_vis, first_call=first_call)
+                grasps, scores, affs, unseen_flags, timings["planning"], visual_mesh = grasp_plan_fn(state, scene_mesh, sim=sim, debug_data=data_for_scene, seed=seed, o3d_vis=o3d_vis, first_call=first_call)
                 first_call = False
                 # assert not visual_mesh.is_empty
                 # o3d.visualization.draw_geometries([visual_mesh.as_open3d])
                 # logger.log_mesh(scene_mesh, visual_mesh, f'round_{round_id:03d}_trial_{trial_id:03d}')
                 
             else:
-                grasps, scores, unseen_flags, timings["planning"] = grasp_plan_fn(state, sim=sim, debug_data=data_for_scene, seed=seed)
+                grasps, scores, affs, unseen_flags, timings["planning"] = grasp_plan_fn(state, sim=sim, debug_data=data_for_scene, seed=seed)
             planning_times.append(timings["planning"])
             total_times.append(timings["planning"] + timings["integration"])
 
@@ -193,11 +202,31 @@ def run(
                 # not enough candidate grasps were sampled OR no grasps above quality threshold were found
                 no_grasp += 1
                 skip_time += 1
+                print("No good grasps, skipping...")
                 continue  # no good grasps found, skip
+
+            # Check affordances:
+            # TODO: Get metrics for the affordances
+            # get assignment of grasps to affordances
+            affrdnce_labels = []
+            mesh_pose_list = get_mesh_pose_list_from_world(sim.world, object_set)
+            for grasp in grasps:
+                affrdnce_labels.append(get_affordance(sim, sim.aff_dataset, grasp, mesh_pose_list)) # affdnces are 0/1 labels for each aff class
+            affrdnce_labels = np.array(affrdnce_labels)
+            # get true positive, false positive, true negative, false negative
+            aff_tp += np.sum(affrdnce_labels * (affs > aff_thresh), axis=0)
+            aff_fp += np.sum(affrdnce_labels * (affs <= aff_thresh), axis=0)
+            aff_tn += np.sum((1 - affrdnce_labels) * (affs <= aff_thresh), axis=0)
+            aff_fn += np.sum((1 - affrdnce_labels) * (affs > aff_thresh), axis=0)
+            # Print the affordances of the best grasp
+            aff_vector = affs[0]
+            aff_values = np.where(aff_vector > aff_thresh)[0] # get indices where aff_vector > thresh
+            best_grasp_affs_text = aff_labels_to_names(aff_values)
+            print("[Grasp Affordances: ", best_grasp_affs_text)
 
             # execute grasp
             grasp, score, unseen_flag = grasps[0], scores[0], unseen_flags[0]
-            print(f"[Unseen grasp?: {unseen_flag}]")
+            # print(f"[Unseen grasp?: {unseen_flag}]")
             print("[BEST Score: %.2f]" % score)
             label, _ = sim.execute_grasp(grasp, allow_contact=True)
             print("[RESULT: %s]" % label)
@@ -229,10 +258,16 @@ def run(
                 break
         left_objs += sim.num_objects
     success_rate = 100.0 * success / cnt
+    affordance_accuracy = 100.0 * (aff_tp + aff_tn) / (aff_tp + aff_fp + aff_tn + aff_fn)
+    affordance_precision = 100.0 * aff_tp / (aff_tp + aff_fp)
+    affordance_recall = 100.0 * aff_tp / (aff_tp + aff_fn)
     seen_success_rate = 100.0 * seen_success / seen_cnt
     unseen_success_rate = 100.0 * unseen_success / unseen_cnt
     declutter_rate = 100.0 * success / total_objs
     print('Grasp success rate: %.2f %%, Declutter rate: %.2f %%' % (success_rate, declutter_rate))
+    print('Affordance accuracy: ', affordance_accuracy)
+    print('Affordance precision: ', affordance_precision)
+    print('Affordance recall: ', affordance_recall)
     print('Seen success rate: %.2f %%, Unseen success rate: %.2f %%' % (seen_success_rate, unseen_success_rate))
     print('Seen grasp count: %d, Unseen grasp count: %d' % (seen_cnt, unseen_cnt))
     print(f'Average planning time: {np.mean(planning_times)}, total time: {np.mean(total_times)}')
