@@ -117,16 +117,16 @@ def main(args):
             metrics[k] = Average(lambda out, sk=k: out[3][sk])
         
         # create ignite engines for training and validation
-        trainer = create_trainer(net, optimizer, scheduler, loss_fn, metrics, device, net_with_occ_semantics=True)
-        evaluator = create_evaluator(net, loss_fn, metrics, device, net_with_occ_semantics=True)
+        trainer = create_trainer(net, optimizer, scheduler, loss_fn, metrics, device, args.no_handover, net_with_occ_semantics=True)
+        evaluator = create_evaluator(net, loss_fn, metrics, device, args.no_handover, net_with_occ_semantics=True)
     else:
         LOSS_KEYS = ['loss_all', 'loss_qual', 'loss_affrdnce', 'loss_occ']
         for k in LOSS_KEYS:
             metrics[k] = Average(lambda out, sk=k: out[3][sk])
         
         # create ignite engines for training and validation
-        trainer = create_trainer(net, optimizer, scheduler, no_sem_loss_fn, metrics, device, net_with_occ_semantics=False)
-        evaluator = create_evaluator(net, no_sem_loss_fn, metrics, device, net_with_occ_semantics=False)
+        trainer = create_trainer(net, optimizer, scheduler, no_sem_loss_fn, metrics, device, args.no_handover, net_with_occ_semantics=False)
+        evaluator = create_evaluator(net, no_sem_loss_fn, metrics, device, args.no_handover, net_with_occ_semantics=False)
 
     # log training progress to the terminal
     ProgressBar(persist=True, ascii=True, dynamic_ncols=True, disable=args.silence).attach(trainer)    
@@ -254,7 +254,7 @@ def no_sem_loss_fn(y_pred, y):
     loss_qual = _qual_loss_fn(label_pred, label).mean()
     loss_affrdnce = _affrdnce_loss_fn(aff_preds, affs, label.bool()) # only consider loss for postitive grasp labels. No mean here since dice loss is over batch
     loss_occ = _occ_loss_fn(occ_pred, occ).mean()
-    loss = loss_qual + loss_affrdnce + (2*loss_occ)
+    loss = loss_qual + (3*loss_affrdnce) + (2*loss_occ)
     loss_dict = {'loss_qual': loss_qual,
                 'loss_affrdnce': loss_affrdnce,
                 'loss_occ': loss_occ,
@@ -269,7 +269,7 @@ def loss_fn(y_pred, y):
     loss_affrdnce = _affrdnce_loss_fn(aff_preds, affs, label.bool()) # only consider loss for postitive grasp labels. No mean here since dice loss is over batch
     loss_occ = _occ_loss_fn(occ_pred, occ).mean()
     loss_sem = _sem_loss_fn(sem_pred, sem, occ.bool()) # only consider loss for occupied points. Mean within function
-    loss = loss_qual + loss_affrdnce + (2*loss_occ) + 0.5*loss_sem
+    loss = loss_qual + (3*loss_affrdnce) + (2*loss_occ) + (1.5*loss_sem)
     loss_dict = {'loss_qual': loss_qual,
                 'loss_affrdnce': loss_affrdnce,
                 'loss_occ': loss_occ,
@@ -307,7 +307,7 @@ def _affrdnce_loss_fn(pred, target, labels_to_consider):
     cardinality_negative = torch.sum(2-pred-target, 0)
     dice_negative = (intersection_negative+1e-6) / \
         (cardinality_negative+1e-6)
-    temp3 = 1.0-dice_positive-dice_negative # Changed from 1.5 to 1.0
+    temp3 = 1.5-dice_positive-dice_negative # Change from 1.5 to 1.0?
 
     DICELoss = torch.mean(temp3) # mean over affrdnce types
 
@@ -326,13 +326,16 @@ def _sem_loss_fn(pred, target, labels_to_consider):
     return F.cross_entropy(pred, target, reduction="none").mean(-1)
 
 
-def create_trainer(net, optimizer, scheduler, loss_fn, metrics, device, net_with_occ_semantics=False):
+def create_trainer(net, optimizer, scheduler, loss_fn, metrics, device, no_handover=False, net_with_occ_semantics=False):
     def _update(_, batch):
         net.train()
         optimizer.zero_grad()
         # forward
         x, y, grasp_query, pos_occ = prepare_batch(batch, device, net_with_occ_semantics) # tsdf/pc, out_labels, (pos, rotations, grasps_pc_local, grasps_pc), pos_occ
         y_pred = select(net(x, grasp_query, p_tsdf=pos_occ), net_with_occ_semantics)
+        if no_handover:
+            # zero handover
+            y[1][:, 0] = 0
         loss, loss_dict = loss_fn(y_pred, y)
 
         # backward
@@ -348,7 +351,7 @@ def create_trainer(net, optimizer, scheduler, loss_fn, metrics, device, net_with
 
     return trainer
 
-def create_evaluator(net, loss_fn, metrics, device, net_with_occ_semantics=False):
+def create_evaluator(net, loss_fn, metrics, device, no_handover=False, net_with_occ_semantics=False):
     def _inference(_, batch):
 
         net.eval()
@@ -357,6 +360,9 @@ def create_evaluator(net, loss_fn, metrics, device, net_with_occ_semantics=False
             out = net(x, grasp_query, p_tsdf=pos_occ)
             y_pred = select(out, net_with_occ_semantics)
             sdf = out[2]
+            if no_handover:
+                # zero handover
+                y[1][:, 0] = 0
             _, loss_dict = loss_fn(y_pred, y)
 
         return x, y_pred, y, loss_dict, sdf
@@ -373,6 +379,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--net", default="neu_grasp_pn_affnet")
     parser.add_argument("--net_with_grasp_occ", type=bool, default='', help="Also use grasp pc occupancy values")
+    parser.add_argument("--no_handover", type=bool, default='', help="Don't learn handover affordances")
     parser.add_argument("--dataset", type=Path, required=True)
     parser.add_argument("--dataset_raw", type=Path, required=True)
     parser.add_argument("--num_workers", type=int, default=24)

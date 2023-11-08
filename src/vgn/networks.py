@@ -24,7 +24,9 @@ def get_network(name):
         "neu_grasp_pn_deeper4": NeuGraspPNDeeper4,
         "neu_grasp_pn_deeper5": NeuGraspPNDeeper5,
         "neu_grasp_pn_affnet": NeuGraspPNAffNet,
+        "neu_grasp_pn_affnet_deeper": NeuGraspPNAffNetDeeper,
         "neu_grasp_pn_affnet_sem": NeuGraspPNAffNetSem,
+        "neu_grasp_pn_affnet_sem_deeper": NeuGraspPNAffNetSemDeeper,
         "neu_grasp_pn_detach": NeuGraspPNDetach,
         "neu_grasp_pn_no_local_cloud": NeuGraspPNNoLocalCloud,
         "neu_grasp_pn_pn": NeuGraspPNPN,
@@ -433,6 +435,34 @@ def NeuGraspPNAffNet():
     }
     return get_model(config)
 
+def NeuGraspPNAffNetDeeper():
+    config = {
+        'encoder': 'voxel_simple_local',
+        'encoder_kwargs': {
+            'plane_type': ['xz', 'xy', 'yz'],
+            'plane_resolution': 64,
+            'unet': True,
+            'unet_kwargs': {
+                'depth': 5,
+                'merge_mode': 'concat',
+                'start_filts': 64
+            }
+        },
+        'decoder': 'picked_points',
+        'decoder_affrdnce': 'picked_points',
+        'decoder_kwargs': {
+            'dim': 7,
+            'point_network': 'pointnet',
+            'sample_mode': 'bilinear',
+            'concat_feat': True,
+        },
+        'decoder_tsdf': 'simple_local',
+        'padding': 0,
+        'c_dim': 64,
+        'hidden_dim': 128 # for simple_local decoder
+    }
+    return get_model(config)
+
 def NeuGraspPNAffNetSem():
     config = {
         'encoder': 'voxel_simple_local',
@@ -442,6 +472,35 @@ def NeuGraspPNAffNetSem():
             'unet': True,
             'unet_kwargs': {
                 'depth': 4,
+                'merge_mode': 'concat',
+                'start_filts': 64
+            }
+        },
+        'decoder': 'picked_points',
+        'decoder_affrdnce': 'picked_points',
+        'decoder_kwargs': {
+            'dim': 7,
+            'point_network': 'pointnet',
+            'sample_mode': 'bilinear',
+            'concat_feat': True,
+        },
+        'decoder_tsdf': 'simple_local',
+        'decoder_sem': 'simple_local',
+        'padding': 0,
+        'c_dim': 64,
+        'hidden_dim': 128 # for simple_local decoder
+    }
+    return get_model(config)
+
+def NeuGraspPNAffNetSemDeeper():
+    config = {
+        'encoder': 'voxel_simple_local',
+        'encoder_kwargs': {
+            'plane_type': ['xz', 'xy', 'yz'],
+            'plane_resolution': 64,
+            'unet': True,
+            'unet_kwargs': {
+                'depth': 5,
                 'merge_mode': 'concat',
                 'start_filts': 64
             }

@@ -96,7 +96,7 @@ def main(args):
         print('Total jobs: %d, CPU num: %d' % (g_num_total_jobs, args.num_proc))
         # Using fix from: https://github.com/UT-Austin-RPL/GIGA/issues/1
         from joblib import Parallel, delayed
-        results = Parallel(n_jobs=args.num_proc)(delayed(process_one_scene)(args, f,) for f in file_list)
+        results = Parallel(n_jobs=args.num_proc)(delayed(process_one_scene)(args, f,) for f in tqdm(file_list))
         
         for result in results:
             log_result(result)

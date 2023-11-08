@@ -16,22 +16,22 @@ N_SEEDS = 1
 N_CORES = 96 #N_EXPS_IN_PARALLEL # HRZ nodes have 96 cores
 # MEMORY_SINGLE_JOB = 1000
 # MEMORY_PER_CORE = N_EXPS_IN_PARALLEL * MEMORY_SINGLE_JOB // N_CORES
-MEMORY_PER_CORE = 500
+MEMORY_PER_CORE = 1500
 # PARTITION = 'amd2,amd'  # 'amd', 'rtx'
 # GRES = 'gpu:1' if USE_CUDA else None  # gpu:rtx2080:1, gpu:rtx3080:1
 CONDA_ENV = 'GIGA-6DoF'
 
 launcher = Launcher(
-    exp_name='generate_PARTIAL_GPG_NOISY_surface_clouds',
-    exp_file='generate_data_grasp_surface_clouds', # local path without .py
+    exp_name='generate_AFFNET_GPG_data',
+    exp_file='generate_data_gpg_parallel', # local path without .py
     # exp_file='/work/home/sj93qicy/IAS_WS/potato-net/GIGA-6DoF/scripts/generate_data_gpg_parallel', # without .py
-    project_name='project01907',  # for hrz cluster
+    project_name='project02201',  # for hrz cluster
     n_seeds=N_SEEDS,
     # n_exps_in_parallel=N_EXPS_IN_PARALLEL,
     n_cores=N_CORES,
     memory_per_core=MEMORY_PER_CORE,
     days=0,
-    hours=8,
+    hours=23,
     minutes=59,
     seconds=0,
     # partition=PARTITION,
@@ -43,20 +43,22 @@ launcher = Launcher(
 
 # Experiment configs (In this case, they are all argparse arguments for the main python file)
 launcher.add_experiment(
-    raw_root="/work/scratch/sj93qicy/potato-net/data/pile/data_pile_train_random_raw_2M_GPG_MIXED",
-    # root="/work/scratch/sj93qicy/potato-net/data/pile/data_pile_train_random_raw_4M_GPG_60_PARTIAL",
+    # raw_root="/work/scratch/sj93qicy/potato-net/data/pile/data_pile_train_random_raw_2M_GPG_MIXED",
+    root="/work/scratch/sj93qicy/potato-net/data/3DGraspAff/data_affnet_train_random_raw_GPG_60",
+    data_root="/work/scratch/sj93qicy/potato-net/",
     # use_previous_scenes=True,
     # previous_root="/work/scratch/sj93qicy/potato-net/data/pile/data_pile_train_random_raw_4M_GPG_60",
-    # scene="pile",
-    # object_set="pile/train",
+    scene="affnet",
+    object_set="train",
     num_proc=N_CORES,
-    # grasps_per_scene=60,
-    # grasps_per_scene_gpg=60, # i.e. all grasps are gpg grasps
+    num_scenes=40000,
+    grasps_per_scene=60,
+    grasps_per_scene_gpg=60, # i.e. all grasps are gpg grasps
     # partial_pc=True,
-    # save_scene=True,
-    # random=True
-    save_occ_values=True, # Don't pass if False
-    add_noise=True # Don't pass if False
+    save_scene=True,
+    random=True,
+    # save_occ_values=True, # Don't pass if False
+    # add_noise=True # Don't pass if False
     )
 
 launcher.run(LOCAL, TEST)
