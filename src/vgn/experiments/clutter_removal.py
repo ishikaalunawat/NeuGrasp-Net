@@ -261,6 +261,7 @@ def run(
     affordance_accuracy = 100.0 * (aff_tp + aff_tn) / (aff_tp + aff_fp + aff_tn + aff_fn)
     affordance_precision = 100.0 * aff_tp / (aff_tp + aff_fp)
     affordance_recall = 100.0 * aff_tp / (aff_tp + aff_fn)
+    affordance_mean_precision = np.mean(affordance_precision)
     seen_success_rate = 100.0 * seen_success / seen_cnt
     unseen_success_rate = 100.0 * unseen_success / unseen_cnt
     declutter_rate = 100.0 * success / total_objs
@@ -268,6 +269,7 @@ def run(
     print('Affordance accuracy: ', affordance_accuracy)
     print('Affordance precision: ', affordance_precision)
     print('Affordance recall: ', affordance_recall)
+    print('Affordance mean precision: ', affordance_mean_precision)
     print('Seen success rate: %.2f %%, Unseen success rate: %.2f %%' % (seen_success_rate, unseen_success_rate))
     print('Seen grasp count: %d, Unseen grasp count: %d' % (seen_cnt, unseen_cnt))
     print(f'Average planning time: {np.mean(planning_times)}, total time: {np.mean(total_times)}')
@@ -276,7 +278,7 @@ def run(
         with open(result_path, 'w') as f:
             f.write('%.2f%%, %.2f%%, %.2f%%, %.2f%%; %d, %d, %d, %d\n' % (success_rate, declutter_rate, seen_success_rate, unseen_success_rate,
                                                    seen_cnt, unseen_cnt, cons_fail, no_grasp))
-    return success_rate, declutter_rate, seen_success_rate, unseen_success_rate, seen_cnt, unseen_cnt
+    return success_rate, declutter_rate, affordance_accuracy, affordance_precision, affordance_recall, affordance_mean_precision
     
 
 

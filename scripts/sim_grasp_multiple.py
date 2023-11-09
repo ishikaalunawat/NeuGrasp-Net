@@ -38,13 +38,17 @@ def main(args):
 
     gsr = []
     dr = []
-    seen_gsr = []
-    unseen_gsr = []
-    seen_cnts = []
-    unseen_cnts = []
+    aff_accuracy = []
+    aff_precision = []
+    aff_recall = []
+    aff_mean_precision = []
+    # seen_gsr = []
+    # unseen_gsr = []
+    # seen_cnts = []
+    # unseen_cnts = []
     for seed in args.zeeds:
         set_random_seed(seed)
-        success_rate, declutter_rate, seen_success_rate, unseen_success_rate, seen_cnt, unseen_cnt = clutter_removal.run(
+        success_rate, declutter_rate, affordance_accuracy, affordance_precision, affordance_recall, affordance_mean_precision = clutter_removal.run(
             grasp_plan_fn=grasp_planner,
             logdir=args.logdir,
             resolution=args.resolution,
@@ -68,11 +72,15 @@ def main(args):
             save_dir=args.save_dir,
             use_nvisii=args.use_nvisii)
         gsr.append(success_rate)
-        seen_gsr.append(seen_success_rate)
-        unseen_gsr.append(unseen_success_rate)
-        seen_cnts.append(seen_cnt)
-        unseen_cnts.append(unseen_cnt)
+        # seen_gsr.append(seen_success_rate)
+        # unseen_gsr.append(unseen_success_rate)
+        # seen_cnts.append(seen_cnt)
+        # unseen_cnts.append(unseen_cnt)
         dr.append(declutter_rate)
+        aff_accuracy.append(affordance_accuracy.tolist())
+        aff_precision.append(affordance_precision.tolist())
+        aff_recall.append(affordance_recall.tolist())
+        aff_mean_precision.append(affordance_mean_precision)
     results = {
         'gsr': {
             'mean': np.mean(gsr),
@@ -84,34 +92,38 @@ def main(args):
             'std': np.std(dr),
             'val': dr
         },
-        'seen_gsr': {
-            'mean': np.mean(seen_gsr),
-            'std': np.std(seen_gsr),
-            'val': seen_gsr
+        'aff_accuracy': {
+            'mean': np.mean(aff_accuracy, axis=0).tolist(),
+            'std': np.std(aff_accuracy, axis=0).tolist(),
+            'val': aff_accuracy
         },
-        'unseen_gsr': {
-            'mean': np.mean(unseen_gsr),
-            'std': np.std(unseen_gsr),
-            'val': unseen_gsr
+        'aff_precision': {
+            'mean': np.mean(aff_precision, axis=0).tolist(),
+            'std': np.std(aff_precision, axis=0).tolist(),
+            'val': aff_precision
         },
-        'seen_cnts': {
-            'mean': np.mean(seen_cnts),
-            'std': np.std(seen_cnts),
-            'val': seen_cnts
+        'aff_recall': {
+            'mean': np.mean(aff_recall, axis=0).tolist(),
+            'std': np.std(aff_recall, axis=0).tolist(),
+            'val': aff_recall
         },
-        'unseen_cnts': {
-            'mean': np.mean(unseen_cnts),
-            'std': np.std(unseen_cnts),
-            'val': unseen_cnts
+        'aff_mean_precision': {
+            'mean': np.mean(aff_mean_precision),
+            'std': np.std(aff_mean_precision),
+            'val': aff_mean_precision
         },
     }
     print('Average results:')
     print(f'Grasp sucess rate: {np.mean(gsr):.2f} ± {np.std(gsr):.2f} %')
-    print(f'Seen grasp sucess rate: {np.mean(seen_gsr):.2f} ± {np.std(seen_gsr):.2f} %')
-    print(f'Unseen grasp sucess rate: {np.mean(unseen_gsr):.2f} ± {np.std(unseen_gsr):.2f} %')
-    print(f'Seen grasp count: {np.mean(seen_cnts):.2f} ± {np.std(seen_cnts):.2f}')
-    print(f'Unseen grasp count: {np.mean(unseen_cnts):.2f} ± {np.std(unseen_cnts):.2f}')
+    # print(f'Seen grasp sucess rate: {np.mean(seen_gsr):.2f} ± {np.std(seen_gsr):.2f} %')
+    # print(f'Unseen grasp sucess rate: {np.mean(unseen_gsr):.2f} ± {np.std(unseen_gsr):.2f} %')
+    # print(f'Seen grasp count: {np.mean(seen_cnts):.2f} ± {np.std(seen_cnts):.2f}')
+    # print(f'Unseen grasp count: {np.mean(unseen_cnts):.2f} ± {np.std(unseen_cnts):.2f}')
     print(f'Declutter rate: {np.mean(dr):.2f} ± {np.std(dr):.2f} %')
+    print(f'Affordance accuracy: {np.mean(aff_accuracy, axis=0).tolist()} ± {np.std(aff_accuracy, axis=0).tolist()}')
+    print(f'Affordance precision: {np.mean(aff_precision, axis=0).tolist()} ± {np.std(aff_precision, axis=0).tolist()}')
+    print(f'Affordance recall: {np.mean(aff_recall, axis=0).tolist()} ± {np.std(aff_recall, axis=0).tolist()}')
+    print(f'Affordance mean precision: {np.mean(aff_mean_precision):.2f} ± {np.std(aff_mean_precision):.2f}')
     with open(args.result_path+'.json', 'w') as f:
         json.dump(results, f, indent=2)
 
@@ -132,7 +144,7 @@ if __name__ == "__main__":
     parser.add_argument("--num_view", type=int, default=1) # No need to change
     parser.add_argument("--num_rounds", type=int, default=100)
     parser.add_argument("--resolution", type=int, default=64)
-    parser.add_argument("--zeeds", type=int, nargs='+', default=[1, 2, 3, 4])
+    parser.add_argument("--zeeds", type=int, nargs='+', default=[1, 2, 3, 4, 5])
     parser.add_argument("--sim-gui", action="store_true")
     # parser.add_argument("--grad-refine", action="store_true")
     parser.add_argument("--qual_th", type=float, default=0.5)
