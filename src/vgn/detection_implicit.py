@@ -17,17 +17,36 @@ from vgn.grasp_sampler import GpgGraspSamplerPcl
 from vgn.grasp_renderer import generate_gt_grasp_cloud, generate_neur_grasp_clouds
 from vgn.scene_renderer import get_scene_surf_render
 
+from vgn.assign_grasp_affordance import aff_labels_to_colors
+
 axes_cond = lambda x,z: np.isclose(np.abs(np.dot(x, z)), 1.0, 1e-4)
 
 
 class VGNImplicit(object):
-    def __init__(self, model_path, model_type, best=False, force_detection=False, seen_pc_only=False, qual_th=0.5, out_th=0.5, visualize=False, resolution=40, **kwargs):
+    def __init__(self, model_path, model_type, best=False, force_detection=False, seen_pc_only=False, qual_th=0.5, aff_thresh=0.5, out_th=0.5, visualize=False, resolution=40, **kwargs):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         # self.device = "cpu"
         self.net = load_network(model_path, self.device, model_type=model_type)
         self.net.eval() # Set to eval mode
+        
+        # Optional: print summary of network
+        # from torchsummary import summary
+        # print(summary(net.encoder, input_size=(1, 64, 64, 64)))
+        # get number of parameters:
+        encoder_params = sum(p.numel() for p in self.net.encoder.parameters() if p.requires_grad)    
+        decoder_params = sum(p.numel() for p in self.net.decoder_qual.parameters() if p.requires_grad)
+        decoder_params += sum(p.numel() for p in self.net.decoder_affrdnce.parameters() if p.requires_grad)
+        decoder_params += sum(p.numel() for p in self.net.decoder_tsdf.parameters() if p.requires_grad)
+        pytorch_total_params = sum(p.numel() for p in self.net.parameters())
+        print("[  NETWORK SUMMARY...  ]:")
+        print("Encoder params: ", encoder_params)
+        print("Decoder params: ", decoder_params)
+        print("Total params: ", pytorch_total_params)
+        print("[  ...NETWORK SUMMARY  ]")
+
         self.model_type = model_type
         self.qual_th = qual_th
+        self.aff_thresh = aff_thresh
         self.best = best
         self.force_detection = force_detection
         self.seen_pc_only = seen_pc_only
@@ -109,8 +128,9 @@ class VGNImplicit(object):
 
         encoded_tsdf = None
         ## Test with point input?
-        point_input = False
-        if point_input:
+        # point_input = False
+        if 'vn' in self.model_type:
+            # Use point cloud input instead of TSDF
             lower = np.array([0.0 , 0.0 , 0.0])
             upper = np.array([size, size, size])
             bounding_box = o3d.geometry.AxisAlignedBoundingBox(lower, upper)
@@ -122,7 +142,7 @@ class VGNImplicit(object):
             pc_cropped = np.asarray(pc_cropped.points)
             pc_final = np.zeros((2048, 3), dtype=np.float32) # pad zeros to have uniform size
             pc_final[0:pc_cropped.shape[0]] = pc_cropped
-            pc_final = pc_final / size - 0.5
+            pc_final = pc_final / size - 0.5 # Norm and shift AFTER adding zeros
             tsdf_vol = np.expand_dims(pc_final,0)
         
         ## Get scene render
@@ -134,7 +154,17 @@ class VGNImplicit(object):
                 o3d_vis.add_geometry(state.pc, reset_bounding_box=True) # HACK TO SET O3D CAMERA VIEW for seed 100!!
                 o3d_vis.poll_events()
                 o3d_vis.update_renderer()
-                return [], [], [], 0.0, scene_mesh
+
+                ## Optional:
+                ## Now set saved camera view
+                #ctr = o3d_vis.get_view_control()
+                #parameters = o3d.io.read_pinhole_camera_parameters("scripts/rendering/ScreenCamera_2023-05-23-22-26-03.json")
+                #ctr.convert_from_pinhole_camera_parameters(parameters)
+                #for i in range(50):
+                    #o3d_vis.poll_events()
+                    #o3d_vis.update_renderer()
+
+                return [], [], [], [], 0.0, scene_mesh
             else:
                 # Viz input point cloud
                 o3d_vis.add_geometry(state.pc, reset_bounding_box=False) # point cloud
@@ -147,7 +177,7 @@ class VGNImplicit(object):
                         encoded_tsdf = self.net.encode_inputs(torch.from_numpy(tsdf_vol).to(self.device))
                     pc_extended = get_scene_surf_render(sim, size, self.resolution, self.net, encoded_tsdf, device=self.device)
                     o3d_vis.add_geometry(pc_extended, reset_bounding_box=False) # point cloud
-                    o3d_vis.poll_events()
+                o3d_vis.poll_events()
                 # num_grasps_gpg = 20
                 num_grasps_gpg = 60
         else:
@@ -196,13 +226,13 @@ class VGNImplicit(object):
             if pc_extended_down.is_empty():
                 print("[Warning]: Empty point cloud input to gpg")
                 if self.visualize:
-                    return [], [], [], 0.0, scene_mesh
+                    return [], [], [], [], 0.0, scene_mesh
                 else:
-                    return [], [], [], 0.0
+                    return [], [], [], [], 0.0
             
             sampler = GpgGraspSamplerPcl(0.05-0.0075) # Franka finger depth is actually a little less than 0.05
             safety_dist_above_table = 0.05 # table is spawned at finger_depth
-            grasps, pos_queries, rot_queries, gpg_origin_points = sampler.sample_grasps_parallel(pc_extended_down, num_parallel=24, num_grasps=num_grasps_gpg, max_num_samples=220,#320
+            grasps, pos_queries, rot_queries, gpg_origin_points = sampler.sample_grasps_parallel(pc_extended_down, num_parallel=24, num_grasps=num_grasps_gpg, max_num_samples=180,#320
                                                 safety_dis_above_table=safety_dist_above_table, show_final_grasps=False, verbose=False,
                                                 return_origin_point=True)
             # Optional: Find out if the point comes from a seen or unseen area
@@ -228,9 +258,9 @@ class VGNImplicit(object):
             if (len(pos_queries) < 2):
                 print("[Warning]: No grasps found by GPG")
                 if self.visualize:
-                    return [], [], [], 0.0, scene_mesh
+                    return [], [], [], [], 0.0, scene_mesh
                 else:
-                    return [], [], [], 0.0
+                    return [], [], [], [], 0.0
 
         # Convert to torch tensor
         pos_queries = torch.Tensor(pos_queries).view(1, -1, 3).to(self.device)
@@ -243,7 +273,7 @@ class VGNImplicit(object):
         pos_queries = pos_queries/size - 0.5
 
         # Variable rot_vol replaced with ==> rot
-        assert tsdf_vol.shape == (1, self.resolution, self.resolution, self.resolution)
+        # assert tsdf_vol.shape == (1, self.resolution, self.resolution, self.resolution)
 
         # Query network
         if 'neu' in self.model_type:
@@ -291,7 +321,7 @@ class VGNImplicit(object):
                 # split into parts to avoid CUDA memory issues
                 n = len(grasps)
                 remaining_grasps = n
-                max_grasps_at_once = 15
+                max_grasps_at_once = 35
                 grasp_idx = 0
                 bad_indices, grasps_pc_local, grasps_pc, grasps_viz_list = [], torch.zeros((len(grasps),render_settings['max_points'],3), device=self.device), torch.zeros((len(grasps),render_settings['max_points'],3), device=self.device), []
                 while remaining_grasps > 1: # Because we can't use just 1 grasp
@@ -327,10 +357,12 @@ class VGNImplicit(object):
             if encoded_tsdf is None:
                 with torch.no_grad():
                     encoded_tsdf = self.net.encode_inputs(torch.from_numpy(tsdf_vol).to(self.device))
-            qual_vol, width_vol = predict(encoded_tsdf, (pos_queries.to(self.device), rot_queries.to(self.device), grasps_pc_local.to(self.device), grasps_pc.to(self.device)),
+            qual_vol, aff_vol = predict(encoded_tsdf, (pos_queries.to(self.device), rot_queries.to(self.device), grasps_pc_local.to(self.device), grasps_pc.to(self.device)),
                                           self.net, self.device, seed=seed, encoded_input=True)
+            width_vol = np.zeros(qual_vol.shape) # zeros
             # import pdb; pdb.set_trace()
             qual_vol[bad_indices] = 0.0 # set bad grasp scores to zero
+            aff_vol[bad_indices] = 0.0 # set bad grasp scores to zero
             
             # put back into original shape so that we can use the same code as before
             pos_queries = pos_queries.transpose(0,1)
@@ -351,6 +383,14 @@ class VGNImplicit(object):
                         if qual_vol[ind] > self.qual_th:
                             # mod green 125, 202, 92
                             grasp_viz_mesh.paint_uniform_color([125/255, 202/255, 92/255])
+			     # Optional: color based on affordance
+                            aff_vector = aff_vol[ind]
+			     aff_values = np.where(aff_vector > self.aff_thresh)[0] # get indices where aff_vector > thresh
+        	                aff_color = aff_labels_to_colors(aff_values)
+        	                if len(aff_color) > 0:
+        	                    aff_color = aff_color[-1] # if more than one, use the last one
+        	                    grasp_viz_mesh.paint_uniform_color(aff_color)
+
                             o3d_vis.update_geometry(grasp_viz_mesh)
                         else:
                             # Either remove the bad grasps from viz or color them red
@@ -407,7 +447,7 @@ class VGNImplicit(object):
             pos_queries = pos_queries.transpose(0,1)
             rot_queries = rot_queries.transpose(0,1)
 
-            qual_vol, width_vol = predict_pngpd((pos_queries.to(self.device), rot_queries.to(self.device), grasps_pc_local.to(self.device), grasps_pc.to(self.device)),
+            qual_vol, aff_vol = predict_pngpd((pos_queries.to(self.device), rot_queries.to(self.device), grasps_pc_local.to(self.device), grasps_pc.to(self.device)),
                                 self.net, self.device)
 
             qual_vol[bad_indices] = 0.0 # set bad grasp scores to zero
@@ -416,12 +456,12 @@ class VGNImplicit(object):
             pos_queries = pos_queries.transpose(0,1)
             rot_queries = rot_queries.transpose(0,1)
         else:
-            qual_vol, width_vol = predict(tsdf_vol, (pos_queries.to(self.device), rot_queries.to(self.device)), self.net, self.device, seed=seed)
+            qual_vol, aff_vol = predict(tsdf_vol, (pos_queries.to(self.device), rot_queries.to(self.device)), self.net, self.device, seed=seed)
         
-        # reject voxels with predicted widths that are too small or too large
+        # Deprecated: reject voxels with predicted widths that are too small or too large
         # qual_vol, width_vol = process(tsdf_process, qual_vol, rot, width_vol, out_th=self.out_th)
-        min_width=0.033
-        max_width=0.233
+        # min_width=0.033
+        # max_width=0.233
         # qual_vol[np.logical_or(width_vol < min_width, width_vol > max_width)] = 0.0
 
         # qual_vol = bound(qual_vol, voxel_size) # TODO: Check if needed
@@ -435,12 +475,12 @@ class VGNImplicit(object):
             ### TODO - check affordance - visual (WEIRD)
             colored_scene_mesh = scene_mesh
             # colored_scene_mesh = visual.affordance_visual(qual_vol, rot, scene_mesh, size, self.resolution, **aff_kwargs)
-        grasps, scores, unseen_flags, bad_grasps, bad_scores = select(qual_vol.copy(), pos_queries[0].squeeze().cpu(), rot_queries[0].squeeze().cpu(), width_vol,
+        grasps, scores, affs, unseen_flags, bad_grasps, bad_scores, bad_affs = select(qual_vol.copy(), pos_queries[0].squeeze().cpu(), rot_queries[0].squeeze().cpu(), aff_vol,
                                                         threshold=self.qual_th, force_detection=self.force_detection, unseen_flags=unseen_flags)
         toc = time.time() - tic
 
-        bad_grasps, bad_scores = np.asarray(bad_grasps), np.asarray(bad_scores)
-        grasps, scores = np.asarray(grasps), np.asarray(scores)
+        bad_grasps, bad_scores, bad_affs = np.asarray(bad_grasps), np.asarray(bad_scores), np.asarray(bad_affs)
+        grasps, scores, affs = np.asarray(grasps), np.asarray(scores), np.asarray(affs)
 
         new_bad_grasps = []
         new_grasps = []
@@ -461,6 +501,8 @@ class VGNImplicit(object):
                 new_grasps.append(Grasp(pose, width))
             bad_scores = bad_scores[p_bad]
             scores = scores[p]
+            bad_affs = bad_affs[p_bad]
+            affs = affs[p]
         bad_grasps = new_bad_grasps
         grasps = new_grasps
 
@@ -476,9 +518,9 @@ class VGNImplicit(object):
             #     composed_scene.add_geometry(g_mesh, node_name=f'bad_grasp_{i}')
             # # Optional: Show grasps (for debugging)
             # composed_scene.show()
-            return grasps, scores, unseen_flags, toc, composed_scene
+            return grasps, scores, affs, unseen_flags, toc, composed_scene
         else:
-            return grasps, scores, unseen_flags, toc
+            return grasps, scores, affs, unseen_flags, toc
 
 
 def bound(qual_vol, voxel_size, limit=[0.02, 0.02, 0.055]):
@@ -563,7 +605,7 @@ def process(
     return qual_vol, width_vol
 
 
-def select(qual_vol, center_vol, rot_vol, width_vol, threshold=0.50, force_detection=False, unseen_flags=None):
+def select(qual_vol, center_vol, rot_vol, aff_vol, threshold=0.50, force_detection=False, unseen_flags=None):
 
     bad_mask = np.where(qual_vol<threshold, 1.0, 0.0)
 
@@ -577,25 +619,27 @@ def select(qual_vol, center_vol, rot_vol, width_vol, threshold=0.50, force_detec
     mask = np.where(qual_vol, 1.0, 0.0)
 
     # construct grasps
-    bad_grasps, bad_scores = [], []
+    bad_grasps, bad_scores, bad_affs = [], [], []
     for index in np.argwhere(bad_mask):
         index = index.squeeze()
         ori = Rotation.from_quat(rot_vol[index])
         pos = center_vol[index].numpy()
-        bad_grasp, bad_score = Grasp(Transform(ori, pos), width_vol[index]), qual_vol[index]
+        bad_grasp, bad_score = Grasp(Transform(ori, pos), 0.0), qual_vol[index]
         # bad_grasp, bad_score = select_index(qual_vol, center_vol, rot_vol, width_vol, index)
         bad_grasps.append(bad_grasp)
         bad_scores.append(bad_score)
+        bad_affs.append(aff_vol[index])
     
-    grasps, scores, unseen_vals = [], [], []
+    grasps, scores, affs, unseen_vals = [], [], [], []
     for index in np.argwhere(mask):
         index = index.squeeze()
         ori = Rotation.from_quat(rot_vol[index])
         pos = center_vol[index].numpy()
-        grasp, score = Grasp(Transform(ori, pos), width_vol[index]), qual_vol[index]
+        grasp, score = Grasp(Transform(ori, pos), 0.0), qual_vol[index]
         # grasp, score = select_index(qual_vol, center_vol, rot_vol, width_vol, index)
         grasps.append(grasp)
         scores.append(score)
+        affs.append(aff_vol[index])
         if unseen_flags is not None:
             unseen_vals.append(unseen_flags[index])
         else:
@@ -603,11 +647,13 @@ def select(qual_vol, center_vol, rot_vol, width_vol, threshold=0.50, force_detec
     
     sorted_bad_grasps = [bad_grasps[i] for i in np.argsort(bad_scores)]
     sorted_bad_scores = [bad_scores[i] for i in np.argsort(bad_scores)]
+    sorted_bad_affs = [bad_affs[i] for i in np.argsort(bad_scores)]
     sorted_grasps = [grasps[i] for i in reversed(np.argsort(scores))]
     sorted_scores = [scores[i] for i in reversed(np.argsort(scores))]
+    sorted_affs = [affs[i] for i in reversed(np.argsort(scores))]
     sorted_unseen_vals = [unseen_vals[i] for i in reversed(np.argsort(scores))]
         
-    return sorted_grasps, sorted_scores, sorted_unseen_vals, sorted_bad_grasps, sorted_bad_scores
+    return sorted_grasps, sorted_scores, sorted_affs, sorted_unseen_vals, sorted_bad_grasps, sorted_bad_scores, sorted_bad_affs
 
 
 def select_index(qual_vol, center_vol, rot_vol, width_vol, index):

@@ -55,7 +55,7 @@ def secant(net, encoded_tsdf, f_low, f_high, d_low, d_high, n_secant_steps,
     return d_pred
 
 
-def generate_neur_grasp_clouds(sim, render_settings, grasps, size, encoded_tsdf, net, device=torch.device("cuda"), scene_mesh=None, debug=False, o3d_vis=None):
+def generate_neur_grasp_clouds(sim, render_settings, grasps, size, encoded_tsdf, net, device=torch.device("cuda"), scene_mesh=None, debug=False, o3d_vis=None, viz_rays=False):
     max_points = render_settings['max_points']
     voxel_downsample_size = render_settings['voxel_downsample_size']
     width = height = render_settings['camera_image_res']
@@ -145,8 +145,7 @@ def generate_neur_grasp_clouds(sim, render_settings, grasps, size, encoded_tsdf,
             from vgn.utils import visual
             grasps_scene.add_geometry(visual.grasp2mesh(grasp), node_name=f'grasp_{idx}')
             o3d_gripper_mesh = as_mesh(grasps_scene).as_open3d
-            o3d_gripper_mesh.paint_uniform_color([255/255, 255/255, 102/255]) # yellow
-            # o3d_gripper_mesh.paint_uniform_color([1.0, 0.85, 0.0]) # yellow
+            o3d_gripper_mesh.paint_uniform_color([1.0, 0.85, 0.0]) # yellow
             o3d_vis.add_geometry(o3d_gripper_mesh, reset_bounding_box=False)
             o3d_vis.poll_events()
             # o3d_vis.update_renderer()
@@ -248,12 +247,15 @@ def generate_neur_grasp_clouds(sim, render_settings, grasps, size, encoded_tsdf,
     points_out_local = torch.bmm(grasp_inv_tfs, points_out_hom.transpose(1,2))
     inval_mask = points_out_local[:,0,:] > (max_measured_dist - dist_from_gripper) # too far X
     inval_mask = inval_mask | (points_out_local[:,0,:] < -dist_from_gripper)       # too close X
-    inval_mask = inval_mask | (points_out_local[:,2,:] >  height_max_dist)         # too far Z
-    inval_mask = inval_mask | (points_out_local[:,2,:] < -height_max_dist)         # too close Z
+    inval_mask = inval_mask | (points_out_local[:,2,:] >  height_max_dist-0.005)         # too far Z
+    inval_mask = inval_mask | (points_out_local[:,2,:] < -height_max_dist+0.005)         # too close Z
 
     surf_mask = mask & ~inval_mask
     
     # Surface Rendering & filtering complete
+    if viz_rays:
+        # For visualization, we need to only return the surface points and the ray points
+        return points_out[mask], p_proposal_world_combined[mask]
     ## Now loop over grasp clouds, downsample and reject grasps with too few points
     grasps_pc_local = torch.zeros((batch_size,max_points,3))
     grasps_pc = grasps_pc_local.clone()
@@ -307,7 +309,7 @@ def generate_neur_grasp_clouds(sim, render_settings, grasps, size, encoded_tsdf,
             down_surf_pc.colors = o3d.utility.Vector3dVector(np.tile(np.array([0.9, 0.9, 0.0]), (np.asarray(down_surf_pc.points).shape[0], 1)))
             # o3d_vis.add_geometry(down_surf_pc, reset_bounding_box=False)
             o3d_vis.poll_events()
-            o3d_vis.update_renderer()
+            # o3d_vis.update_renderer()
 
     return bad_indices, grasps_pc_local, grasps_pc, grasps_viz_list
 

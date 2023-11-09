@@ -82,6 +82,7 @@ class LocalDecoder(nn.Module):
                  sample_mode='bilinear', 
                  padding=0.1,
                  concat_feat=False,
+                 multilabel=False,
                  no_xyz=False):
         super().__init__()
         
@@ -92,6 +93,7 @@ class LocalDecoder(nn.Module):
         self.n_blocks = n_blocks
         self.no_xyz = no_xyz
         self.hidden_size = hidden_size
+        self.multilabel = multilabel
 
         if c_dim != 0:
             self.fc_c = nn.ModuleList([
@@ -188,6 +190,11 @@ class LocalDecoder(nn.Module):
 
         out = self.fc_out(self.actvn(net))
         out = out.squeeze(-1)
+
+        if self.multilabel is True:
+            # if three dimensions, get rid of the extra multi-class dimension
+            if out.dim() == 3:
+                out = out.squeeze(1)
 
         return out
 
@@ -413,7 +420,8 @@ class PickedPointDecoder(nn.Module):
                  concat_local_cloud=True,
                  sample_mode='bilinear', 
                  padding=0.1,
-                 concat_feat=True):
+                 concat_feat=True,
+                 multilabel=False):
         super().__init__()
         
         self.dim = dim # input
@@ -430,13 +438,15 @@ class PickedPointDecoder(nn.Module):
 
         self.fc_g = nn.Linear(dim, c_dim) # Linear layer to encode input grasp center and orientation
         if point_network == 'pointnet':
-            self.point_network = PointNet(input_dim=c_dim, num_class=out_dim)
+            self.point_network = PointNet(input_dim=c_dim, num_class=out_dim, multilabel=multilabel)
         elif point_network == 'pointnet_resnet':
             # TODO
             # self.point_network = PointNetResNet(input_dim=c_dim, num_class=out_dim)
             raise NotImplementedError
         elif point_network == 'dgcnn':
-            self.point_network = DGCNN(input_dim=c_dim, num_class=out_dim, n_knn=20)
+            self.point_network = DGCNN(input_dim=c_dim, num_class=out_dim, n_knn=20, multilabel=multilabel)
+        else:
+            raise NotImplementedError
 
     def sample_plane_feature(self, p, c, plane='xz'):
         xy = normalize_coordinate(p.clone(), plane=plane, padding=self.padding) # normalize to the range of (0, 1)
@@ -450,6 +460,7 @@ class PickedPointDecoder(nn.Module):
             pos, rotations, grasps_pc_local, grasps_pc = grasp_query
             zero_pc_indices = grasps_pc.sum(dim=2) == 0
             f = torch.cat([pos,rotations], dim = 2) # <- Changed to predict only grasp quality
+            # print(f.size())
         else:
             raise NotImplementedError
 
@@ -477,6 +488,7 @@ class PickedPointDecoder(nn.Module):
         queries = torch.cat([g, c], dim=1)
         
         queries = queries.transpose(2, 1) # Transpose to get shape B, D, N
+        # print(queries.size())
         out = self.point_network(queries)
 
         return out

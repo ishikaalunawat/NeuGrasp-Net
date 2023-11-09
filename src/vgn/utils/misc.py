@@ -35,7 +35,7 @@ def apply_mod_dex_noise(img,
                 gp_rate=0.5):
     gamma_noise = np.random.gamma(gamma_shape, gamma_scale)
     img = img * gamma_noise
-    if True: # Removed np.random.rand() < gp_rate:
+    if np.random.rand() < gp_rate:
         h, w = img.shape[:2]
         gp_sample_height = int(h / gp_scale)
         gp_sample_width = int(w / gp_scale)

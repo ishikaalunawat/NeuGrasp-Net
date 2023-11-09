@@ -82,7 +82,7 @@ class GpgGraspSamplerPcl():
             "gripper_finger_width": 0.02, # Approx
             "gripper_hand_height": 0.030,
             "gripper_hand_outer_diameter": 0.12, # 0.218, the diameter of the robot hand (= maximum aperture plus 2 * finger width)
-            "gripper_hand_depth": 0.0425, # 0.125,
+            "gripper_hand_depth": 0.0425, # 0.125,  # Franka finger depth is actually a little less than 0.05
             "gripper_init_bite": 0.005
 
             # # Robotiq 2F-85
@@ -312,6 +312,13 @@ class GpgGraspSamplerPcl():
             all_normals = np.asarray(point_cloud.normals)
         # make sure the normal is pointing upwards
         ok_normal_mask = all_normals[:,2] > 0.1
+        num_parallel_jobs = min(ok_normal_mask.sum(), num_parallel_jobs) # Handle edge case where ok_points are too few
+        if num_parallel_jobs < 1:
+            if return_origin_point:
+                return [], [], [], []
+            else:
+                return [], [], []
+
         kd = o3d.geometry.KDTreeFlann(point_cloud)
         
         self.hand_points = self.get_hand_points(np.array([0, 0, 0]), np.array([1, 0, 0]), np.array([0, 1, 0]))

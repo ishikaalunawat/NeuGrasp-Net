@@ -81,7 +81,7 @@ def read_df(root):
     return pd.read_csv(root / "grasps.csv")
 
 def read_df_with_surface_clouds(root):
-    return pd.read_csv(root / "grasps_with_clouds.csv")
+    return pd.read_csv(root / "grasps_aff_balanced_with_clouds.csv")
 
 def write_df(df, root):
     df.to_csv(root / "grasps.csv", index=False)
