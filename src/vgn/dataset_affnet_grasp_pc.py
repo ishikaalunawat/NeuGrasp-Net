@@ -146,28 +146,28 @@ def transform_to_frame(points, orientation, position):
 
     return points_transformed
 
-def apply_aug_transform(voxel_grid, orientation, position):
-    angle = np.pi / 2.0 * np.random.choice(4)
-    R_augment = Rotation.from_rotvec(np.r_[0.0, 0.0, angle])
+# def apply_aug_transform(voxel_grid, orientation, position):
+#     angle = np.pi / 2.0 * np.random.choice(4)
+#     R_augment = Rotation.from_rotvec(np.r_[0.0, 0.0, angle])
 
-    z_offset = np.random.uniform(6, 34) - position[2]
+#     z_offset = np.random.uniform(6, 34) - position[2]
 
-    t_augment = np.r_[0.0, 0.0, z_offset]
-    T_augment = Transform(R_augment, t_augment)
+#     t_augment = np.r_[0.0, 0.0, z_offset]
+#     T_augment = Transform(R_augment, t_augment)
 
-    T_center = Transform(Rotation.identity(), np.r_[20.0, 20.0, 20.0])
-    T = T_center * T_augment * T_center.inverse()
+#     T_center = Transform(Rotation.identity(), np.r_[20.0, 20.0, 20.0])
+#     T = T_center * T_augment * T_center.inverse()
 
-    # transform voxel grid
-    T_inv = T.inverse()
-    matrix, offset = T_inv.rotation.as_matrix(), T_inv.translation
-    voxel_grid[0] = ndimage.affine_transform(voxel_grid[0], matrix, offset, order=0)
+#     # transform voxel grid
+#     T_inv = T.inverse()
+#     matrix, offset = T_inv.rotation.as_matrix(), T_inv.translation
+#     voxel_grid[0] = ndimage.affine_transform(voxel_grid[0], matrix, offset, order=0)
 
-    # transform grasp pose
-    position = T.transform_point(position)
-    orientation = T.rotation * orientation
+#     # transform grasp pose
+#     position = T.transform_point(position)
+#     orientation = T.rotation * orientation
 
-    return voxel_grid, orientation, position
+#     return voxel_grid, orientation, position
 
 def sample_point_cloud(pc, num_point, return_idx=False):
     num_point_all = pc.shape[0]

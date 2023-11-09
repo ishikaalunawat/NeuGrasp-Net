@@ -15,6 +15,7 @@ def get_network(name):
         "giga": GIGA,
         "giga_hr": GIGAHighRes,
         "giga_hr_deeper": GIGAHighResDeeper,
+        "giga_hr_affnet": GIGAHighResAffNet,
         "giga_geo": GIGAGeo,
         "giga_detach": GIGADetach,
         "neu_grasp_pn": NeuGraspPN,
@@ -189,6 +190,34 @@ def GIGAHighResDeeper():
         'padding': 0,
         'c_dim': 128,
         'hidden_size': 256, 
+    }
+    return get_model(config)
+
+def GIGAHighResAffNet():
+    config = {
+        'encoder': 'voxel_simple_local',
+        'encoder_kwargs': {
+            'plane_type': ['xz', 'xy', 'yz'],
+            'plane_resolution': 64,
+            'unet': True,
+            'unet_kwargs': {
+                'depth': 4,
+                'merge_mode': 'concat',
+                'start_filts': 64
+            }
+        },
+        'decoder': 'simple_local',
+        'decoder_affrdnce': 'simple_local',
+        'decoder_kwargs': {
+            'dim': 7, # <- 3:7 Changed to predict only grasp quality
+            'sample_mode': 'bilinear',
+            'hidden_size': 128,
+            'concat_feat': True
+        },
+        'decoder_tsdf': 'simple_local',
+        'padding': 0,
+        'c_dim': 64,
+        'hidden_size': 128, 
     }
     return get_model(config)
 
