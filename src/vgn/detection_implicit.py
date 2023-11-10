@@ -17,7 +17,7 @@ from vgn.grasp_sampler import GpgGraspSamplerPcl
 from vgn.grasp_renderer import generate_gt_grasp_cloud, generate_neur_grasp_clouds
 from vgn.scene_renderer import get_scene_surf_render
 
-from vgn.assign_grasp_affordance import aff_labels_to_colors
+from vgn.assign_grasp_affordance import affrdnce_label_dict, aff_labels_to_colors
 
 axes_cond = lambda x,z: np.isclose(np.abs(np.dot(x, z)), 1.0, 1e-4)
 
@@ -176,7 +176,7 @@ class VGNImplicit(object):
                     with torch.no_grad():
                         encoded_tsdf = self.net.encode_inputs(torch.from_numpy(tsdf_vol).to(self.device))
                     pc_extended = get_scene_surf_render(sim, size, self.resolution, self.net, encoded_tsdf, device=self.device)
-                    o3d_vis.add_geometry(pc_extended, reset_bounding_box=False) # point cloud
+                    # o3d_vis.add_geometry(pc_extended, reset_bounding_box=False) # point cloud
                 o3d_vis.poll_events()
                 # num_grasps_gpg = 20
                 num_grasps_gpg = 60
@@ -383,13 +383,17 @@ class VGNImplicit(object):
                         if qual_vol[ind] > self.qual_th:
                             # mod green 125, 202, 92
                             grasp_viz_mesh.paint_uniform_color([125/255, 202/255, 92/255])
-			     # Optional: color based on affordance
+                            # Optional: color based on affordance
                             aff_vector = aff_vol[ind]
-			     aff_values = np.where(aff_vector > self.aff_thresh)[0] # get indices where aff_vector > thresh
-        	                aff_color = aff_labels_to_colors(aff_values)
-        	                if len(aff_color) > 0:
-        	                    aff_color = aff_color[-1] # if more than one, use the last one
-        	                    grasp_viz_mesh.paint_uniform_color(aff_color)
+                            aff_values = np.where(aff_vector > self.aff_thresh)[0] # get indices where aff_vector > thresh
+                            # Optional: Only color certain affordances
+                            if np.any(aff_values == affrdnce_label_dict['cut']) or np.any(aff_values == affrdnce_label_dict['stab']):
+                                aff_color = aff_labels_to_colors(aff_values)
+                                if len(aff_color) > 0:
+                                    aff_color = aff_color[-1] # if more than one, use the last one
+                                    grasp_viz_mesh.paint_uniform_color(aff_color)
+                            else:
+                                o3d_vis.remove_geometry(grasp_viz_mesh, reset_bounding_box=False)
 
                             o3d_vis.update_geometry(grasp_viz_mesh)
                         else:
@@ -398,7 +402,9 @@ class VGNImplicit(object):
                             # grasp_viz_mesh.paint_uniform_color([1,0,0])
                             o3d_vis.update_geometry(grasp_viz_mesh)
                     o3d_vis.poll_events()
-                    # o3d_vis.update_renderer()
+                    o3d_vis.update_renderer()
+                    o3d_vis.poll_events()
+                    o3d_vis.update_renderer()
         elif self.model_type == 'pointnetgpd':
             grasps_pc_local = torch.zeros((len(grasps),1000,3), device=self.device)
             grasps_pc = grasps_pc_local.clone()

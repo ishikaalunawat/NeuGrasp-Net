@@ -14,12 +14,12 @@ affrdnce_label_dict = {
 
 affrdnce_label_color_dict = {
     'handover': np.array([125/255, 202/255, 92/255]),
-    'cut': np.array([1.0, 0.0, 0.0]), # red
-    'stab': np.array([1.0, 0.0, 0.0]), # red
-    'lift': np.array([1.0, 1.0, 0.0]), # yellow
-    'wrap': np.array([0.0, 1.0, 0.0]), # green
-    'pour': np.array([0.0, 1.0, 1.0]), # light blue
-    'wear': np.array([0.0, 0.0, 1.0]), # dark blue
+    'cut': np.array([0.78039216, 0.        , 0.22352941]), # red
+    'stab': np.array([0.78039216, 0.        , 0.22352941]), # red
+    'lift': np.array([1.        , 0.34117647, 0.2       ]), # orange
+    'wrap': np.array([1.0, 0.85, 0.0]),                     # yellow
+    'pour': np.array([0.39215686, 0.58431373, 0.92941176]), # light blue
+    'wear': np.array([0.34509804, 0.09411765, 0.27058824]), # purple
 }
 
 
