@@ -78,7 +78,7 @@ def read_grasp(df, i):
 
 
 def read_df(root):
-    return pd.read_csv(root / "grasps.csv")
+    return pd.read_csv(root / "grasps_aff_balanced_with_clouds.csv")
 
 
 def write_df(df, root):

@@ -10,6 +10,7 @@ from vgn.ConvONets import config
 from vgn.ConvONets.common import decide_total_volume_range, update_reso
 from torchvision import transforms
 import numpy as np
+from vgn.assign_grasp_affordance import affrdnce_label_dict
 
 
 def get_model(cfg, device=None, dataset=None, **kwargs):
@@ -57,11 +58,21 @@ def get_model(cfg, device=None, dataset=None, **kwargs):
             c_dim=c_dim, padding=padding, out_dim=4,
             **decoder_kwargs
         )
-        decoder_width = models.decoder_dict[decoder](
-            c_dim=c_dim, padding=padding, out_dim=1,
-            **decoder_kwargs
-        )
-        decoders = [decoder_qual, decoder_rot, decoder_width]
+        # decoder_width = models.decoder_dict[decoder](
+        #     c_dim=c_dim, padding=padding, out_dim=1,
+        #     **decoder_kwargs
+        # )
+        if 'decoder_affrdnce' in cfg.keys():
+            num_aff_classes = len(affrdnce_label_dict.keys())
+            decoder_affrdnce = models.decoder_dict[decoder](
+                c_dim=c_dim, padding=padding, out_dim=num_aff_classes,
+                multilabel=True, # important
+                **decoder_kwargs
+            )
+            decoders = [decoder_qual, decoder_rot, decoder_affrdnce]
+        else:
+            decoders = [decoder_qual, decoder_rot]
+        
     if cfg['decoder_tsdf'] or tsdf_only:
         decoder_tsdf = models.decoder_dict[decoder](
             c_dim=c_dim, padding=padding, out_dim=1,

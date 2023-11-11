@@ -26,7 +26,8 @@ class ConvolutionalOccupancyNetwork(nn.Module):
         
         self.decoder_qual = decoders[0].to(device)
         self.decoder_rot = decoders[1].to(device)
-        self.decoder_width = decoders[2].to(device)
+        # self.decoder_width = decoders[2].to(device)
+        self.decoder_affrdnce = decoders[2].to(device)
         if len(decoders) == 4:
             self.decoder_tsdf = decoders[3].to(device)
 
@@ -56,15 +57,15 @@ class ConvolutionalOccupancyNetwork(nn.Module):
         c = self.encode_inputs(inputs)
         # feature = self.query_feature(p, c)
         # qual, rot, width = self.decode_feature(p, feature)
-        qual, rot, width = self.decode(p, c)
+        qual, rot, affrdnce = self.decode(p, c)
         if p_tsdf is not None:
             if self.detach_tsdf:
                 for k, v in c.items():
                     c[k] = v.detach()
             tsdf = self.decoder_tsdf(p_tsdf, c, **kwargs)
-            return qual, rot, width, tsdf
+            return qual, rot, affrdnce, tsdf
         else:
-            return qual, rot, width
+            return qual, rot, affrdnce
             
     def infer_geo(self, inputs, p_tsdf, **kwargs):
         c = self.encode_inputs(inputs)
@@ -90,12 +91,13 @@ class ConvolutionalOccupancyNetwork(nn.Module):
         return self.decoder_qual.query_feature(p, c)
 
     def decode_feature(self, p, feature):
+        raise DeprecationWarning
         qual = self.decoder_qual.compute_out(p, feature)
         qual = torch.sigmoid(qual)
         rot = self.decoder_rot.compute_out(p, feature)
         rot = nn.functional.normalize(rot, dim=2)
-        width = self.decoder_width.compute_out(p, feature)
-        return qual, rot, width
+        affrdnce = self.decoder_affrdnce.compute_out(p, feature)
+        return qual, rot, affrdnce
 
     def decode_occ(self, p, c, **kwargs):
         ''' Returns occupancy probabilities for the sampled points.
@@ -120,8 +122,9 @@ class ConvolutionalOccupancyNetwork(nn.Module):
         qual = torch.sigmoid(qual)
         rot = self.decoder_rot(p, c, **kwargs)
         rot = nn.functional.normalize(rot, dim=2)
-        width = self.decoder_width(p, c, **kwargs)
-        return qual, rot, width
+        affrdnce = self.decoder_affrdnce(p, c, **kwargs)
+        affrdnce = torch.sigmoid(affrdnce)
+        return qual, rot, affrdnce
 
     def to(self, device):
         ''' Puts the model to the device.

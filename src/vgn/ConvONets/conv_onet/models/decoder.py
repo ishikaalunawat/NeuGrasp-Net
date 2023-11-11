@@ -80,6 +80,7 @@ class LocalDecoder(nn.Module):
                  sample_mode='bilinear', 
                  padding=0.1,
                  concat_feat=False,
+                 multilabel=False,
                  no_xyz=False):
         super().__init__()
         
@@ -90,6 +91,7 @@ class LocalDecoder(nn.Module):
         self.n_blocks = n_blocks
         self.no_xyz = no_xyz
         self.hidden_size = hidden_size
+        self.multilabel = multilabel
 
         if c_dim != 0:
             self.fc_c = nn.ModuleList([
@@ -172,6 +174,11 @@ class LocalDecoder(nn.Module):
 
         out = self.fc_out(self.actvn(net))
         out = out.squeeze(-1)
+
+        if self.multilabel is True:
+            # if three dimensions, get rid of the extra multi-class dimension
+            if out.dim() == 3:
+                out = out.squeeze(1)
 
         return out
 
