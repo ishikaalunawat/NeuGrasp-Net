@@ -10,6 +10,7 @@ from vgn.ConvONets.conv_onet.config import get_model
 def get_network(name):
     models = {
         "vgn": ConvNet,
+        "vgn_affnet": ConvNet_AffNet,
         "giga_aff": GIGAAff,
         "giga_classic": GIGA,
         "giga_classic_hr": GIGAHighRes,
@@ -65,6 +66,23 @@ class ConvNet(nn.Module):
         width_out = self.conv_width(x)
         return qual_out, rot_out, width_out
 
+class ConvNet_AffNet(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.encoder = Encoder(1, [16, 32, 64], [5, 3, 3])
+        self.decoder = Decoder(64, [64, 32, 16], [3, 3, 5])
+        self.conv_qual = conv(16, 1, 5)
+        self.conv_rot = conv(16, 4, 5)
+        self.conv_aff = conv(16, 7, 5) # 7 = num of affrdnce classes
+
+    def forward(self, x):
+        x = self.encoder(x)
+        x = self.decoder(x)
+        qual_out = torch.sigmoid(self.conv_qual(x))
+        rot_out = F.normalize(self.conv_rot(x), dim=1)
+        aff_out = torch.sigmoid(self.conv_aff(x))
+        return qual_out, rot_out, aff_out
+    
 def GIGAAff():
     config = {
         'encoder': 'voxel_simple_local',
