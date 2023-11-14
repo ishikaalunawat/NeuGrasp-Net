@@ -27,6 +27,7 @@ def main(args):
                             args.type,
                             best=args.best,
                             qual_th=args.qual_th,
+                            aff_thresh=args.aff_thresh,
                             force_detection=args.force,
                             out_th=0.1,
                             visualize=args.vis)

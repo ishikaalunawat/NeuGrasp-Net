@@ -24,21 +24,24 @@ if VIS:
 
 
 class VGN(object):
-    def __init__(self, model_path, model_type, best=False, force_detection=False, qual_th=0.9, out_th=0.5, visualize=False):
+    def __init__(self, model_path, model_type, best=False, force_detection=False, qual_th=0.9, aff_thresh=0.5, out_th=0.5, visualize=False, resolution=64, **kwargs):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.net = load_network(model_path, self.device, model_type=model_type)
-        self.net.eval()
+        self.net.eval() # Set to eval mode
         self.qual_th = qual_th
+        self.aff_thresh = aff_thresh
         self.best = best
         self.force_detection = force_detection
         self.out_th = out_th
         self.visualize = visualize
 
+        self.resolution = resolution
+
 
     def __call__(self, state, scene_mesh=None, aff_kwargs={}):
         if isinstance(state.tsdf, np.ndarray):
             tsdf_vol = state.tsdf
-            voxel_size = 0.3 / 40
+            voxel_size = 0.3 / self.resolution
             size = 0.3
         else:
             tsdf_vol = state.tsdf.get_grid()
@@ -46,10 +49,10 @@ class VGN(object):
             size = state.tsdf.size
 
         tic = time.time()
-        qual_vol, rot_vol, width_vol = predict(tsdf_vol, self.net, self.device)
+        qual_vol, rot_vol, aff_vol = predict(tsdf_vol, self.net, self.device)
 
 
-        qual_vol, rot_vol, width_vol = process(tsdf_vol, qual_vol, rot_vol, width_vol, out_th=self.out_th)
+        qual_vol, rot_vol, aff_vol = process(tsdf_vol, qual_vol, rot_vol, aff_vol, out_th=self.out_th)
         qual_vol = bound(qual_vol, voxel_size)
 
         if self.visualize:
@@ -57,16 +60,16 @@ class VGN(object):
                 qual_vol, rot_vol.transpose(1, 2, 3, 0),
                 scene_mesh, size, 40, **aff_kwargs)
                 
-        grasps, scores = select(qual_vol.copy(), rot_vol, width_vol, threshold=self.qual_th, force_detection=self.force_detection, max_filter_size=8 if self.visualize else 4)
+        grasps, scores, affs = select(qual_vol.copy(), rot_vol, aff_vol, threshold=self.qual_th, force_detection=self.force_detection, max_filter_size=8 if self.visualize else 4)
         toc = time.time() - tic
 
-        grasps, scores = np.asarray(grasps), np.asarray(scores)
+        grasps, scores, affs = np.asarray(grasps), np.asarray(scores), np.asarray(affs)
 
         if len(grasps) > 0:
-            if self.best:
-                p = np.arange(len(grasps))
-            else:
-                p = np.random.permutation(len(grasps))
+            # if self.best:
+            p = np.arange(len(grasps))
+            # else:
+            #     p = np.random.permutation(len(grasps))
 
             grasps = [from_voxel_coordinates(g, voxel_size) for g in grasps[p]]
             scores = scores[p]
@@ -76,9 +79,9 @@ class VGN(object):
             composed_scene = trimesh.Scene(colored_scene_mesh)
             for i, g_mesh in enumerate(grasp_mesh_list):
                 composed_scene.add_geometry(g_mesh, node_name=f'grasp_{i}')
-            return grasps, scores, toc, composed_scene
+            return grasps, scores, affs, toc, composed_scene
         else:
-            return grasps, scores, toc
+            return grasps, scores, affs, toc
 
 def bound(qual_vol, voxel_size, limit=[0.02, 0.02, 0.055]):
     # avoid grasp out of bound [0.02  0.02  0.055]
@@ -93,20 +96,20 @@ def bound(qual_vol, voxel_size, limit=[0.02, 0.02, 0.055]):
     return qual_vol
 
 def predict(tsdf_vol, net, device):
-    assert tsdf_vol.shape == (1, 40, 40, 40)
+    # assert tsdf_vol.shape == (1, 40, 40, 40)
 
     # move input to the GPU
     tsdf_vol = torch.from_numpy(tsdf_vol).unsqueeze(0).to(device)
 
     # forward pass
     with torch.no_grad():
-        qual_vol, rot_vol, width_vol = net(tsdf_vol)
+        qual_vol, rot_vol, aff_vol = net(tsdf_vol)
 
     # move output back to the CPU
     qual_vol = qual_vol.cpu().squeeze().numpy()
     rot_vol = rot_vol.cpu().squeeze().numpy()
-    width_vol = width_vol.cpu().squeeze().numpy()
-    return qual_vol, rot_vol, width_vol
+    aff_vol = aff_vol.cpu().squeeze().numpy()
+    return qual_vol, rot_vol, aff_vol
 
 def process(
     tsdf_vol,
@@ -126,15 +129,15 @@ def process(
     )
 
     # mask out voxels too far away from the surface
-    outside_voxels = tsdf_vol > out_th
-    inside_voxels = np.logical_and(1e-3 < tsdf_vol, tsdf_vol < out_th)
-    valid_voxels = ndimage.morphology.binary_dilation(
-        outside_voxels, iterations=2, mask=np.logical_not(inside_voxels)
-    )
-    qual_vol[valid_voxels == False] = 0.0
+    # outside_voxels = tsdf_vol > out_th
+    # inside_voxels = np.logical_and(1e-3 < tsdf_vol, tsdf_vol < out_th)
+    # valid_voxels = ndimage.morphology.binary_dilation(
+    #     outside_voxels, iterations=2, mask=np.logical_not(inside_voxels)
+    # )
+    # qual_vol[valid_voxels == False] = 0.0
 
     # reject voxels with predicted widths that are too small or too large
-    qual_vol[np.logical_or(width_vol < min_width, width_vol > max_width)] = 0.0
+    # qual_vol[np.logical_or(width_vol < min_width, width_vol > max_width)] = 0.0
 
     if VIS:
         voxel_dict = {'tsdf': tsdf_vol, 'quality': qual_vol.squeeze()}
@@ -144,11 +147,12 @@ def process(
 
     return qual_vol, rot_vol, width_vol
 
-def select(qual_vol, rot_vol, width_vol, threshold=0.90, max_filter_size=4, force_detection=False):
-    best_only = False
+def select(qual_vol, rot_vol, aff_vol, threshold=0.90, max_filter_size=4, force_detection=False):
+    # best_only = False
     qual_vol[qual_vol < LOW_TH] = 0.0
     if force_detection and (qual_vol >= threshold).sum() == 0:
-        best_only = True
+        # best_only = True
+        pass
     else:
         # threshold on grasp quality
         qual_vol[qual_vol < threshold] = 0.0
@@ -159,25 +163,29 @@ def select(qual_vol, rot_vol, width_vol, threshold=0.90, max_filter_size=4, forc
     mask = np.where(qual_vol, 1.0, 0.0)
 
     # construct grasps
-    grasps, scores = [], []
+    grasps, scores, affs = [], [], []
     for index in np.argwhere(mask):
-        grasp, score = select_index(qual_vol, rot_vol, width_vol, index)
+        grasp, score, aff = select_index(qual_vol, rot_vol, aff_vol, index)
         grasps.append(grasp)
         scores.append(score)
+        affs.append(aff)
 
     sorted_grasps = [grasps[i] for i in reversed(np.argsort(scores))]
     sorted_scores = [scores[i] for i in reversed(np.argsort(scores))]
+    sorted_affs = [affs[i] for i in reversed(np.argsort(scores))]
 
-    if best_only and len(sorted_grasps) > 0:
-        sorted_grasps = [sorted_grasps[0]]
-        sorted_scores = [sorted_scores[0]]
+    # if best_only and len(sorted_grasps) > 0:
+    #     sorted_grasps = [sorted_grasps[0]]
+    #     sorted_scores = [sorted_scores[0]]
 
-    return sorted_grasps, sorted_scores
+    return sorted_grasps, sorted_scores, sorted_affs
 
-def select_index(qual_vol, rot_vol, width_vol, index):
+
+
+def select_index(qual_vol, rot_vol, aff_vol, index):
     i, j, k = index
     score = qual_vol[i, j, k]
     ori = Rotation.from_quat(rot_vol[:, i, j, k])
     pos = np.array([i, j, k], dtype=np.float64)
-    width = width_vol[i, j, k]
-    return Grasp(Transform(ori, pos), width), score
+    aff = aff_vol[:, i, j, k]
+    return Grasp(Transform(ori, pos), 0.0), score, aff
