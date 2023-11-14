@@ -75,10 +75,12 @@ class BtWorld(object):
         self.bodies[body.uid] = body
         return body
 
-    def load_obj_fixed_scale(self, urdf_path, pose, scale=1.0,):
-        # the plane don't have mass
+    def load_obj_fixed_scale(self, urdf_path, pose, scale=1.0, name=None):
         body = Body.from_obj_fixed_scale(self.p, urdf_path, pose, scale)
-        body.name = urdf_path.name
+        if name is None:
+            body.name = urdf_path.name
+        else:
+            body.name = name
         self.bodies[body.uid] = body
         return body
 

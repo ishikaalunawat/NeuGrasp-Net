@@ -1,4 +1,5 @@
 import collections
+import os
 import argparse
 from datetime import datetime
 import uuid
@@ -12,6 +13,8 @@ from vgn.grasp import *
 from vgn.simulation import ClutterRemovalSim
 from vgn.utils.transform import Rotation, Transform
 from vgn.utils.implicit import get_mesh_pose_list_from_world, get_scene_from_mesh_pose_list
+from vgn.assign_grasp_affordance import affrdnce_label_dict, aff_labels_to_names, viz_color_legend, get_affordance
+
 
 MAX_CONSECUTIVE_FAILURES = 2
 MAX_SKIPS = 3
@@ -30,6 +33,7 @@ def run(
     N=None,
     num_rounds=40,
     seed=1,
+    aff_thresh=0.5,
     sim_gui=False,
     result_path=None,
     add_noise=False,
@@ -52,6 +56,10 @@ def run(
     logger = Logger(logdir, description)
     cnt = 0
     success = 0
+    aff_tp = np.zeros(len(affrdnce_label_dict.keys())) # true positive
+    aff_fp = aff_tp.copy() # false positive
+    aff_tn = aff_tp.copy() # true negative
+    aff_fn = aff_tp.copy() # false negative
     left_objs = 0
     total_objs = 0
     cons_fail = 0
@@ -75,16 +83,16 @@ def run(
             timings = {}
 
             # scan the scene
-            see_table = False
-            if see_table == False:
-                sim.world.remove_body(sim.world.bodies[0]) # remove table because we dont want to render it # normally table is the first body
+            # see_table = False
+            # if see_table == False:
+            #     sim.world.remove_body(sim.world.bodies[0]) # remove table because we dont want to render it # normally table is the first body
             tsdf, pc, timings["integration"] = sim.acquire_tsdf(n=n, N=N, resolution=resolution, randomize_view=randomize_view, tight_view=tight_view)
-            state = argparse.Namespace(tsdf=tsdf, pc=pc)
-            if resolution != 40:
-                extra_tsdf, _, _ = sim.acquire_tsdf(n=n, N=N, resolution=resolution)
-                state.tsdf_process = extra_tsdf
-            if see_table == False:
-                sim.place_table(height=sim.gripper.finger_depth) # Add table back
+            state = argparse.Namespace(tsdf=tsdf, pc=pc)#, pc_extended=pc_extended)
+            # if resolution != 40:
+            #     extra_tsdf, _, _ = sim.acquire_tsdf(n=n, N=N, resolution=resolution)
+            #     state.tsdf_process = extra_tsdf
+            # if see_table == False:
+            #     sim.place_table(height=sim.gripper.finger_depth) # Add table back
 
             if pc.is_empty():
                 print("[WARNING] Empty point cloud, aborting this round")
@@ -95,17 +103,38 @@ def run(
             if visualize:
                 mesh_pose_list = get_mesh_pose_list_from_world(sim.world, object_set)
                 scene_mesh = get_scene_from_mesh_pose_list(mesh_pose_list)
-                grasps, scores, timings["planning"], visual_mesh = grasp_plan_fn(state, scene_mesh)
+                grasps, scores, affs, timings["planning"], visual_mesh = grasp_plan_fn(state, scene_mesh)
                 logger.log_mesh(scene_mesh, visual_mesh, f'round_{round_id:03d}_trial_{trial_id:03d}')
             else:
-                grasps, scores, timings["planning"] = grasp_plan_fn(state)
+                grasps, scores, affs, timings["planning"] = grasp_plan_fn(state)
             planning_times.append(timings["planning"])
             total_times.append(timings["planning"] + timings["integration"])
 
             if len(grasps) == 0:
+                # not enough candidate grasps were sampled OR no grasps above quality threshold were found
                 no_grasp += 1
                 skip_time += 1
+                print("No good grasps, skipping...")
                 continue  # no good grasps found, skip
+
+            # Check affordances:
+            # TODO: Get metrics for the affordances
+            # get assignment of grasps to affordances
+            affrdnce_labels = []
+            mesh_pose_list = get_mesh_pose_list_from_world(sim.world, object_set)
+            for grasp in grasps:
+                affrdnce_labels.append(get_affordance(sim, sim.aff_dataset, grasp, mesh_pose_list)) # affdnces are 0/1 labels for each aff class
+            affrdnce_labels = np.array(affrdnce_labels)
+            # get true positive, false positive, true negative, false negative
+            aff_tp += np.sum(affrdnce_labels * (affs > aff_thresh), axis=0)
+            aff_fp += np.sum(affrdnce_labels * (affs <= aff_thresh), axis=0)
+            aff_tn += np.sum((1 - affrdnce_labels) * (affs <= aff_thresh), axis=0)
+            aff_fn += np.sum((1 - affrdnce_labels) * (affs > aff_thresh), axis=0)
+            # Print the affordances of the best grasp
+            aff_vector = affs[0]
+            aff_values = np.where(aff_vector > aff_thresh)[0] # get indices where aff_vector > thresh
+            best_grasp_affs_text = aff_labels_to_names(aff_values)
+            print("[Grasp Affordances: ", best_grasp_affs_text)
 
             # execute grasp
             grasp, score = grasps[0], scores[0]
@@ -128,14 +157,22 @@ def run(
             last_label = label
         left_objs += sim.num_objects
     success_rate = 100.0 * success / cnt
+    affordance_accuracy = 100.0 * (aff_tp + aff_tn) / (aff_tp + aff_fp + aff_tn + aff_fn)
+    affordance_precision = 100.0 * aff_tp / (aff_tp + aff_fp)
+    affordance_recall = 100.0 * aff_tp / (aff_tp + aff_fn)
+    affordance_mean_precision = np.mean(affordance_precision)
     declutter_rate = 100.0 * success / total_objs
     print('Grasp success rate: %.2f %%, Declutter rate: %.2f %%' % (success_rate, declutter_rate))
+    print('Affordance accuracy: ', affordance_accuracy)
+    print('Affordance precision: ', affordance_precision)
+    print('Affordance recall: ', affordance_recall)
+    print('Affordance mean precision: ', affordance_mean_precision)
     print(f'Average planning time: {np.mean(planning_times)}, total time: {np.mean(total_times)}')
     print('Consecutive failures and no detections: %d, %d' % (cons_fail, no_grasp))
     if result_path is not None:
         with open(result_path, 'w') as f:
             f.write('%.2f%%, %.2f%%; %d, %d\n' % (success_rate, declutter_rate, cons_fail, no_grasp))
-    return success_rate, declutter_rate
+    return success_rate, declutter_rate, affordance_accuracy, affordance_precision, affordance_recall, affordance_mean_precision
     
 
 

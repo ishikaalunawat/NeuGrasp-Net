@@ -11,16 +11,18 @@ from vgn.utils.misc import set_random_seed
 
 def main(args):
 
-    if args.type in ['giga', 'giga_classic_hr', 'giga_classic_hr_deeper', 'giga_aff']:
+    if args.type in ['giga', 'giga_classic_hr', 'giga_classic_hr_affnet', 'giga_classic_hr_deeper', 'giga_aff']:
         grasp_planner = VGNImplicit(args.model,
                                     args.type,
                                     best=args.best,
                                     qual_th=args.qual_th,
+                                    aff_thresh=args.aff_thresh,
                                     force_detection=args.force,
                                     out_th=0.1,
                                     select_top=False,
+                                    resolution=args.resolution,
                                     visualize=args.vis)
-    elif args.type == 'vgn':
+    elif args.type in ['vgn', 'vgn_affnet']:
         grasp_planner = VGN(args.model,
                             args.type,
                             best=args.best,
@@ -33,11 +35,16 @@ def main(args):
 
     gsr = []
     dr = []
+    aff_accuracy = []
+    aff_precision = []
+    aff_recall = []
+    aff_mean_precision = []
     for seed in args.zeeds:
         set_random_seed(seed)
-        success_rate, declutter_rate = clutter_removal.run(
+        success_rate, declutter_rate, affordance_accuracy, affordance_precision, affordance_recall, affordance_mean_precision = clutter_removal.run(
             grasp_plan_fn=grasp_planner,
             logdir=args.logdir,
+            resolution=args.resolution,
             description=args.description,
             scene=args.scene,
             object_set=args.object_set,
@@ -45,6 +52,7 @@ def main(args):
             n=args.num_view,
             num_rounds=args.num_rounds,
             seed=seed,
+            aff_thresh=args.aff_thresh,
             sim_gui=args.sim_gui,
             result_path=args.result_path,
             add_noise=args.add_noise,
@@ -55,6 +63,10 @@ def main(args):
             visualize=args.vis)
         gsr.append(success_rate)
         dr.append(declutter_rate)
+        aff_accuracy.append(affordance_accuracy.tolist())
+        aff_precision.append(affordance_precision.tolist())
+        aff_recall.append(affordance_recall.tolist())
+        aff_mean_precision.append(affordance_mean_precision)
     results = {
         'gsr': {
             'mean': np.mean(gsr),
@@ -65,11 +77,35 @@ def main(args):
             'mean': np.mean(dr),
             'std': np.std(dr),
             'val': dr
-        }
+        },
+        'aff_accuracy': {
+            'mean': np.mean(aff_accuracy, axis=0).tolist(),
+            'std': np.std(aff_accuracy, axis=0).tolist(),
+            'val': aff_accuracy
+        },
+        'aff_precision': {
+            'mean': np.mean(aff_precision, axis=0).tolist(),
+            'std': np.std(aff_precision, axis=0).tolist(),
+            'val': aff_precision
+        },
+        'aff_recall': {
+            'mean': np.mean(aff_recall, axis=0).tolist(),
+            'std': np.std(aff_recall, axis=0).tolist(),
+            'val': aff_recall
+        },
+        'aff_mean_precision': {
+            'mean': np.mean(aff_mean_precision),
+            'std': np.std(aff_mean_precision),
+            'val': aff_mean_precision
+        },
     }
     print('Average results:')
     print(f'Grasp sucess rate: {np.mean(gsr):.2f} ± {np.std(gsr):.2f} %')
     print(f'Declutter rate: {np.mean(dr):.2f} ± {np.std(dr):.2f} %')
+    print(f'Affordance accuracy: {np.mean(aff_accuracy, axis=0).tolist()} ± {np.std(aff_accuracy, axis=0).tolist()}')
+    print(f'Affordance precision: {np.mean(aff_precision, axis=0).tolist()} ± {np.std(aff_precision, axis=0).tolist()}')
+    print(f'Affordance recall: {np.mean(aff_recall, axis=0).tolist()} ± {np.std(aff_recall, axis=0).tolist()}')
+    print(f'Affordance mean precision: {np.mean(aff_mean_precision):.2f} ± {np.std(aff_mean_precision):.2f}')
     with open(args.result_path+'.json', 'w') as f:
         json.dump(results, f, indent=2)
 
@@ -82,24 +118,25 @@ if __name__ == "__main__":
     parser.add_argument("--description", type=str, default="")
     parser.add_argument("--scene",
                         type=str,
-                        choices=["pile", "packed", "egad"],
+                        choices=["pile", "packed", "egad", "affnet"],
                         default="pile")
-    parser.add_argument("--object_set", type=str, default="blocks")
+    parser.add_argument("--object_set", type=str, default="pile/test")
     parser.add_argument("--num-objects", type=int, default=5)
-    parser.add_argument("--num_view", type=int, default=1)
+    parser.add_argument("--num_view", type=int, default=1) # No need to change
     parser.add_argument("--num_rounds", type=int, default=100)
-    parser.add_argument("--zeeds", type=int, nargs='+', default=[0, 1, 2, 3, 4])
+    parser.add_argument("--resolution", type=int, default=64)
+    parser.add_argument("--zeeds", type=int, nargs='+', default=[1, 2, 3, 4, 5])
     parser.add_argument("--sim-gui", action="store_true")
     # parser.add_argument("--grad-refine", action="store_true")
-    parser.add_argument("--qual_th", type=float, default=0.9)
+    parser.add_argument("--qual_th", type=float, default=0.5)
+    parser.add_argument("--aff_thresh", type=float, default=0.5)
     parser.add_argument("--eval_geo",
                         action="store_true",
                         help='whether evaluate geometry prediction')
     parser.add_argument(
         "--best",
         action="store_true",
-        default=True,
-        help="Whether to use best valid grasp (or random valid grasp)")
+        help="UNUSED. Whether to use best valid grasp (or random valid grasp). UNUSED")
     parser.add_argument(
         "--randomize_view",
         type=bool, default='',
