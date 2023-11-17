@@ -352,7 +352,9 @@ class GraspEstimator:
         """
 
         if K is None:
-            raise ValueError('K is required either as argument --K or from the input numpy file')
+            # GIGA K:
+            K = np.array([[540., 0.0, 320.], [0.0, 540., 240.], [0.0, 0.0, 1.0]])
+            # raise ValueError('K is required either as argument --K or from the input numpy file')
             
         # Convert to pc 
         pc_full, pc_colors = depth2pc(depth, K, rgb)
@@ -360,6 +362,9 @@ class GraspEstimator:
         # Threshold distance
         if pc_colors is not None:
             pc_colors = pc_colors[(pc_full[:,2] < z_range[1]) & (pc_full[:,2] > z_range[0])] 
+        # import pdb
+        # pdb.set_trace()
+        # pc_full = pc_full[(pc_full[:,2] < z_range[1]) & (pc_full[:,2] > z_range[0])]
         pc_full = pc_full[(pc_full[:,2] < z_range[1]) & (pc_full[:,2] > z_range[0])]
         
         # Extract instance point clouds from segmap and depth map

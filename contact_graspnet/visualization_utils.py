@@ -1,10 +1,10 @@
 import numpy as np
-# import mayavi.mlab as mlab
+import mayavi.mlab as mlab
 
 import matplotlib.pyplot as plt
 from matplotlib import cm
 
-import mesh_utils
+import contact_graspnet.mesh_utils as mesh_utils
 
 def plot_mesh(mesh, cam_trafo=np.eye(4), mesh_pose=np.eye(4)):
     """
@@ -88,7 +88,7 @@ def visualize_grasps(full_pc, pred_grasps_cam, scores, plot_opencv_cam=False, pc
     cm = plt.get_cmap('rainbow')
     cm2 = plt.get_cmap('gist_rainbow')
 
-    mlab.options.offscreen = True
+    # mlab.options.offscreen = True
     fig = mlab.figure('Pred Grasps')
     mlab.view(azimuth=180, elevation=180, distance=0.2)
     draw_pc_with_colors(full_pc, pc_colors)
@@ -106,9 +106,10 @@ def visualize_grasps(full_pc, pred_grasps_cam, scores, plot_opencv_cam=False, pc
                             gripper_openings=[gripper_openings_k[np.argmax(scores[k])]], tube_radius=0.0025)    
             else:
                 colors3 = [cm2(0.5*score)[:3] for score in scores[k]]
-                draw_grasps(pred_grasps_cam[k], np.eye(4), colors=colors3, gripper_openings=gripper_openings_k)    
-    # mlab.show()
-    mlab.savefig('figure1.png')
+                draw_grasps(pred_grasps_cam[k], np.eye(4), colors=colors3, gripper_openings=gripper_openings_k)  
+    # mlab.savefig('figure.png', figure=fig)  
+    mlab.show()
+    return fig
 
 def draw_pc_with_colors(pc, pc_colors=None, single_color=(0.3,0.3,0.3), mode='2dsquare', scale_factor=0.0018):
     """
@@ -145,7 +146,7 @@ def draw_pc_with_colors(pc, pc_colors=None, single_color=(0.3,0.3,0.3), mode='2d
         points_mlab.module_manager.scalar_lut_manager.lut.number_of_colors = rgb_lut.shape[0]
         points_mlab.module_manager.scalar_lut_manager.lut.table = rgb_lut
 
-def draw_grasps(grasps, cam_pose, gripper_openings, color=(0,1.,0), colors=None, show_gripper_mesh=False, tube_radius=0.0008):
+def draw_grasps(grasps, cam_pose, gripper_openings, color=(0,1.,0), colors=None, show_gripper_mesh=False, tube_radius=0.0015):
     """
     Draws wireframe grasps from given camera pose and with given gripper openings
 
@@ -197,6 +198,6 @@ def draw_grasps(grasps, cam_pose, gripper_openings, color=(0,1.,0), colors=None,
     src = mlab.pipeline.scalar_scatter(all_pts[:,0], all_pts[:,1], all_pts[:,2])
     src.mlab_source.dataset.lines = connections
     src.update()
-    lines =mlab.pipeline.tube(src, tube_radius=tube_radius, tube_sides=12)
+    lines = mlab.pipeline.tube(src, tube_radius=tube_radius, tube_sides=12)
     mlab.pipeline.surface(lines, color=color, opacity=1.0)
     

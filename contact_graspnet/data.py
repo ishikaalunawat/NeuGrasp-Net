@@ -218,7 +218,6 @@ def depth2pc(depth, K, rgb=None):
     :param K: 3x3 Camera Matrix with intrinsics
     :returns: (Nx3 point cloud, point cloud color)
     """
-
     mask = np.where(depth > 0)
     x,y = mask[1], mask[0]
     
@@ -231,7 +230,7 @@ def depth2pc(depth, K, rgb=None):
 
     if rgb is not None:
         rgb = rgb[y,x,:]
-        
+    
     pc = np.vstack((world_x, world_y, world_z)).T
     return (pc, rgb)
 
@@ -321,8 +320,8 @@ def load_available_input_data(p, K=None):
             else:
                 depth = data
 
-        if 'depth' in keys:
-            depth = data['depth']
+        if 'depth_imgs' in keys:
+            depth = data['depth_imgs'][0]
             if K is None and 'K' in keys:
                 cam_K = data['K'].reshape(3,3)
             if 'segmap' in keys:    

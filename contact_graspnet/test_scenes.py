@@ -80,19 +80,16 @@ def inference(global_config, checkpoint_dir, input_paths, K=None, local_regions=
 
         #Flipping Z-axis of PC:
         # pc_full[:, 2] *= -1
-        print('Generating Grasps...')
-        # import pdb
-        # pdb.set_trace()
         pred_grasps_cam, scores, contact_pts, _ = grasp_estimator.predict_scene_grasps(sess, pc_full, pc_segments=pc_segments, 
                                                                                           local_regions=local_regions, filter_grasps=filter_grasps, forward_passes=forward_passes)  
 
-        # Taking best 50
+        # Taking best 20
         pred_grasps_cam, scores, contact_pts = pred_grasps_cam[-1], scores[-1], contact_pts[-1]
         scores_sort = scores.argsort()[::-1]
         pred_grasps_cam = pred_grasps_cam[scores_sort, :, :]
         contact_pts = contact_pts[scores_sort, :]
         scores = scores[scores_sort]
-        pred_grasps_cam, scores, contact_pts = {-1 : pred_grasps_cam[:50, :, :]}, {-1 : scores[:50]}, {-1 : contact_pts[:50, :]}
+        pred_grasps_cam, scores, contact_pts = {-1 : pred_grasps_cam[:20, :, :]}, {-1 : scores[:20]}, {-1 : contact_pts[:20, :]}
 
         # Save results
         np.savez('results/predictions_{}'.format(os.path.basename(p.replace('png','npz').replace('npy','npz'))), 
@@ -107,17 +104,28 @@ def inference(global_config, checkpoint_dir, input_paths, K=None, local_regions=
         print('No files found: ', input_paths)
 
 def run_experiments(args):
-    pc_root = args.root + 'point_clouds/'
+    if not args.use_depth_imgs:
+        pc_root = args.root + 'point_clouds/'
     
-    if args.random and args.num_scenes:
-        scene_ids = np.random.choice(os.listdir(pc_root), args.num_scenes)
-    elif args.scene_ids:
-        scene_ids = [scene_id + '.npz' for scene_id in args.scene_ids]
-        # scene_ids = eval(str(args.scene_ids))
+        if args.random and args.num_scenes:
+            scene_ids = np.random.choice(os.listdir(pc_root), args.num_scenes)
+        elif args.scene_ids:
+            scene_ids = [scene_id + '.npz' for scene_id in args.scene_ids]
+            # scene_ids = eval(str(args.scene_ids))
 
-    scenes = [pc_root + scene_id for scene_id in scene_ids]
-    global_config = config_utils.load_config(args.ckpt_dir, batch_size=args.forward_passes, arg_configs=args.arg_configs)
+        scenes = [pc_root + scene_id for scene_id in scene_ids]
+        global_config = config_utils.load_config(args.ckpt_dir, batch_size=args.forward_passes, arg_configs=args.arg_configs)
 
+    else:
+        depth_root = args.root + '/scenes/'
+        if args.random and args.num_scenes:
+            scene_ids = np.random.choice(os.listdir(depth_root), args.num_scenes)
+        elif args.scene_ids:
+            scene_ids = [scene_id + '.npz' for scene_id in args.scene_ids]
+            # scene_ids = eval(str(args.scene_ids))
+
+        scenes = [depth_root + scene_id for scene_id in scene_ids]
+        global_config = config_utils.load_config(args.ckpt_dir, batch_size=args.forward_passes, arg_configs=args.arg_configs)
     
     for scene in scenes:
         print(f"\n\nProcessing scene: {scene.strip()}\n\n")
@@ -127,14 +135,15 @@ def run_experiments(args):
 if __name__=='__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--ckpt_dir', default='checkpoints/contact_graspnet_train_and_test', help='Log dir [default: checkpoints/scene_test_2048_bs3_hor_sigma_001]')
-    parser.add_argument('--root', default='/media/hypatia/6903154a-554e-4ca5-987c-4a24f3250e97/home/hypatia/6D-DAAD/GIGA/data/pile/data_pile_train_constructed_4M_HighRes_radomized_views_no_table/', help='Input data: npz/npy file with keys either "depth" & camera matrix "K" or just point cloud "pc" in meters. Optionally, a 2D "segmap"')
+    parser.add_argument('--root', default='/home/hypatia/6D-DAAD/GIGA/data/packed/data_packed_train_random_raw_4M_GPG_60_packked', help='Input data: npz/npy file with keys either "depth" & camera matrix "K" or just point cloud "pc" in meters. Optionally, a 2D "segmap"')
     parser.add_argument('--random', action="store_true", help='If random, enter num_scenes, else enter scene_ids')
     parser.add_argument('--num_scenes', type=int, default=1, help='Number of scenes to test only if random is provdied')
     # parser.add_argument('--scene_ids', default=[], help='Scene ids to test only if random is not provided')
     parser.add_argument('--scene_ids', default=[], nargs='+')
-    parser.add_argument('--z_range', default=[0.,0.3], help='Z value threshold to crop the input point cloud')
-    parser.add_argument('--forward_passes', type=int, default=1,  help='Run multiple parallel forward passes to mesh_utils more potential contact points.')
+    parser.add_argument('--z_range', default=[0.2,1.8], help='Z value threshold to crop the input point cloud')
+    parser.add_argument('--forward_passes', type=int, default=5,  help='Run multiple parallel forward passes to mesh_utils more potential contact points.')
     parser.add_argument('--arg_configs', nargs="*", type=str, default=[], help='overwrite config parameters')
+    parser.add_argument('--use_depth_imgs', action="store_true", help='use depth images')
     
     args = parser.parse_args()
     run_experiments(args)
