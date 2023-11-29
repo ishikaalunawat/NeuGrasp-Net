@@ -25,7 +25,7 @@ from vgn.networks import get_network, load_network
 # seed = np.random.randint(2**32 - 1)
 nice_seeds = [2744579596, 3736952697, 1570237463, 3573398670, 3090687052]
 great_scene_forscene_recon = [2837027833, 1075486976]
-seed = nice_seeds[4]
+seed = nice_seeds[2] # nice_seeds[4]
 np.random.seed(seed)
 
 constructed_root = Path("/home/sjauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/pile/data_pile_train_constructed_4M_HighRes_radomized_views_GPG_only")
@@ -406,6 +406,7 @@ seed = 309068705
 np.random.seed(seed)
 # downsampl & crop the cloud:
 down_surf_pc = surf_pc.voxel_down_sample(voxel_size=scene_voxel_downsample_size) # 5mm
+down_surf_pc = surf_pc.voxel_down_sample(voxel_size=0.035) # 35mm
 down_surf_pc_cropped = down_surf_pc.crop(o3d.geometry.AxisAlignedBoundingBox(np.array([0.0, 0.0, 0.0]), np.array([size, size, size])))
 sampler = GpgGraspSamplerPcl(sim.gripper.finger_depth-0.0075) # Franka finger depth is actually a little less than 0.05
 safety_dist_above_table = sim.gripper.finger_depth # table is spawned at finger_depth
@@ -503,7 +504,7 @@ viz_camera_mesh.visual.face_colors = cam_colors
 
 # Add feat space box and make it more transparent
 box_feat_space = trimesh.creation.box(extents=[0.3, 0.3, 0.3-0.08])
-box_feat_space.visual.face_colors = [0.9, 0.9, 0.9, 0.2]
+box_feat_space.visual.face_colors = [0.9, 0.9, 0.9, 0.0]
 translation = [0.15, 0.05, 0.05+0.15]
 box_feat_space.apply_translation(translation)
 viz_camera_scene = trimesh.Scene([box_feat_space, box])
