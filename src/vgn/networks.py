@@ -487,8 +487,8 @@ def NeuGraspPNAffNetDeeper():
         },
         'decoder_tsdf': 'simple_local',
         'padding': 0,
-        'c_dim': 64,
-        'hidden_dim': 128 # for simple_local decoder
+        'c_dim': 128,
+        'hidden_dim': 256 # for simple_local decoder
     }
     return get_model(config)
 
