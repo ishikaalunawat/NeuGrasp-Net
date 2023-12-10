@@ -113,6 +113,8 @@ class ClutterRemovalSim(object):
 
         for mesh_path, scale, pose in mesh_pose_list:
             body_pose = Transform.from_matrix(pose)
+            if data_root is not None:
+                mesh_path = os.path.join(data_root, mesh_path)
 
             if 'egad' in str(mesh_path):
                 if data_root is not None:

@@ -38,6 +38,9 @@ python -u scripts/sim_grasp_multiple.py --num-view 1 --object_set pile/test --sc
 # Affnet dataset:
 python scripts/generate_data_gpg_parallel.py --root /work/scratch/sj93qicy/potato-net/data/3DGraspAff/data_affnet_train_random_raw_GPG_60 --num_proc 2 --grasps_per_scene 60 --grasps_per_scene_gpg 60 --save_scene True --random True --object_set train --scene affnet --data_root /work/scratch/sj93qicy/potato-net/
 
+# construct dataset
+python scripts/construct_dataset_parallel.py --num-proc 40 --single-view --add-noise dex /home/sjauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/3DGraspAff/data_affnet_train_random_raw_GPG_60 /home/sjauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/3DGraspAff/data_affnet_train_constructed_GPG_60
+
 # affdnce assignment
 python -u GIGA-6DoF/scripts/generate_data_grasp_surface_clouds.py --scene affnet --object_set train --raw_root /home/sjauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/3DGraspAff/data_affnet_train_random_raw_GPG_60 --num_proc 2 --save_occ_values True --save_affrdnce_values True --save_occ_semantics True --add_noise True --data_root /home/sjauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/
 
@@ -46,3 +49,6 @@ python -u GIGA-6DoF/scripts/save_occ_data_parallel.py /home/sjauhri/IAS_WS/potat
 
 # affnet test/debug
 python -u scripts/sim_grasp_multiple.py --num_view 1 --object_set test --scene affnet --num_rounds 100 --model data/runs_relevant_affnet/23-11-06-04-55-36_dataset=data_affnet_train_constructed_GPG_60,augment=False,net=6d_neu_grasp_pn_affnet,batch_size=64,lr=2e-04,AFFNET_v4_no_hand_balanced/best_neural_grasp_neu_grasp_pn_affnet_val_acc=0.9179.pt --resolution=64 --type neu_grasp_pn_affnet --qual_th 0.75 --see_table True --aff_thresh 0.3 --sim-gui --vis
+
+# Make tsdf vizs
+python generate_visuals.py --root /home/sjauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/3DGraspAff/data_affnet_train_constructed_GPG_60 --raw_root /home/sjauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/3DGraspAff/data_affnet_train_random_raw_GPG_60 --data_root /home/sjauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/ --net neu_grasp_pn_affnet --cuda True --model_path /home/sjauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/runs_relevant_affnet/23-11-06-04-55-36_dataset=data_affnet_train_constructed_GPG_60,augment=False,net=6d_neu_grasp_pn_affnet,batch_size=64,lr=2e-04,AFFNET_v4_no_hand_balanced/best_neural_grasp_neu_grasp_pn_affnet_val_acc=0.9179.pt --random

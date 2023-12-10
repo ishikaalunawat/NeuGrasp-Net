@@ -3,8 +3,9 @@ import numpy as np
 from vgn.networks import load_network
 import torch
 import plotly.graph_objects as go
-from vgn.dataset_voxel_grasp_pc import DatasetVoxelGraspPCOcc
-from vgn.dataset_voxel import DatasetVoxelOccFile
+# from vgn.dataset_voxel_grasp_pc import DatasetVoxelGraspPCOcc
+from vgn.dataset_affnet_grasp_pc import DatasetAffnetGraspPC
+from vgn.io import *
 from pathlib import Path
 import random
 import argparse
@@ -78,11 +79,12 @@ def make_tsdf(sim, device):
     tsdf = torch.tensor(tsdf.get_grid(), device=device, dtype=torch.float32)
     return tsdf
 
-def make_occ_grid(resolution):
+def make_occ_grid(resolution, device):
     x, y, z = torch.meshgrid(torch.linspace(start=-0.5, end=0.5 - 1.0 / resolution, steps= resolution), torch.linspace(start=-0.5, end=0.5 - 1.0 / resolution, steps=resolution), torch.linspace(start=-0.5, end=0.5 - 1.0 / resolution, steps=resolution))
     # 1, self.resolution, self.resolution, self.resolution, 3
     pos = torch.stack((x, y, z), dim=-1).float().unsqueeze(0)
     pos = pos.view(1, resolution*resolution*resolution, 3)
+    pos = pos.to(device)
     return pos
 
 def create_plot(geometry, camera_eye):
@@ -143,7 +145,8 @@ def main(args):
 
     # NOTE: Renamed "grasps_with_clouds_gt".csv to "grasps_with_clouds.csv"
     # data = DatasetVoxelGraspPCOcc(args.root, args.raw_root, use_grasp_occ=False, num_point_occ=8000)
-    data = DatasetVoxelOccFile(args.root, args.raw_root, num_point_occ=8000)
+    data = DatasetAffnetGraspPC(args.root, args.raw_root, num_point_occ=8000)
+
     # Packed scene_id's
     scenes = ["3e096fb3f3ad407bb655a87a16c06efc"] if not args.random \
             else data.df.sample(args.num_scenes, random_state=args.seed)["scene_id"]
@@ -152,27 +155,29 @@ def main(args):
         print("Processing scene: ", scene)
         mesh_list_file = os.path.join(args.raw_root, 'mesh_pose_list', scene + '.npz')
         mesh_pose_list = np.load(mesh_list_file, allow_pickle=True)['pc']
-        sim = ClutterRemovalSim('pile', 'pile/train', gui=False, data_root=args.data_root) # parameters scene and object_set are not used
+        sim = ClutterRemovalSim('affnet', 'train', gui=False, data_root=args.data_root) # parameters scene and object_set are not used
         sim.setup_sim_scene_from_mesh_pose_list(mesh_pose_list, table=args.see_table, data_root=args.data_root)
 
-        # index = random.choice(data.df[data.df.scene_id==scene].index)
-        # tsdf, _, _, _= load_data(data[index])
-        tsdf = make_tsdf(sim, device)
+        # read saved tsdf
+        tsdf = read_voxel_grid(args.root, scene_id=scene)
+        tsdf = torch.tensor(tsdf, device=device, dtype=torch.float32)
+        # OR make the tsdf now
+        # tsdf = make_tsdf(sim, device)
 
         
-        pos = make_occ_grid(args.resolution)
+        pos = make_occ_grid(args.resolution, device)
         c = net.encode_inputs(tsdf)
 
         # Reconstruction
         occupancies = net.decoder_tsdf(pos, c,)
-        vertices, triangles = mcubes.marching_cubes(occupancies.view(64, 64, 64).detach().numpy(), 0.5)
+        vertices, triangles = mcubes.marching_cubes(occupancies.view(64, 64, 64).detach().cpu().numpy(), 0.5)
                 
-        if random:
+        if args.random:
             cam_eye = np.random.uniform(0.9, 1.3, 3)
         # Plotting
         (save_path / f"scene_{scene}").mkdir(parents=True, exist_ok=True)
         make_save_fig((vertices, triangles), cam_eye, file_name= save_path / f"scene_{scene}/reconstruction.png")
-        make_save_fig(tsdf, cam_eye, file_name= save_path / f"scene_{scene}/tsdf.png", type="voxel")
+        make_save_fig(tsdf.cpu(), cam_eye, file_name= save_path / f"scene_{scene}/tsdf.png", type="voxel")
 
 
 

@@ -264,6 +264,7 @@ neur_grasps_pc = neur_grasps_pc[~torch.all(neur_grasps_pc == 0, axis=1)]
 neur_grasps_pc_trimesh = trimesh.points.PointCloud(neur_grasps_pc)
 neur_grasps_pc_trimesh.colors = np.array([0, 0, 0]) # Black
 neur_grasps_pc_trimesh.colors = np.array([194, 30, 86]) # Rose Red
+neur_grasps_pc_trimesh.colors = np.array([0, 110, 175]) # Blue cover fig
 neur_render_scene = trimesh.Scene([grasps_scene, neur_grasps_pc_trimesh])
 neur_render_scene.camera_transform = np.array([[ 0.92534726,  0.37798069,  0.02937752,  0.20271586],
        [-0.25004428,  0.66671217, -0.70212018,  0.08510838],
