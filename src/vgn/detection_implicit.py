@@ -183,7 +183,7 @@ class VGNImplicit(object):
         else:
             o3d_vis = None
             # num_grasps_gpg = 40
-            num_grasps_gpg = 60
+            num_grasps_gpg = 85
             if (self.seen_pc_only == True):
                 pc_extended = o3d.geometry.PointCloud(state.pc) # Use only seen areas for grasp sampling
             else:
@@ -232,9 +232,10 @@ class VGNImplicit(object):
             
             sampler = GpgGraspSamplerPcl(0.05-0.0075) # Franka finger depth is actually a little less than 0.05
             safety_dist_above_table = 0.05 # table is spawned at finger_depth
+            sample_constraints = dict({'x': [0.14, 0.28]})
             grasps, pos_queries, rot_queries, gpg_origin_points = sampler.sample_grasps_parallel(pc_extended_down, num_parallel=24, num_grasps=num_grasps_gpg, max_num_samples=180,#320
                                                 safety_dis_above_table=safety_dist_above_table, show_final_grasps=False, verbose=False,
-                                                return_origin_point=True)
+                                                return_origin_point=True, sample_constraints=sample_constraints)
             # Optional: Find out if the point comes from a seen or unseen area
             if (self.seen_pc_only == True):
                 unseen_flags = None # will be set to 0 for all grasps in select()
@@ -249,7 +250,7 @@ class VGNImplicit(object):
                         unseen_flags.append(0) # Seen
                     else:
                         unseen_flags.append(1) # Unseen
-
+            
             # Use standard GIGA grasp sampling:
             # points, normals = self.sample_grasp_points(pc_extended, self.finger_depth)
             # pos_queries, rot_queries = self.get_grasp_queries(points, normals) # Grasp queries :: (pos ;xyz, rot ;as quat)
@@ -360,7 +361,6 @@ class VGNImplicit(object):
             qual_vol, aff_vol = predict(encoded_tsdf, (pos_queries.to(self.device), rot_queries.to(self.device), grasps_pc_local.to(self.device), grasps_pc.to(self.device)),
                                           self.net, self.device, seed=seed, encoded_input=True)
             width_vol = np.zeros(qual_vol.shape) # zeros
-            # import pdb; pdb.set_trace()
             qual_vol[bad_indices] = 0.0 # set bad grasp scores to zero
             aff_vol[bad_indices] = 0.0 # set bad grasp scores to zero
             
@@ -386,14 +386,14 @@ class VGNImplicit(object):
                             # Optional: color based on affordance
                             aff_vector = aff_vol[ind]
                             aff_values = np.where(aff_vector > self.aff_thresh)[0] # get indices where aff_vector > thresh
-                            # Optional: Only color certain affordances
-                            if np.any(aff_values == affrdnce_label_dict['cut']) or np.any(aff_values == affrdnce_label_dict['stab']):
-                                aff_color = aff_labels_to_colors(aff_values)
-                                if len(aff_color) > 0:
-                                    aff_color = aff_color[-1] # if more than one, use the last one
-                                    grasp_viz_mesh.paint_uniform_color(aff_color)
-                            else:
-                                o3d_vis.remove_geometry(grasp_viz_mesh, reset_bounding_box=False)
+                            # # Optional: Only color certain affordances
+                            # if np.any(aff_values == affrdnce_label_dict['pour']):# or np.any(aff_values == affrdnce_label_dict['stab']):
+                            #     aff_color = aff_labels_to_colors(aff_values)
+                            #     if len(aff_color) > 0:
+                            #         aff_color = aff_color[-1] # if more than one, use the last one
+                            #         grasp_viz_mesh.paint_uniform_color(aff_color)
+                            # else:
+                            #     o3d_vis.remove_geometry(grasp_viz_mesh, reset_bounding_box=False)
 
                             o3d_vis.update_geometry(grasp_viz_mesh)
                         else:

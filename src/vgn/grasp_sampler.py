@@ -69,6 +69,7 @@ class GpgGraspSamplerPcl():
             'num_dy': 10,  # number
             'dtheta': 10,  # unit degree
             'range_dtheta': 90,
+            'range_dy': 0.04, # try to keep this to half of max gripper width
             'debug_vis': False,
             # 'r_ball': self.gripper.hand_height,
             'approach_step': 0.005,
@@ -173,9 +174,9 @@ class GpgGraspSamplerPcl():
                 dtheta = np.float64(dtheta)
                 quat = np.array([x, y, z, dtheta / 180 * np.pi])
                 rotation = Rotation.from_quat(quat).as_matrix() # NOTE this also rotates about the z axis (minor_pc) to get the correct grasping frame
-                for dy in np.arange(-self.params['num_dy'] * self.params['gripper_finger_width'],
-                                    (self.params['num_dy'] + 1) * self.params['gripper_finger_width'],
-                                    self.params['gripper_finger_width']):
+                for dy in np.arange(-self.params['range_dy'],
+                                    (self.params['range_dy'] + self.params['range_dy']/self.params['num_dy']),
+                                    self.params['range_dy']/self.params['num_dy']):
                     # compute centers and axes
                     tmp_major_pc = np.dot(rotation, major_pc * normal_dir)
                     tmp_grasp_normal = np.dot(rotation, new_normal * normal_dir)
@@ -284,7 +285,7 @@ class GpgGraspSamplerPcl():
 
 
     def sample_grasps_parallel(self, point_cloud, num_parallel, num_grasps=20, max_num_samples=180, safety_dis_above_table=0.005,
-                       show_final_grasps=False, verbose=False, return_origin_point=False):
+                       show_final_grasps=False, verbose=False, return_origin_point=False, sample_constraints=None):
         """
         (Paralellized with joblib) Returns a list of candidate grasps for the given point cloud.
 
@@ -312,7 +313,14 @@ class GpgGraspSamplerPcl():
             all_normals = np.asarray(point_cloud.normals)
         # make sure the normal is pointing upwards
         ok_normal_mask = all_normals[:,2] > 0.1
+        # Optional: Use sample constraints eg. only sample in a region of interest
+        if sample_constraints is not None:
+            for key, value in sample_constraints.items():
+                if key == 'x':
+                    ok_normal_mask = np.logical_and(ok_normal_mask, all_points[:,0] > value[0])
+                    ok_normal_mask = np.logical_and(ok_normal_mask, all_points[:,0] < value[1])
         num_parallel_jobs = min(ok_normal_mask.sum(), num_parallel_jobs) # Handle edge case where ok_points are too few
+
         if num_parallel_jobs < 1:
             if return_origin_point:
                 return [], [], [], []
@@ -356,7 +364,7 @@ class GpgGraspSamplerPcl():
 
             # sample grasps for n points in parallel
             results = Parallel(n_jobs=num_parallel_jobs)(delayed(self.sample_grasps_for_point)(index, all_num_points_r_ball[i], all_kd_indices[i], all_sqr_distances[i], all_points, all_normals) for i, index in enumerate(indices))
-            
+
             # accumulate results
             for result in results:
                 if return_origin_point:
@@ -368,6 +376,18 @@ class GpgGraspSamplerPcl():
                 potential_grasps_vgn_rot_quat.extend(ret_potential_grasps_vgn_rot_quat)
                 if return_origin_point:
                     origin_points.extend(ret_origin_points)
+            
+            # # DEBUGGGGGGGGGG grasp sampling far away issue
+            # if len(processed_potential_grasps_vgn) > 0:
+            #     self.show_grasps_and_pcl_open3d(processed_potential_grasps_vgn, point_cloud)
+            #     # chosen index r_ball points:
+            #     chosen_pcd = o3d.geometry.PointCloud()
+            #     chosen_pcd.points = o3d.utility.Vector3dVector(all_points[kd_indices])
+            #     chosen_pcd.colors = o3d.utility.Vector3dVector(np.array([[0, 1, 0]] * len(indices)))
+            #     self.show_grasps_and_pcl_open3d(processed_potential_grasps_vgn, chosen_pcd)
+            #     import pdb; pdb.set_trace()
+            #     processed_potential_grasps_vgn = []
+            # # DEBUGGGGGGGGGG
 
         if show_final_grasps:
             # Show all grasps and the surface point cloud with open3d
@@ -380,7 +400,7 @@ class GpgGraspSamplerPcl():
 
 
     def sample_grasps(self, point_cloud, num_grasps=20, max_num_samples=180, safety_dis_above_table=0.005,
-                       show_final_grasps=False, verbose=False, return_origin_point=False,
+                       show_final_grasps=False, verbose=False, return_origin_point=False, sample_constraints=None,
                       **kwargs):
         """
         Returns a list of candidate grasps for the given point cloud.
@@ -425,6 +445,12 @@ class GpgGraspSamplerPcl():
             sampled_surface_amount += 1
             # print("No. of sampled surface points:", sampled_surface_amount)
             ok = all_normals[ind, 2] > -0.1  # make sure the normal is pointing upwards
+            # Optional: Use sample constraints eg. only sample in a region of interest
+            if sample_constraints is not None:
+                for key, value in sample_constraints.items():
+                    if key == 'x':
+                        ok = np.logical_and(ok, all_points[ind,0] > value[0])
+                        ok = np.logical_and(ok, all_points[ind,0] < value[1])
             if not ok:
                 continue
             selected_surface = all_points[ind, :].squeeze()
