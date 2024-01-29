@@ -69,6 +69,7 @@ class GpgGraspSamplerPcl():
             'num_dy': 10,  # number
             'dtheta': 10,  # unit degree
             'range_dtheta': 90,
+            # FIX? 'range_dy': 0.04, # try to keep this to half of max gripper width
             'debug_vis': False,
             # 'r_ball': self.gripper.hand_height,
             'approach_step': 0.005,
@@ -82,7 +83,7 @@ class GpgGraspSamplerPcl():
             "gripper_finger_width": 0.02, # Approx
             "gripper_hand_height": 0.030,
             "gripper_hand_outer_diameter": 0.12, # 0.218, the diameter of the robot hand (= maximum aperture plus 2 * finger width)
-            "gripper_hand_depth": 0.0425, # 0.125,
+            "gripper_hand_depth": 0.0425, # 0.125,  # Franka finger depth is actually a little less than 0.05
             "gripper_init_bite": 0.005
 
             # # Robotiq 2F-85
@@ -176,6 +177,9 @@ class GpgGraspSamplerPcl():
                 for dy in np.arange(-self.params['num_dy'] * self.params['gripper_finger_width'],
                                     (self.params['num_dy'] + 1) * self.params['gripper_finger_width'],
                                     self.params['gripper_finger_width']):
+                # FIX? for dy in np.arange(-self.params['range_dy'],
+                                    # (self.params['range_dy'] + self.params['range_dy']/self.params['num_dy']),
+                                    # self.params['range_dy']/self.params['num_dy']):
                     # compute centers and axes
                     tmp_major_pc = np.dot(rotation, major_pc * normal_dir)
                     tmp_grasp_normal = np.dot(rotation, new_normal * normal_dir)
