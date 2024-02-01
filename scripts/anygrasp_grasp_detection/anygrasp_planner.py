@@ -99,10 +99,10 @@ class AnyGraspPlanner(object):
                     grasp_tf_world[1,3] > sim.size or grasp_tf_world[1,3] < 0:
                 # gg.remove(grasp)
                 continue
-            # DEBUG: add an in-frame translation offset to the grasp since we want to move closer (Franka gripper and not Robotiq)
-            offset = np.array([0,0,-0.02])
-            offset_tf = Transform(Rotation.from_matrix(np.eye(3)), offset)
-            grasp_tf_world = grasp_tf_world @ offset_tf.as_matrix()
+            # # DEBUG?: add an in-frame translation offset to the grasp since we want to move closer? (Franka gripper and not Robotiq)
+            # offset = np.array([0,0,-0.015])
+            # offset_tf = Transform(Rotation.from_matrix(np.eye(3)), offset)
+            # grasp_tf_world = grasp_tf_world @ offset_tf.as_matrix()
 
             curr_grasp = vgn.grasp.Grasp(Transform.from_matrix(grasp_tf_world), grasp.width)#self.cfg.max_gripper_width)
             grasps.append(curr_grasp)
@@ -121,6 +121,7 @@ class AnyGraspPlanner(object):
                 # viewer.add_geometry(grippers[0])
                 for gripper in grippers:
                     viewer.add_geometry(gripper)
+                    # break only show the best grasp
                 opt = viewer.get_render_option()
                 opt.show_coordinate_frame = True
                 opt.background_color = np.asarray([0.5, 0.5, 0.5])
