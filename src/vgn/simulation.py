@@ -213,7 +213,7 @@ class ClutterRemovalSim(object):
         self.remove_and_wait()
         return urdf, pose
 
-    def acquire_tsdf(self, n, N=None, resolution=40, randomize_view=False, tight_view=False):
+    def acquire_tsdf(self, n, N=None, resolution=40, randomize_view=False, tight_view=False, return_depths_and_ext=False):
         """Render synthetic depth images from n viewpoints and integrate into a TSDF.
 
         If N is None, the n viewpoints are equally distributed on circular trajectory.
@@ -222,6 +222,8 @@ class ClutterRemovalSim(object):
         """
         tsdf = TSDFVolume(self.size, resolution)
         high_res_tsdf = TSDFVolume(self.size, 120)
+        depths = []
+        extrinsics = []
 
         if self.sideview:
             # origin = Transform(Rotation.identity(), np.r_[self.size / 2, self.size / 2, self.size / 3])
@@ -266,10 +268,14 @@ class ClutterRemovalSim(object):
             tsdf.integrate(depth_img, self.camera.intrinsic, extrinsic)
             timing += time.time() - tic
             high_res_tsdf.integrate(depth_img, self.camera.intrinsic, extrinsic)
+            if return_depths_and_ext:
+                depths.append(depth_img)
         bounding_box = o3d.geometry.AxisAlignedBoundingBox(self.lower, self.upper)
         pc = high_res_tsdf.get_cloud()
         pc = pc.crop(bounding_box)
 
+        if return_depths_and_ext:
+            return tsdf, pc, timing, depths, extrinsics
         return tsdf, pc, timing
 
     def execute_grasp(self, grasp, remove=True, allow_contact=False):

@@ -86,22 +86,20 @@ class VGNImplicit(object):
         return pos_queries, rot_queries
             
     
-    def __call__(self, state, scene_mesh=None, sim=None, debug_data=None, seed=None, o3d_vis=None, first_call=False, aff_kwargs={}):
+    def __call__(self, state, scene_mesh=None, sim=None, debug_data=None, seed=None, o3d_vis=None, first_call=False, aff_kwargs={}):        
         if hasattr(state, 'tsdf_process'):
             tsdf_process = state.tsdf_process
         else:
             tsdf_process = state.tsdf
-
         if isinstance(state.tsdf, np.ndarray):
             tsdf_vol = state.tsdf
             voxel_size = 0.3 / self.resolution
             size = 0.3
             # pc_extended = state.pc_extended # If debug: Using extended PC for grasp sampling
-
         else:
-            tsdf_vol = state.tsdf.get_grid()
+            # tsdf_vol = state.tsdf.get_grid()
             voxel_size = tsdf_process.voxel_size
-            tsdf_process = tsdf_process.get_grid()
+            # tsdf_process = tsdf_process.get_grid()
             size = state.tsdf.size
             # pc_extended = state.pc_extended # If debug: Using extended PC for grasp sampling
 

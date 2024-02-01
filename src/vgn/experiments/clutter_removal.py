@@ -3,7 +3,7 @@ import os
 import argparse
 from datetime import datetime
 import uuid
-import wandb
+# import wandb
 from pathlib import Path
 
 import numpy as np
@@ -48,6 +48,7 @@ def run(
     visualize=False,
     save_dir=None,
     use_nvisii=False,
+    data_root=None
 ):
     """Run several rounds of simulated clutter removal experiments.
 
@@ -59,7 +60,7 @@ def run(
     #n = 6
     if save_dir is not None:
         os.makedirs(save_dir, exist_ok=True)
-    sim = ClutterRemovalSim(scene, object_set, gui=sim_gui, seed=seed, add_noise=add_noise, sideview=sideview, save_dir=save_dir, use_nvisii=use_nvisii)
+    sim = ClutterRemovalSim(scene, object_set, gui=sim_gui, seed=seed, add_noise=add_noise, sideview=sideview, save_dir=save_dir, use_nvisii=use_nvisii, data_root=data_root)
     logger = Logger(logdir, description)
     if visualize:
         # Running viz of the scene point clouds and meshes
@@ -147,7 +148,7 @@ def run(
             # scan the scene: with optionally, RANDOMIZED view
             if see_table == False:
                 sim.world.remove_body(sim.world.bodies[0]) # remove table because we dont want to render it # normally table is the first body
-            tsdf, pc, timings["integration"] = sim.acquire_tsdf(n=n, N=N, resolution=resolution, randomize_view=randomize_view, tight_view=tight_view)
+            tsdf, pc, timings["integration"], depths, extrinsics = sim.acquire_tsdf(n=n, N=N, resolution=resolution, randomize_view=randomize_view, tight_view=tight_view, return_depths_and_ext=True)
             if see_table == False:
                 sim.place_table(height=sim.gripper.finger_depth) # Add table back            
             
@@ -161,7 +162,7 @@ def run(
                 # Use tsdf from the dataset
                 tsdf = io.read_voxel_grid(root, scene_id)
             
-            state = argparse.Namespace(tsdf=tsdf, pc=pc)#, pc_extended=pc_extended)
+            state = argparse.Namespace(tsdf=tsdf, pc=pc, depths=depths, extrinsics=extrinsics, intrinsic=sim.camera.intrinsic)
             # if resolution != 40:
             #     extra_tsdf, _, _ = sim.acquire_tsdf(n=n, N=N, resolution=resolution)
             #     state.tsdf_process = extra_tsdf
@@ -186,6 +187,19 @@ def run(
                 
             else:
                 grasps, scores, unseen_flags, timings["planning"] = grasp_plan_fn(state, sim=sim, debug_data=data_for_scene, seed=seed)
+                # # TEMP: viz of the scene point clouds and grasps
+                # mesh_pose_list = get_mesh_pose_list_from_world(sim.world, object_set)
+                # scene_mesh = get_scene_from_mesh_pose_list(mesh_pose_list)
+                # grasps_scene = trimesh.Scene()
+                # from vgn.utils import visual
+                # grasp_mesh_list = [visual.grasp2mesh(g) for g in grasps]
+                # for i, g_mesh in enumerate(grasp_mesh_list):
+                #     grasps_scene.add_geometry(g_mesh, node_name=f'grasp_{i}')
+                #     # break
+                # # grasps_scene.show()
+                # composed_scene = trimesh.Scene([scene_mesh, grasps_scene])
+                # composed_scene.show()
+                # # TEMP
             planning_times.append(timings["planning"])
             total_times.append(timings["planning"] + timings["integration"])
 
@@ -197,7 +211,7 @@ def run(
 
             # execute grasp
             grasp, score, unseen_flag = grasps[0], scores[0], unseen_flags[0]
-            print(f"[Unseen grasp?: {unseen_flag}]")
+            # print(f"[Unseen grasp?: {unseen_flag}]")
             print("[BEST Score: %.2f]" % score)
             label, _ = sim.execute_grasp(grasp, allow_contact=True)
             print("[RESULT: %s]" % label)
@@ -233,8 +247,8 @@ def run(
     unseen_success_rate = 100.0 * unseen_success / unseen_cnt
     declutter_rate = 100.0 * success / total_objs
     print('Grasp success rate: %.2f %%, Declutter rate: %.2f %%' % (success_rate, declutter_rate))
-    print('Seen success rate: %.2f %%, Unseen success rate: %.2f %%' % (seen_success_rate, unseen_success_rate))
-    print('Seen grasp count: %d, Unseen grasp count: %d' % (seen_cnt, unseen_cnt))
+    # print('Seen success rate: %.2f %%, Unseen success rate: %.2f %%' % (seen_success_rate, unseen_success_rate))
+    # print('Seen grasp count: %d, Unseen grasp count: %d' % (seen_cnt, unseen_cnt))
     print(f'Average planning time: {np.mean(planning_times)}, total time: {np.mean(total_times)}')
     print('Consecutive failures and no detections: %d, %d' % (cons_fail, no_grasp))
     if result_path is not None:
@@ -305,7 +319,8 @@ class Logger(object):
         tsdf, points = state.tsdf, np.asarray(state.pc.points)
         scene_id = uuid.uuid4().hex
         scene_path = self.scenes_dir / (scene_id + ".npz")
-        np.savez_compressed(scene_path, grid=tsdf.get_grid(), points=points)
+        # np.savez_compressed(scene_path, grid=tsdf.get_grid(), points=points)
+        
 
         # log grasp
         qx, qy, qz, qw = grasp.pose.rotation.as_quat()

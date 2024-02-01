@@ -31,6 +31,9 @@ def main(args):
                             force_detection=args.force,
                             out_th=0.1,
                             visualize=args.vis)
+    elif args.type == 'anygrasp':
+        from anygrasp_grasp_detection.grasp_planner import AnyGraspPlanner
+        grasp_planner = AnyGraspPlanner(points, colors, lims)
     else:
         raise NotImplementedError(f'model type {args.type} not implemented!')
 

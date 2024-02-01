@@ -1,0 +1,14 @@
+{
+    "version": "3.0.0",
+    "feature_id": "6723473694462459713",
+    "public_key": "SnehalJauhri2.public_key",
+    "signature": "SnehalJauhri2.signature",
+    "license": "SnehalJauhri2.lic",
+    "toolbox": [
+        {
+            "name": "Basic",
+            "type": "PERMANENT",
+            "data": ""
+        }
+    ]
+}
