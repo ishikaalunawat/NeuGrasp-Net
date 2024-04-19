@@ -55,7 +55,7 @@ def main(args, rank):
         # render synthetic depth images
         # n = MAX_VIEWPOINT_COUNT
         # depth_imgs, extrinsics = render_images(sim, n)
-        depth_imgs_side, extrinsics_side = render_side_images(sim, 1, args.random)
+        depth_imgs_side, extrinsics_side = render_side_images(sim, 8, args.random)
         
         # Debug
         # import cv2

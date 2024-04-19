@@ -16,3 +16,4 @@ summary_*
 *.yml
 commands.txt
 figures*
+results_contact_grasp_net/*

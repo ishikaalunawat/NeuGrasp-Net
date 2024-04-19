@@ -3,10 +3,10 @@ scipy
 pandas
 matplotlib
 open3d==0.12.0
-catkin_pkg
+# catkin_pkg
 pybullet==2.7.9
-# torch==1.7.0
-# pytorch-ignite
+torch
+pytorch-ignite
 tensorboard
 tqdm
 trimesh

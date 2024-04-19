@@ -7,9 +7,6 @@ from vgn.grasp import Grasp
 from vgn.experiments import contact_clutter_removal_single
 from vgn.utils.implicit import get_scene_from_mesh_pose_list
 
-raw_root = '/media/hypatia/6903154a-554e-4ca5-987c-4a24f3250e97/home/hypatia/6D-DAAD/GIGA/data/pile/data_pile_train_random_raw_4M_radomized_views/mesh_pose_list/'
-data_root = "/media/hypatia/6903154a-554e-4ca5-987c-4a24f3250e97/home/hypatia/6D-DAAD/GIGA/"
-
 T_try = np.array(
     [[0, -1, 0, 0],
      [0, 0, 1, 0],
@@ -18,13 +15,13 @@ T_try = np.array(
 )
 gripper_width = 0.08
 
-def load_data(scene_id, result_path, pc_path):
+def load_data(scene_id, result_path, pc_path, data_root, raw_root):
     pc_full = np.load(pc_path + scene_id + '.npz', allow_pickle=True)['pc'] # OURS
     results = np.load(result_path + f'predictions_{scene_id}.npz', allow_pickle=True)
     pred_grasps_cam, scores = results['pred_grasps_cam'].item()[-1], results['scores'].item()[-1]
     mesh_pose_list = np.load(raw_root + scene_id + '.npz', allow_pickle=True)['pc']
-    scene_mesh = get_scene_from_mesh_pose_list(mesh_pose_list, data_root=data_root)
-    return (pred_grasps_cam, scores), pc_full, scene_mesh
+    # scene_mesh = get_scene_from_mesh_pose_list(mesh_pose_list, data_root=data_root)
+    return (pred_grasps_cam, scores), pc_full, mesh_pose_list
 
 def pre_process_grasp(grasps_info):
     grasps_info = grasps_info[0]
@@ -38,18 +35,21 @@ def pre_process_grasp(grasps_info):
         grasp_rot = Rotation.from_matrix(grasp_rot)
         grasp = Grasp(Transform(grasp_rot, grasp_pos), gripper_width) # make grasp with width 0.08 (max gripper width)?
 
-        grasp_frame_rot =  grasp.pose.rotation * Rotation.from_euler('Y', -0.5*np.pi) #* Rotation.from_euler('Z', np.pi)
-        # grasp_tf = Transform(grasp_frame_rot, grasp_pos).as_matrix()
-        grasp_pos[2] -= 0.015
-        grasp_pos[1] += 0.03
+        grasp_frame_rot =  grasp.pose.rotation * Rotation.from_euler('Y', -0.5*np.pi) * Rotation.from_euler('Z', np.pi/2)
         grasp = Grasp(Transform(grasp_frame_rot, grasp_pos), gripper_width) # make grasp
+        # post multiply with a translation in z axis
+        new_matrix = grasp.pose.as_matrix() @ np.array([[1, 0, 0, 0],
+                                                        [0, 1, 0, 0],
+                                                        [0, 0, 1, 0.05],
+                                                        [0, 0, 0, 1]])
+        grasp = Grasp(Transform.from_matrix(new_matrix), gripper_width)
         grasps.append(grasp)
 
     return grasps
 
 def main(args):
     #wandb.init(config=args, project="6dgrasp", entity="irosa-ias")
-    grasps_info, pc, scene_mesh = load_data(args.scene_id, args.result_path, args.pc_path)
+    grasps_info, pc, mesh_pose_list = load_data(args.scene_id, args.result_path, args.pc_path, args.data_root, args.raw_root)
     grasps_info = pre_process_grasp(grasps_info)
 
     results = {}
@@ -58,8 +58,9 @@ def main(args):
         save_dir = args.save_dir / f'round_{n:03d}'
         results[n], visual_mesh = contact_clutter_removal_single.run(grasps_info=grasps_info,
                                                                     pc=pc,
-                                                                    scene_mesh=scene_mesh,
+                                                                    mesh_pose_list=mesh_pose_list,
                                                                     save_dir=save_dir,
+                                                                    data_root = args.data_root,
                                                                     scene=args.scene,
                                                                     object_set=args.object_set,
                                                                     num_objects=args.num_objects,
@@ -83,11 +84,14 @@ if __name__ == "__main__":
     parser.add_argument("--scene-id", type=str, required=True)
     parser.add_argument("--result-path", type=str, default='/home/hypatia/6D-DAAD/contact_graspnet/results/')
     parser.add_argument("--pc-path", type=str, 
-                        default='/media/hypatia/6903154a-554e-4ca5-987c-4a24f3250e97/home/hypatia/6D-DAAD/GIGA/data/pile/data_pile_train_constructed_4M_HighRes_radomized_views_no_table/point_clouds/')
-    # parser.add_argument("--type", type=str, required=True)
+                        default='/home/hypatia/6D-DAAD/GIGA/data/pile/data_pile_train_constructed_FULL/point_clouds/')
+    parser.add_argument("--data-root", type=str, 
+                        default="/home/hypatia/6D-DAAD/GIGA/")
+    parser.add_argument("--raw-root", type=str, 
+                        default='/home/hypatia/6D-DAAD/GIGA/data/pile/data_pile_train_random_raw_FULL/mesh_pose_list/')
     parser.add_argument("--save-dir", type=Path, default=Path('results_contact_grasp_net'))
     parser.add_argument("--scene",type=str,choices=["pile", "packed"],default="pile")
-    parser.add_argument("--object-set", type=str, default="blocks")
+    parser.add_argument("--object-set", type=str, default="pile")
     parser.add_argument("--num-objects", type=int, default=5)
     parser.add_argument("--num-view", type=int, default=1)
     parser.add_argument("--num-rounds", type=int, default=10)

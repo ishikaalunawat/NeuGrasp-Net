@@ -30,7 +30,7 @@ def visualize_grasps(scene_mesh, grasps, pc_full):
     # composed_scene.add_geometry(trimesh.creation.axis())
     return composed_scene
 
-def run( grasps_info, pc, scene_mesh, save_dir, scene, object_set, num_objects=5, n=6, N=None, seed=1, sim_gui=False, add_noise=False,
+def run( grasps_info, pc, mesh_pose_list, save_dir, data_root, scene, object_set, num_objects=5, n=6, N=None, seed=1, sim_gui=False, add_noise=False,
         sideview=False, resolution=40, silence=False, save_freq=8, visualize = True):
     """Run several rounds of simulated clutter removal experiments.
 
@@ -47,14 +47,16 @@ def run( grasps_info, pc, scene_mesh, save_dir, scene, object_set, num_objects=5
     cons_fail = 0
     no_grasp = 0
 
-    sim.reset(num_objects)
+    sim.reset(0)
+    sim.setup_sim_scene_from_mesh_pose_list(mesh_pose_list, table=True)
+    sim.save_state()
 
     total_objs += sim.num_objects
     consecutive_failures = 1
     last_label = None
     trial_id = -1
 
-    while sim.num_objects > 0 and consecutive_failures < MAX_CONSECUTIVE_FAILURES:
+    while consecutive_failures < MAX_CONSECUTIVE_FAILURES:
         trial_id += 1
         timings = {}
         grasps = grasps_info
@@ -70,6 +72,7 @@ def run( grasps_info, pc, scene_mesh, save_dir, scene, object_set, num_objects=5
 
         ## TODO: Figure out visual_mesh
         if visualize:
+            scene_mesh = get_scene_from_mesh_pose_list(mesh_pose_list, data_root=data_root)
             visual_mesh = visualize_grasps(scene_mesh, grasps, pc)
             # grasps, scores, timings["planning"], visual_mesh = grasp_plan_fn(state, scene_mesh)
         else:
@@ -83,18 +86,21 @@ def run( grasps_info, pc, scene_mesh, save_dir, scene, object_set, num_objects=5
         # execute grasp
         # grasp, score = grasps[0], scores[0]
         grasp = grasps[0] # Same as GIGA (best)
-        label, _ = sim.execute_grasp(grasp, allow_contact=True)
-        cnt += 1
-        if label != Label.FAILURE:
-            success += 1
+        cnt = 0
+        for grasp in grasps:
+            label, _ = sim.execute_grasp(grasp, allow_contact=True, remove=False)
+            sim.restore_state()
+            cnt += 1
+            if label != Label.FAILURE:
+                success += 1
 
-        if last_label == Label.FAILURE and label == Label.FAILURE:
-            consecutive_failures += 1
-        else:
-            consecutive_failures = 1
-        if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
-            cons_fail += 1
-        last_label = label
-    left_objs += sim.num_objects
+            if last_label == Label.FAILURE and label == Label.FAILURE:
+                consecutive_failures += 1
+            else:
+                consecutive_failures = 1
+            if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
+                cons_fail += 1
+            last_label = label
+    # left_objs += sim.num_objects
 
     return (success, cnt, total_objs), visual_mesh

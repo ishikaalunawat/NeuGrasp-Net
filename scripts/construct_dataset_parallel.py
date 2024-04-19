@@ -31,7 +31,7 @@ def process_one_scene(args, f):
     pc = tsdf.get_cloud()
     # crop surface and borders from point cloud
     # o3d.visualization.draw_geometries([pc])
-    lower = np.array([0.0 , 0.0 , 0.0])
+    lower = np.array([0.0 , 0.0 , 0.052])
     upper = np.array([0.3, 0.3, 0.3])
     bounding_box = o3d.geometry.AxisAlignedBoundingBox(lower, upper)
     pc_cropped = pc.crop(bounding_box)
