@@ -7,6 +7,9 @@ from vgn.grasp import Grasp
 from vgn.experiments import contact_clutter_removal_single
 from vgn.utils.implicit import get_scene_from_mesh_pose_list
 
+# raw_root = '/home/sjauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/data/pile/data_pile_train_random_raw_4M_radomized_views/mesh_pose_list/'
+# data_root = "/home/sjauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF"
+
 T_try = np.array(
     [[0, -1, 0, 0],
      [0, 0, 1, 0],
@@ -82,7 +85,7 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--scene-id", type=str, required=True)
-    parser.add_argument("--result-path", type=str, default='/home/hypatia/6D-DAAD/contact_graspnet/results/')
+    parser.add_argument("--result-path", type=str, default='/home/sjauhri/IAS_WS/potato-net/GIGA-TSDF/GIGA-6DoF/results_contact_grasp_net/')
     parser.add_argument("--pc-path", type=str, 
                         default='/home/hypatia/6D-DAAD/GIGA/data/pile/data_pile_train_constructed_FULL/point_clouds/')
     parser.add_argument("--data-root", type=str, 
